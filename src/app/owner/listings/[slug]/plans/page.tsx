@@ -45,7 +45,7 @@ export default async function ListingPlansPage({ params, searchParams }: {
             <h2 className="text-xl font-semibold">{plan.name}</h2>
             {plan.description && <p className="text-sm text-muted-foreground">{plan.description}</p>}
             <p className="text-2xl font-semibold">{planPrice(plan)}</p>
-            <p className="text-sm">{plan.featured ? "Featured placement" : "Standard placement"}</p>
+            <p className="text-sm">{`${plan.durationDays} days · ${plan.featured ? "Featured placement" : "Standard placement"}`}</p>
             <CheckoutButton slug={slug} planKey={plan.key} />
           </article>
         ))}
