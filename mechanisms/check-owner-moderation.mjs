@@ -266,9 +266,11 @@ try {
     const page = await request('/admin/review', { headers: { Cookie: adminCookie } });
     const html = await page.text();
     const guest = await request('/admin/review');
-    if (!history?.decidedAt || !history?.decidedBy || !page.ok || !contains(html, 'pending-review-entry') ||
-        !contains(html, 'Duplicate resource') || guest.status === 200) {
-      throw new Error('The administrator review view omits pending work, history, or access control.');
+    const hasPending = contains(html, 'pending-review-entry');
+    const hasHistory = contains(html, 'Duplicate resource');
+    if (!history?.decidedAt || !history?.decidedBy || !page.ok || !hasPending ||
+        !hasHistory || guest.status === 200) {
+      throw new Error(`Review view mismatch: page ${page.status}, pending ${hasPending}, history ${hasHistory}, guest ${guest.status}, decision ${Boolean(history?.decidedAt && history?.decidedBy)}.`);
     }
   });
 } catch (error) {

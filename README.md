@@ -28,6 +28,18 @@ The provisioning command prompts for a password. Open [the administrator sign-in
 
 The sample seed is repeatable and leaves existing listings unchanged. The public directory supports `q`, `category`, and `page` URL parameters and shows at most 12 listings per page. Draft and suspended listings are absent from public pages.
 
+## Owner submissions and review
+
+Owners create an account or sign in at `/owner/sign-in`. Their private workspace at `/owner/listings` lets them save a draft, submit it, and propose changes to an approved listing. A submitted snapshot stays in review while the approved version remains public. Owners cannot read or edit another owner's private work.
+
+The first administrator can review submissions at `/admin/review`. To create a moderator account with review and suspension access but without general administrator access, run the provisioning command against the same database:
+
+```sh
+npm run account:provision -- --email moderator@example.com --name "Moderator" --role moderator
+```
+
+The command prompts for a password and asks for confirmation if accounts already exist. Moderators sign in through `/owner/sign-in` and then open `/admin/review`. Rejections require a reason; prior decisions remain in review history. The review view also lets a moderator suspend a published listing. A suspended listing immediately leaves public search and its detail route.
+
 ## Deploying
 
 Set `BETTER_AUTH_URL` and `SITE_URL` to the site's public HTTPS origin. Set `BETTER_AUTH_SECRET` to a unique secret and `DATABASE_URL` to a writable, persistent SQLite file, then run `npm run db:migrate` and provision an administrator using the same environment as the running application. Back up the SQLite file. The ignored `.runtime/directory.db` default is intended for local development; production storage must survive builds and deployments.
