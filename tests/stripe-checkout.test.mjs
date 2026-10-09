@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 
 test('Checkout uses approved ownership and snapshots the displayed plan terms', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'directory-checkout-contract-'));
@@ -32,13 +33,14 @@ test('Checkout uses approved ownership and snapshots the displayed plan terms', 
       calls.push({ settings, options });
       return { id: 'cs_test_approved', url: 'https://checkout.stripe.com/c/pay/cs_test_approved' };
     };
-    await assert.rejects(createPublishingCheckout('other', 'mine', 'featured-thirty', fakeStripe),
+    await assert.rejects(createPublishingCheckout('other', 'mine', 'featured-thirty', randomUUID(), fakeStripe),
       /Approved owned listing not found/);
-    await assert.rejects(createPublishingCheckout('owner', 'draft', 'featured-thirty', fakeStripe),
+    await assert.rejects(createPublishingCheckout('owner', 'draft', 'featured-thirty', randomUUID(), fakeStripe),
       /Approved owned listing not found/);
     assert.equal(calls.length, 0);
 
-    const result = await createPublishingCheckout('owner', 'mine', 'featured-thirty', fakeStripe);
+    const requestId = randomUUID();
+    const result = await createPublishingCheckout('owner', 'mine', 'featured-thirty', requestId, fakeStripe);
     assert.equal(result.url, 'https://checkout.stripe.com/c/pay/cs_test_approved');
     assert.equal(calls.length, 1);
     assert.equal(calls[0].settings.mode, 'payment');
@@ -59,6 +61,32 @@ test('Checkout uses approved ownership and snapshots the displayed plan terms', 
     updatePlan('featured-thirty', { amountMinor: 2500, durationDays: 60, featured: false }, 'admin');
     const stillOriginal = database.prepare('SELECT amount_minor, duration_days, featured FROM purchases WHERE id = ?').get(result.purchaseId);
     assert.deepEqual(stillOriginal, { amount_minor: 1200, duration_days: 30, featured: 1 });
+    const retried = await createPublishingCheckout('owner', 'mine', 'featured-thirty', requestId, fakeStripe);
+    assert.equal(retried.purchaseId, result.purchaseId);
+    assert.equal(calls[1].settings.line_items[0].price_data.unit_amount, 1200);
+    assert.equal(calls[1].options.idempotencyKey, result.purchaseId);
+    assert.equal(database.prepare('SELECT COUNT(*) AS count FROM purchases WHERE checkout_request_id = ?').get(requestId).count, 1);
+
+    database.exec(`CREATE TRIGGER reject_session_update BEFORE UPDATE OF stripe_session_id ON purchases
+      BEGIN SELECT RAISE(ABORT, 'simulated local write failure'); END`);
+    const interruptedId = randomUUID();
+    const interruptedCalls = [];
+    const interruptedStripe = async (settings, options) => {
+      interruptedCalls.push({ settings, options });
+      return { id: 'cs_test_interrupted', url: 'https://checkout.stripe.com/c/pay/cs_test_interrupted' };
+    };
+    await assert.rejects(createPublishingCheckout('owner', 'mine', 'featured-thirty', interruptedId, interruptedStripe),
+      /simulated local write failure/);
+    const pending = database.prepare('SELECT * FROM purchases WHERE checkout_request_id = ?').get(interruptedId);
+    assert.equal(pending.status, 'pending');
+    assert.equal(pending.stripe_session_id, `pending:${pending.id}`);
+    database.exec('DROP TRIGGER reject_session_update');
+    const recovered = await createPublishingCheckout('owner', 'mine', 'featured-thirty', interruptedId, interruptedStripe);
+    assert.equal(recovered.purchaseId, pending.id);
+    assert.equal(interruptedCalls[0].options.idempotencyKey, pending.id);
+    assert.equal(interruptedCalls[1].options.idempotencyKey, pending.id);
+    assert.equal(database.prepare('SELECT stripe_session_id FROM purchases WHERE id = ?').get(pending.id).stripe_session_id,
+      'cs_test_interrupted');
   } finally {
     database?.close();
     if (previous.database === undefined) delete process.env.DATABASE_URL;

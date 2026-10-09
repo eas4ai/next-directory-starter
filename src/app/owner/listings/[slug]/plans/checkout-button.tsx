@@ -1,20 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 export function CheckoutButton({ slug, planKey }: { slug: string; planKey: string }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const requestId = useRef<string | null>(null);
 
   async function checkout() {
     setPending(true);
     setError("");
     try {
+      requestId.current ??= crypto.randomUUID();
       const response = await fetch(`/api/owner/listings/${encodeURIComponent(slug)}/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planKey }),
+        body: JSON.stringify({ planKey, requestId: requestId.current }),
       });
       const result = await response.json();
       if (!response.ok || typeof result.url !== "string") {
