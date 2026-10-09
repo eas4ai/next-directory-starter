@@ -1,10 +1,10 @@
 import { isAdmin } from "@/lib/admin";
+import { adminReadResponse } from "@/lib/admin-api";
 import { parseListing } from "@/lib/catalog-input";
 import { allListings, createListing, listingBySlug } from "@/lib/listings";
 
 export async function GET(request: Request) {
-  if (!(await isAdmin(request.headers))) return Response.json({ error: "Forbidden" }, { status: 403 });
-  return Response.json({ listings: allListings() });
+  return adminReadResponse(request, () => ({ listings: allListings() }));
 }
 
 export async function POST(request: Request) {

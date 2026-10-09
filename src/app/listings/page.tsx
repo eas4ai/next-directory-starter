@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { publishedCategories, searchPublishedListings } from "@/lib/listings";
+import { directoryCategories, searchPublishedListings } from "@/lib/listings";
 import { getThemePreset } from "@/lib/theme";
 import { PresetExternalLinkIcon } from "@/components/preset-icon";
 import { connection } from "next/server";
@@ -24,7 +24,7 @@ export default async function ListingsPage({ searchParams }: PageProps<"/listing
   const category = one(params.category).trim().slice(0, 80);
   const page = one(params.page);
   const result = searchPublishedListings({ q, category, page });
-  const categories = publishedCategories();
+  const categories = directoryCategories();
   const selectedCategory = categories.find((item) => item.toLowerCase() === category.toLowerCase()) ?? category;
   const unknownCategory = Boolean(category) && !categories.includes(selectedCategory);
   const preset = getThemePreset();
