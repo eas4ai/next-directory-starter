@@ -12,8 +12,8 @@ export function ReviewDecision({ id }: { id: string }) {
   const [message, setMessage] = useState("");
 
   async function decide(decision: "approve" | "reject") {
-    if (decision === "reject" && !reason.trim()) {
-      setMessage("Give a reason before rejecting.");
+    if (!reason.trim()) {
+      setMessage("Give a reason for this decision.");
       return;
     }
     setPending(true);
@@ -39,7 +39,7 @@ export function ReviewDecision({ id }: { id: string }) {
   return (
     <div className="mt-4 space-y-3 border-t pt-4">
       <label className="grid gap-2 text-sm font-medium">Reason
-        <Input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="Required for rejection" />
+        <Input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="Required for every decision" />
       </label>
       <div className="flex gap-2">
         <Button type="button" disabled={pending} onClick={() => decide("approve")}>Approve</Button>
