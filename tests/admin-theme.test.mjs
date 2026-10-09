@@ -118,7 +118,7 @@ test('ADM-004 only authenticated administrators can open or change the theme', a
   const guestOptions = await request('/api/admin/theme/options');
   const guestPreview = await request('/api/admin/theme/preview', json(unauthorized));
   assert.ok([302, 303, 307, 308, 401, 403].includes(guestPage.status));
-  assert.ok([401, 403].includes(guestSave.status));
+  assert.equal(guestSave.status, 403);
   assert.equal(guestOptions.status, 403);
   assert.equal(guestPreview.status, 403);
   const member = memberCookie;
