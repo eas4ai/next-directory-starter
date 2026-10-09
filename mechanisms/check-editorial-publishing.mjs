@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { XMLParser, XMLValidator } from 'fast-xml-parser';
 
 const ids = ['EDIT-001', 'EDIT-002', 'EDIT-003'];
 const results = Object.fromEntries(ids.map((id) => [id, false]));
@@ -56,6 +57,23 @@ async function stopApp() {
 
 const request = (path, options = {}) => fetch(new URL(path, origin), { redirect: 'manual', ...options });
 const contains = (content, value) => content.toLowerCase().includes(value.toLowerCase());
+
+function parsedFeed(xml) {
+  if (XMLValidator.validate(xml) !== true) throw new Error('The article feed is malformed XML.');
+  for (const character of xml) {
+    const point = character.codePointAt(0);
+    if (!(point === 9 || point === 10 || point === 13 ||
+      (point >= 32 && point <= 0xd7ff) ||
+      (point >= 0xe000 && point <= 0xfffd) ||
+      (point >= 0x10000 && point <= 0x10ffff))) {
+      throw new Error('The article feed contains an XML-invalid code point.');
+    }
+  }
+  const parsed = new XMLParser().parse(xml);
+  if (!parsed.rss?.channel) throw new Error('The article feed is missing an RSS channel.');
+  return Array.isArray(parsed.rss.channel.item)
+    ? parsed.rss.channel.item : parsed.rss.channel.item ? [parsed.rss.channel.item] : [];
+}
 
 function json(body, cookie, method = 'POST') {
   return {
@@ -209,20 +227,30 @@ try {
     if (!initialFeed.ok || !contains(initialFeed.headers.get('content-type') ?? '', 'xml')) {
       throw new Error('The article feed is missing or is not XML.');
     }
+    parsedFeed(await initialFeed.text());
     await ensureEditor();
     await createArticle('feed-published', 'published');
     await createArticle('feed-second', 'published');
     await createArticle('feed-draft');
+    const special = await request('/api/admin/articles', json({
+      ...article('feed-special', 'published'),
+      title: 'A & B < C\ufffe valid',
+      summary: 'Summary & <world>\uffff valid',
+    }, editorCookie));
+    if (special.status !== 201) throw new Error(`Special-character article returned ${special.status}.`);
     const currentFeed = await request('/feed.xml');
-    const xml = await currentFeed.text();
-    if (!currentFeed.ok || !contains(xml, 'Article feed-published') ||
-        !contains(xml, 'Article feed-second') ||
-        !contains(xml, `${origin}/articles/feed-published`) || contains(xml, 'Article feed-draft')) {
+    const items = parsedFeed(await currentFeed.text());
+    const byTitle = new Map(items.map((item) => [item.title, item]));
+    if (!currentFeed.ok || !byTitle.has('Article feed-published') ||
+        !byTitle.has('Article feed-second') ||
+        byTitle.get('Article feed-published')?.link !== `${origin}/articles/feed-published` ||
+        byTitle.has('Article feed-draft') ||
+        byTitle.get('A & B < C valid')?.description !== 'Summary & <world> valid') {
       throw new Error('The feed omits a published article or includes a draft.');
     }
     await updateArticle('feed-published', { status: 'draft' });
-    const after = await (await request('/feed.xml')).text();
-    if (contains(after, 'Article feed-published') || !contains(after, 'Article feed-second')) {
+    const after = new Set(parsedFeed(await (await request('/feed.xml')).text()).map((item) => item.title));
+    if (after.has('Article feed-published') || !after.has('Article feed-second')) {
       throw new Error('The feed retains an unpublished article or loses a still-published one.');
     }
   });
