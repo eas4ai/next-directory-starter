@@ -258,15 +258,27 @@ try {
     }
     await createDraft('suspended-entry');
     await decide(await submit('suspended-entry'), 'approve', 'Initial approval');
+    const proposedEdit = await request('/api/owner/listings/suspended-entry',
+      json({ name: 'Unapproved suspended revision' }, ownerACookie, 'PATCH'));
+    if (!proposedEdit.ok) throw new Error(`Owner revision before suspension returned ${proposedEdit.status}.`);
+    const pendingRevisionId = await submit('suspended-entry');
     const ownerAttempt = await request('/api/admin/listings/suspended-entry/suspend',
       json({ reason: 'Owner bypass' }, ownerACookie));
     const response = await request('/api/admin/listings/suspended-entry/suspend',
       json({ reason: 'Unsafe destination' }, moderatorCookie));
     const detail = await request('/listings/suspended-entry');
     const search = await request('/listings?q=suspended-entry');
+    const revisionAfter = (await reviewRecords()).find((item) => item.id === pendingRevisionId);
+    const resubmit = await request('/api/owner/listings/suspended-entry/submit', json({}, ownerACookie));
+    const editAfter = await request('/api/owner/listings/suspended-entry',
+      json({ name: 'Another revision' }, ownerACookie, 'PATCH'));
+    const ownerView = await request('/api/owner/listings/suspended-entry',
+      { headers: { Cookie: ownerACookie } });
+    const ownerState = await ownerView.json();
     if (![401, 403].includes(ownerAttempt.status) || !response.ok || detail.status !== 404 ||
-        contains(await search.text(), 'Owner suspended-entry')) {
-      throw new Error('A moderator cannot suspend immediately or the listing remains public.');
+        contains(await search.text(), 'Owner suspended-entry') || revisionAfter?.status !== 'rejected' ||
+        resubmit.status !== 409 || editAfter.status !== 409 || ownerState.proposal !== null) {
+      throw new Error('Suspension is public, leaves an approvable pending revision, or permits owner resubmission.');
     }
   });
 
