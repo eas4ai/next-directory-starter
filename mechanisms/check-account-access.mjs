@@ -210,7 +210,9 @@ try {
     const before = messages.length;
     const known = await request('/api/auth/request-password-reset',
       json({ email, redirectTo: `${origin}/owner/reset-password` }));
-    if (known.status !== unknown.status) throw new Error('Reset request status reveals account existence.');
+    if (known.status !== unknown.status || (await known.text()) !== (await unknown.text())) {
+      throw new Error('Reset request response reveals account existence.');
+    }
     const link = await mailLink(email, before);
     const token = new URL(link).searchParams.get('token');
     if (!token) throw new Error('Reset message has no token.');
