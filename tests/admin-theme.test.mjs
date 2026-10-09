@@ -170,7 +170,7 @@ test('ADM-006 the saved theme reaches public and admin pages after restart', asy
   const admin = await signIn(adminEmail);
   const chosen = {
     style: 'vega', baseColor: 'stone', theme: 'blue', chartColor: 'blue',
-    iconLibrary: 'lucide', font: 'geist', fontHeading: 'inherit',
+    iconLibrary: 'remixicon', font: 'lora', fontHeading: 'playfair-display',
     radius: 'large', menuAccent: 'bold', menuColor: 'inverted', mode: 'dark',
   };
   assert.equal((await request('/api/admin/theme', json(chosen, admin))).status, 200);
@@ -180,9 +180,13 @@ test('ADM-006 the saved theme reaches public and admin pages after restart', asy
   const adminAgain = await signIn(adminEmail);
   const adminPage = await (await request('/admin/theme', { headers: { Cookie: adminAgain } })).text();
   for (const html of [publicPage, adminPage]) {
-    assert.match(html, /data-site-preset=["'][^"']+["']/);
-    assert.match(html, /--primary:/);
-    assert.match(html, /--radius:/);
+    assert.equal(html.match(/data-site-preset="([^"]+)"/)?.[1], Object.values(chosen).join('.'));
+    assert.match(html, /data-mode="dark"/);
+    assert.match(html, /data-icon-library="remixicon"/);
+    assert.match(html, /--primary: oklch\([^)]*264\)/);
+    assert.match(html, /--radius: 0\.875rem/);
+    assert.match(html, /--preset-body-font: "Lora"/);
+    assert.match(html, /--preset-heading-font: "Playfair Display"/);
   }
   const persisted = await (await request('/api/admin/theme', { headers: { Cookie: adminAgain } })).json();
   assert.deepEqual(persisted.preset, chosen);

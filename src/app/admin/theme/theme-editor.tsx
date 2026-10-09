@@ -3,6 +3,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useRouter } from "next/navigation";
+import { PresetExternalLinkIcon } from "@/components/preset-icon";
 import type { ThemePreset } from "@/lib/theme";
 
 const labels: Record<keyof ThemePreset, string> = {
@@ -30,6 +32,7 @@ type Props = {
 };
 
 export function ThemeEditor({ options, initialPreset, initialCss }: Props) {
+  const router = useRouter();
   const [preset, setPreset] = useState(initialPreset);
   const [css, setCss] = useState(initialCss);
   const [status, setStatus] = useState("");
@@ -66,6 +69,7 @@ export function ThemeEditor({ options, initialPreset, initialCss }: Props) {
       });
       if (!response.ok) throw new Error("The theme could not be saved.");
       setStatus("Theme saved.");
+      router.refresh();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "The theme could not be saved.");
     }
@@ -115,7 +119,7 @@ export function ThemeEditor({ options, initialPreset, initialCss }: Props) {
               <p className="text-sm font-semibold">Example Tool</p>
               <p className="mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>A sample link for your directory</p>
               <div className="mt-4 flex items-center gap-3">
-                <span className="inline-flex items-center px-4 text-sm font-medium" style={{ height: "var(--preset-control-height)", background: "var(--primary)", color: "var(--primary-foreground)", borderRadius: "var(--radius)" }}>Visit listing</span>
+                <span className="inline-flex items-center gap-2 px-4 text-sm font-medium" style={{ height: "var(--preset-control-height)", background: "var(--primary)", color: "var(--primary-foreground)", borderRadius: "var(--radius)" }}>Visit listing <PresetExternalLinkIcon library={preset.iconLibrary} /></span>
                 <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>{displayName(preset.iconLibrary)} icons</span>
               </div>
             </div>
