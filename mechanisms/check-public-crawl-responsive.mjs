@@ -200,6 +200,10 @@ try {
       if (!response.ok || !contains(html, visible) || data.length === 0) {
         throw new Error(`${path} lacks visible content or structured data.`);
       }
+      if (!data.some((entry) => entry['@context'] === 'https://schema.org' &&
+          typeof entry['@type'] === 'string')) {
+        throw new Error(`${path} has no typed schema.org data.`);
+      }
       if (path === '/listings/example-tool' && !data.some((entry) =>
         entry.name === 'Example Tool' && entry.url === 'https://example.org/tool' &&
         entry.description === 'A sample link for your directory that operators can replace.')) {
@@ -208,6 +212,10 @@ try {
       if (path === '/articles/crawl-article' && !data.some((entry) =>
         entry.headline === 'Article crawl-article' && entry.description === 'Summary for crawl-article')) {
         throw new Error('Article structured data disagrees with its visible article.');
+      }
+      if (['/', '/listings', '/articles'].includes(path) &&
+          !data.some((entry) => entry.name === visible)) {
+        throw new Error(`${path} structured name disagrees with its visible heading or site identity.`);
       }
     }
   });
