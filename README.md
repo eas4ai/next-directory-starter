@@ -58,6 +58,8 @@ The article RSS feed is available at `/feed.xml`. It includes published articles
 
 Administrators configure price, currency, duration, featured placement, and availability at `/admin/plans`. Approved listing owners see current plans from **My listings → Publishing plans** before they leave for Stripe-hosted Checkout. Each checkout saves the selected terms with its pending purchase; later plan edits do not change that purchase. Set `STRIPE_SECRET_KEY` in the environment to enable checkout. A return to the site is only a receipt of the browser navigation; payment confirmation is handled by the signed webhook.
 
+If an administrator changes a plan while an owner has its page open, Checkout asks the owner to refresh and review the new terms. A retry after a connection or database error keeps the same pending purchase and Stripe idempotency key for that attempt.
+
 Configure a Stripe webhook destination at `https://your-site.example/api/webhooks/stripe` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, and `charge.refunded`. Put that destination's signing secret in `STRIPE_WEBHOOK_SECRET`. The handler verifies the raw body signature and matching purchase details before granting a time-limited entitlement. Repeated events have no additional effect; a verified full refund revokes the entitlement. Test mode and live mode have separate API keys and webhook secrets.
 
 ## Deploying
