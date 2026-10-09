@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,6 +61,7 @@ export function OwnerAuthForm() {
             {pending ? "Please wait…" : mode === "sign-in" ? "Sign in" : "Create account"}
           </Button>
         </form>
+        {mode === "sign-in" && <Link href="/owner/forgot-password" className="text-sm text-primary underline-offset-4 hover:underline">Forgot password?</Link>}
         <Button type="button" variant="link" className="px-0" onClick={() => { setMode(mode === "sign-in" ? "sign-up" : "sign-in"); setError(""); setMessage(""); }}>
           {mode === "sign-in" ? "Need an account? Create one" : "Already have an account? Sign in"}
         </Button>
