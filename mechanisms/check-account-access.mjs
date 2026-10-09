@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
+import { createServer as createHttpServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -32,42 +33,17 @@ async function freePort() {
 }
 
 async function startMail() {
-  mailServer = createServer((socket) => {
-    let buffer = '';
+  mailServer = createHttpServer(async (request, response) => {
+    if (request.method !== 'POST' || request.url !== '/emails' ||
+        request.headers.authorization !== 'Bearer test-resend-key') {
+      response.writeHead(404).end();
+      return;
+    }
     let body = '';
-    let recipient = '';
-    let dataMode = false;
-    socket.write('220 test.local ESMTP\r\n');
-    socket.on('data', (chunk) => {
-      buffer += chunk.toString('utf8');
-      let end;
-      while ((end = buffer.indexOf('\n')) >= 0) {
-        const line = buffer.slice(0, end).replace(/\r$/, '');
-        buffer = buffer.slice(end + 1);
-        if (dataMode) {
-          if (line === '.') {
-            messages.push({ to: recipient, body });
-            dataMode = false;
-            body = '';
-            socket.write('250 2.0.0 accepted\r\n');
-          } else {
-            body += `${line.startsWith('..') ? line.slice(1) : line}\n`;
-          }
-          continue;
-        }
-        if (/^(EHLO|HELO)\b/i.test(line)) socket.write('250 test.local\r\n');
-        else if (/^MAIL FROM:/i.test(line)) socket.write('250 2.1.0 ok\r\n');
-        else if (/^RCPT TO:/i.test(line)) {
-          recipient = line.slice(line.indexOf(':') + 1).trim().replace(/[<>]/g, '').toLowerCase();
-          socket.write('250 2.1.5 ok\r\n');
-        } else if (/^DATA$/i.test(line)) {
-          dataMode = true;
-          socket.write('354 end with .\r\n');
-        } else if (/^RSET$/i.test(line)) socket.write('250 2.0.0 ok\r\n');
-        else if (/^QUIT$/i.test(line)) { socket.write('221 bye\r\n'); socket.end(); }
-        else socket.write('502 unsupported\r\n');
-      }
-    });
+    for await (const chunk of request) body += chunk.toString('utf8');
+    const email = JSON.parse(body);
+    messages.push({ to: String(email.to?.[0]).toLowerCase(), body: String(email.text ?? '') });
+    response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ id: `test-${messages.length}` }));
   });
   await new Promise((resolve) => mailServer.listen(0, '127.0.0.1', resolve));
   return mailServer.address().port;
@@ -77,9 +53,7 @@ async function mailLink(address, since) {
   for (let attempt = 0; attempt < 60; attempt += 1) {
     const mail = messages.slice(since).find((item) => item.to === address.toLowerCase());
     if (mail) {
-      const decoded = mail.body.replace(/=\n/g, '').replace(/=([0-9a-f]{2})/gi,
-        (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)));
-      const match = decoded.match(/https?:\/\/[^\s<>"']+/);
+      const match = mail.body.match(/https?:\/\/[^\s<>"']+/);
       if (match) return match[0];
       throw new Error('Mail arrived without an actionable URL.');
     }
@@ -153,14 +127,15 @@ function withDb(action) {
 }
 
 try {
-  const smtpPort = await startMail();
+  const resendPort = await startMail();
   origin = `http://127.0.0.1:${await freePort()}`;
   appEnv = {
     ...process.env, CI: '1', DATABASE_URL: `file:${databasePath}`,
     BETTER_AUTH_SECRET: randomBytes(32).toString('hex'),
     BETTER_AUTH_URL: origin, SITE_URL: origin,
-    SMTP_HOST: '127.0.0.1', SMTP_PORT: String(smtpPort),
-    SMTP_FROM: 'Directory test <mail@test.local>', SMTP_USER: '', SMTP_PASSWORD: '',
+    RESEND_API_KEY: 'test-resend-key', RESEND_FROM: 'Directory test <mail@test.local>',
+    RESEND_API_BASE_URL: `http://127.0.0.1:${resendPort}`,
+    ACCOUNT_VERIFY_TTL_SECONDS: '3',
   };
   requireCommand(['run', 'db:migrate']);
   requireCommand(['run', 'db:seed']);
@@ -191,7 +166,7 @@ try {
       json({ name: 'Expired Verify', email: expiredEmail, password }));
     if (!expiredSignup.ok) throw new Error('Second verification fixture failed.');
     const expiredLink = await mailLink(expiredEmail, beforeExpired);
-    withDb((db) => db.prepare('UPDATE verification SET expiresAt = ?').run(0));
+    await new Promise((resolve) => setTimeout(resolve, 4_000));
     await request(expiredLink);
     const expiredVerified = withDb((db) => db.prepare('SELECT emailVerified FROM "user" WHERE email = ?')
       .get(expiredEmail)?.emailVerified);
