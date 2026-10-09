@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { publishedListingBySlug } from "@/lib/listings";
+import { activeFeaturedSlugs, publishedListingBySlug } from "@/lib/listings";
 import { getThemePreset } from "@/lib/theme";
 import { PresetExternalLinkIcon } from "@/components/preset-icon";
 import { connection } from "next/server";
@@ -24,6 +24,7 @@ export default async function ListingPage({ params }: PageProps<"/listings/[slug
   const listing = publishedListingBySlug(slug);
   if (!listing) notFound();
   const preset = getThemePreset();
+  const featured = activeFeaturedSlugs([listing.slug]).has(listing.slug);
 
   return (
     <main className="mx-auto w-full max-w-[1400px] wrap-anywhere px-6 py-12">
@@ -34,6 +35,7 @@ export default async function ListingPage({ params }: PageProps<"/listings/[slug
       }} />
       <Link href="/listings" className="text-sm text-muted-foreground hover:text-foreground">← Listings</Link>
       <p className="mt-10 text-sm font-medium uppercase tracking-widest text-muted-foreground">{listing.category}</p>
+      {featured && <p className="mt-3 w-fit rounded-full bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground">Featured</p>}
       <h1 className="mt-3 text-4xl font-semibold tracking-tight">{listing.name}</h1>
       <p className="mt-5 text-lg text-muted-foreground">{listing.summary}</p>
       <p className="mt-8 leading-relaxed">{listing.description}</p>

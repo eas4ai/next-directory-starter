@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { directoryCategories, searchPublishedListings } from "@/lib/listings";
+import { activeFeaturedListings, activeFeaturedSlugs, directoryCategories, searchPublishedListings } from "@/lib/listings";
 import { getThemePreset } from "@/lib/theme";
 import { PresetExternalLinkIcon } from "@/components/preset-icon";
 import { connection } from "next/server";
@@ -29,6 +29,8 @@ export default async function ListingsPage({ searchParams }: PageProps<"/listing
   const category = one(params.category).trim().slice(0, 80);
   const page = one(params.page);
   const result = searchPublishedListings({ q, category, page });
+  const featured = activeFeaturedListings({ q, category });
+  const featuredSlugs = activeFeaturedSlugs(result.listings.map((listing) => listing.slug));
   const categories = directoryCategories();
   const selectedCategory = categories.find((item) => item.toLowerCase() === category.toLowerCase()) ?? category;
   const unknownCategory = Boolean(category) && !categories.includes(selectedCategory);
@@ -73,17 +75,34 @@ export default async function ListingsPage({ searchParams }: PageProps<"/listing
         <Button type="submit">Find links</Button>
       </form>
       <p className="mt-6 text-sm text-muted-foreground" role="status">{result.total} {result.total === 1 ? "listing" : "listings"} found</p>
-      <div className="mt-8 grid gap-4 sm:grid-cols-2">
+      {featured.length > 0 && (
+        <section aria-label="Featured listings" className="mt-8">
+          <h2 className="text-xl font-semibold">Featured listings</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Paid placements matching these filters.</p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            {featured.map((listing) => (
+              <Card key={listing.slug} className="border-primary/50">
+                <CardHeader>
+                  <span className="w-fit rounded-full bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground">Featured</span>
+                  <CardTitle><Link href={`/listings/${listing.slug}`} className="inline-flex items-center gap-1 hover:underline">{listing.name}<PresetExternalLinkIcon library={preset.iconLibrary} /></Link></CardTitle>
+                </CardHeader>
+                <CardContent><p className="text-muted-foreground">{listing.summary}</p></CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
+      <section aria-label="Directory results" data-testid="ordinary-results" className="mt-8 grid gap-4 sm:grid-cols-2">
         {result.listings.map((listing) => (
           <Card key={listing.slug}>
             <CardHeader>
-              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">{listing.category}</p>
+              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">{listing.category}{featuredSlugs.has(listing.slug) ? " · Featured" : ""}</p>
               <CardTitle><Link href={`/listings/${listing.slug}`} className="inline-flex items-center gap-1 hover:underline">{listing.name}<PresetExternalLinkIcon library={preset.iconLibrary} /></Link></CardTitle>
             </CardHeader>
             <CardContent><p className="text-muted-foreground">{listing.summary}</p></CardContent>
           </Card>
         ))}
-      </div>
+      </section>
       {result.listings.length === 0 && <p className="mt-6 text-muted-foreground">No listings match these filters.</p>}
       {result.pages > 1 && (
         <nav className="mt-8 flex items-center justify-between gap-4" aria-label="Listing pages">
