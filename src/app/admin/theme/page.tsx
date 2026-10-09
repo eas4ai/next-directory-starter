@@ -3,6 +3,13 @@ import { notFound } from "next/navigation";
 import { isAdmin } from "@/lib/admin";
 import { getThemePreset, presetCss, themeOptions } from "@/lib/theme";
 import { ThemeEditor } from "./theme-editor";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Theme | Directory Starter",
+  description: "Administrator theme settings.",
+  robots: { index: false, follow: false },
+};
 
 export const instant = false;
 

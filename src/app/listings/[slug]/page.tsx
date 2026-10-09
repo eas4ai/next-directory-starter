@@ -4,8 +4,18 @@ import { Button } from "@/components/ui/button";
 import { publishedListingBySlug } from "@/lib/listings";
 import { getThemePreset } from "@/lib/theme";
 import { PresetExternalLinkIcon } from "@/components/preset-icon";
+import { connection } from "next/server";
+import { pageMetadata } from "@/lib/page-metadata";
 
 export const instant = false;
+
+export async function generateMetadata({ params }: PageProps<"/listings/[slug]">) {
+  await connection();
+  const { slug } = await params;
+  const listing = publishedListingBySlug(slug);
+  if (!listing) notFound();
+  return pageMetadata(`/listings/${listing.slug}`, `${listing.name} | Directory Starter`, listing.summary);
+}
 
 export default async function ListingPage({ params }: PageProps<"/listings/[slug]">) {
   const { slug } = await params;

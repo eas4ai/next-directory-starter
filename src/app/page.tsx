@@ -1,5 +1,12 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { connection } from "next/server";
+import { pageMetadata } from "@/lib/page-metadata";
+
+export async function generateMetadata() {
+  await connection();
+  return pageMetadata("/", "Directory Starter", "A curated directory of useful links.");
+}
 
 export default function Home() {
   return (
