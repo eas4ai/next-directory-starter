@@ -1,15 +1,20 @@
 import records from "../../fixtures/sample-listings.json";
+import { parseListing } from "@/lib/catalog-input";
 import { database } from "@/lib/database";
 
 function insertSampleRows(): void {
   const category = database.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)");
-  const listing = database.prepare(`INSERT OR IGNORE INTO listings
+  const existing = database.prepare("SELECT 1 FROM listings WHERE slug = ?");
+  const listing = database.prepare(`INSERT INTO listings
     (slug, name, summary, description, category, url, status)
     VALUES (?, ?, ?, ?, ?, ?, ?)`);
-  for (const record of records) {
-    category.run(record.category);
-    listing.run(record.slug, record.title, record.summary, record.description,
-      record.category, record.url, record.status);
+  for (const [index, record] of records.entries()) {
+    const value = parseListing({ ...record, name: record.title });
+    if (!value) throw new Error(`Invalid sample listing at index ${index}.`);
+    if (existing.get(value.slug)) continue;
+    category.run(value.category);
+    listing.run(value.slug, value.name, value.summary, value.description,
+      value.category, value.url, value.status);
   }
 }
 
