@@ -36,6 +36,8 @@ Owners create an account or sign in at `/owner/sign-in`. Their private workspace
 
 Verified accounts can also request a single-use email sign-in link from `/owner/sign-in`. Requesting one never registers an unknown address.
 
+Administrators can suspend and reinstate accounts at `/admin/accounts`. Suspension revokes active sessions, blocks new sign-ins, and hides that account's approved listings from public pages and the sitemap. Reinstatement restores eligible listings. The final active administrator cannot be suspended. Each status change records the administrator and time in `/admin/audit`.
+
 The first administrator can review submissions at `/admin/review`. To create a moderator account with review and suspension access but without general administrator access, run the provisioning command against the same database:
 
 ```sh

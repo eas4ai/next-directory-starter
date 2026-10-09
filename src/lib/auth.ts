@@ -35,9 +35,9 @@ export const auth = betterAuth({
       disableSignUp: true,
       storeToken: "hashed",
       sendMagicLink: async ({ email, url }) => {
-        const account = database.prepare('SELECT emailVerified FROM "user" WHERE email = ? COLLATE NOCASE')
-          .get(email) as { emailVerified: number } | undefined;
-        if (!account?.emailVerified) return;
+        const account = database.prepare('SELECT emailVerified, banned FROM "user" WHERE email = ? COLLATE NOCASE')
+          .get(email) as { emailVerified: number; banned: number } | undefined;
+        if (!account?.emailVerified || account.banned) return;
         after(async () => {
           try { await sendAccountEmail(email, "Your sign-in link", `Sign in to your account: ${url}`); }
           catch { console.error("Magic sign-in email delivery failed."); }
