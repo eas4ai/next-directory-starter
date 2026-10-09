@@ -196,6 +196,15 @@ try {
   });
 
   await check('EDIT-002', async () => {
+    const ownerCategory = await request('/api/owner/listings', json({
+      slug: 'owner-created-category', name: 'Owner-created category',
+      summary: 'A private owner draft.', description: 'Should not add a global category.',
+      category: 'Owner Only', url: 'https://example.invalid/owner-category',
+    }, memberCookie));
+    const beforeCategories = await (await request('/listings')).text();
+    if (ownerCategory.status !== 400 || contains(beforeCategories, 'Owner Only</option>')) {
+      throw new Error('A listing owner can create a global category without operator permission.');
+    }
     const memberCategory = await request('/api/admin/categories',
       json({ name: 'Research' }, memberCookie));
     const category = await request('/api/admin/categories',
