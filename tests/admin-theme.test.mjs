@@ -14,6 +14,8 @@ let workspace;
 let origin;
 let app;
 let appEnv;
+let adminCookie;
+let memberCookie;
 
 function command(args) {
   const done = spawnSync('npm', args, {
@@ -95,6 +97,8 @@ before(async () => {
   await startApp();
   const member = await request('/api/auth/sign-up/email', json({ name: 'Member', email: memberEmail, password }));
   assert.equal(member.status, 200, await member.text());
+  adminCookie = await signIn(adminEmail);
+  memberCookie = await signIn(memberEmail);
 });
 
 after(async () => {
@@ -105,14 +109,14 @@ after(async () => {
 test('ADM-004 only authenticated administrators can open or change the theme', async () => {
   const { DEFAULT_PRESET_CONFIG } = await import('shadcn/preset');
   const initial = { ...DEFAULT_PRESET_CONFIG, theme: 'red', mode: 'system' };
-  const admin = await signIn(adminEmail);
+  const admin = adminCookie;
   const initialSave = await request('/api/admin/theme', json(initial, admin));
   assert.equal(initialSave.status, 200);
   const guestPage = await request('/admin/theme');
   const guestSave = await request('/api/admin/theme', json({ theme: 'blue' }));
   assert.ok([302, 303, 307, 308, 401, 403].includes(guestPage.status));
   assert.ok([401, 403].includes(guestSave.status));
-  const member = await signIn(memberEmail);
+  const member = memberCookie;
   const memberPage = await request('/admin/theme', { headers: { Cookie: member } });
   const memberSave = await request('/api/admin/theme', json({ theme: 'blue' }, member));
   assert.equal(memberPage.status, 403);
@@ -123,7 +127,7 @@ test('ADM-004 only authenticated administrators can open or change the theme', a
 });
 
 test('ADM-005 the editor exposes and previews every pinned shadcn preset choice', async () => {
-  const admin = await signIn(adminEmail);
+  const admin = adminCookie;
   const { PRESET_STYLES, PRESET_BASE_COLORS, PRESET_THEMES,
     PRESET_CHART_COLORS, PRESET_ICON_LIBRARIES, PRESET_FONTS,
     PRESET_FONT_HEADINGS, PRESET_RADII, PRESET_MENU_ACCENTS,
@@ -167,7 +171,7 @@ test('ADM-005 the editor exposes and previews every pinned shadcn preset choice'
 });
 
 test('ADM-006 the saved theme reaches public and admin pages after restart', async () => {
-  const admin = await signIn(adminEmail);
+  const admin = adminCookie;
   const chosen = {
     style: 'vega', baseColor: 'stone', theme: 'blue', chartColor: 'blue',
     iconLibrary: 'remixicon', font: 'lora', fontHeading: 'playfair-display',
@@ -177,7 +181,7 @@ test('ADM-006 the saved theme reaches public and admin pages after restart', asy
   await stopApp();
   await startApp();
   const publicPage = await (await request('/listings')).text();
-  const adminAgain = await signIn(adminEmail);
+  const adminAgain = adminCookie;
   const adminPage = await (await request('/admin/theme', { headers: { Cookie: adminAgain } })).text();
   for (const html of [publicPage, adminPage]) {
     assert.equal(html.match(/data-site-preset="([^"]+)"/)?.[1], Object.values(chosen).join('.'));
@@ -193,8 +197,14 @@ test('ADM-006 the saved theme reaches public and admin pages after restart', asy
 });
 
 test('ADM-007 first-admin provisioning works without public self-promotion', async () => {
-  const admin = await signIn(adminEmail);
-  const member = await signIn(memberEmail);
+  const signInPage = await request('/admin/sign-in');
+  assert.equal(signInPage.status, 200);
+  const signInHtml = await signInPage.text();
+  assert.match(signInHtml, /Administrator sign in/);
+  assert.match(signInHtml, /name="email"/);
+  assert.match(signInHtml, /name="password"/);
+  const admin = adminCookie;
+  const member = memberCookie;
   const adminAccount = await (await request('/api/auth/get-session', { headers: { Cookie: admin } })).json();
   const memberAccount = await (await request('/api/auth/get-session', { headers: { Cookie: member } })).json();
   assert.equal(adminAccount.user.role, 'admin');
