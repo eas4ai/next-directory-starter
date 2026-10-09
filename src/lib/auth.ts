@@ -1,5 +1,5 @@
 import { betterAuth } from "better-auth";
-import { admin } from "better-auth/plugins";
+import { admin, magicLink } from "better-auth/plugins";
 import { after } from "next/server";
 import { database } from "@/lib/database";
 import { accessControl, roles } from "@/lib/permissions";
@@ -29,5 +29,20 @@ export const auth = betterAuth({
       });
     },
   },
-  plugins: [admin({ ac: accessControl, roles })],
+  plugins: [
+    admin({ ac: accessControl, roles }),
+    magicLink({
+      disableSignUp: true,
+      storeToken: "hashed",
+      sendMagicLink: async ({ email, url }) => {
+        const account = database.prepare('SELECT emailVerified FROM "user" WHERE email = ? COLLATE NOCASE')
+          .get(email) as { emailVerified: number } | undefined;
+        if (!account?.emailVerified) return;
+        after(async () => {
+          try { await sendAccountEmail(email, "Your sign-in link", `Sign in to your account: ${url}`); }
+          catch { console.error("Magic sign-in email delivery failed."); }
+        });
+      },
+    }),
+  ],
 });

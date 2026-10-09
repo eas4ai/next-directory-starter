@@ -34,6 +34,8 @@ The sample seed is repeatable and leaves existing listings unchanged. The public
 
 Owners create an account or sign in at `/owner/sign-in`. Their private workspace at `/owner/listings` lets them save a draft, submit it, and propose changes to an approved listing. A submitted snapshot stays in review while the approved version remains public. Owners cannot read or edit another owner's private work.
 
+Verified accounts can also request a single-use email sign-in link from `/owner/sign-in`. Requesting one never registers an unknown address.
+
 The first administrator can review submissions at `/admin/review`. To create a moderator account with review and suspension access but without general administrator access, run the provisioning command against the same database:
 
 ```sh

@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 
 export function OwnerAuthForm() {
   const router = useRouter();
-  const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
+  const [mode, setMode] = useState<"sign-in" | "sign-up" | "magic">("sign-in");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -22,8 +22,17 @@ export function OwnerAuthForm() {
     setMessage("");
     const values = Object.fromEntries(new FormData(event.currentTarget));
     const email = String(values.email);
-    const password = String(values.password);
+    const password = String(values.password ?? "");
     try {
+      if (mode === "magic") {
+        const result = await authClient.signIn.magicLink({ email, callbackURL: "/owner/listings" });
+        if (result.error) {
+          setError("Unable to request a sign-in link right now.");
+          return;
+        }
+        setMessage("If this is a verified account, a sign-in link is on its way.");
+        return;
+      }
       const result = mode === "sign-in"
         ? await authClient.signIn.email({ email, password })
         : await authClient.signUp.email({ email, password, name: String(values.name) });
@@ -47,23 +56,24 @@ export function OwnerAuthForm() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
-        <CardTitle><h1>{mode === "sign-in" ? "Owner sign in" : "Create owner account"}</h1></CardTitle>
+        <CardTitle><h1>{mode === "sign-in" ? "Owner sign in" : mode === "sign-up" ? "Create owner account" : "Email sign-in link"}</h1></CardTitle>
         <CardDescription>Manage your listing drafts and submissions.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
         <form onSubmit={submit} className="space-y-4">
           {mode === "sign-up" && <label className="grid gap-2 text-sm font-medium">Name<Input name="name" required autoComplete="name" /></label>}
           <label className="grid gap-2 text-sm font-medium">Email<Input name="email" type="email" required autoComplete="email" /></label>
-          <label className="grid gap-2 text-sm font-medium">Password<Input name="password" type="password" minLength={8} required autoComplete={mode === "sign-in" ? "current-password" : "new-password"} /></label>
+          {mode !== "magic" && <label className="grid gap-2 text-sm font-medium">Password<Input name="password" type="password" minLength={8} required autoComplete={mode === "sign-in" ? "current-password" : "new-password"} /></label>}
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           {message && <p role="status" className="text-sm text-muted-foreground">{message}</p>}
           <Button type="submit" disabled={pending} className="w-full">
-            {pending ? "Please wait…" : mode === "sign-in" ? "Sign in" : "Create account"}
+            {pending ? "Please wait…" : mode === "sign-in" ? "Sign in" : mode === "sign-up" ? "Create account" : "Send sign-in link"}
           </Button>
         </form>
         {mode === "sign-in" && <Link href="/owner/forgot-password" className="text-sm text-primary underline-offset-4 hover:underline">Forgot password?</Link>}
+        {mode === "sign-in" && <Button type="button" variant="link" className="px-0" onClick={() => { setMode("magic"); setError(""); setMessage(""); }}>Email me a sign-in link</Button>}
         <Button type="button" variant="link" className="px-0" onClick={() => { setMode(mode === "sign-in" ? "sign-up" : "sign-in"); setError(""); setMessage(""); }}>
-          {mode === "sign-in" ? "Need an account? Create one" : "Already have an account? Sign in"}
+          {mode === "sign-in" ? "Need an account? Create one" : "Use email and password"}
         </Button>
       </CardContent>
     </Card>
