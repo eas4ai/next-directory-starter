@@ -5,7 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { connection } from "next/server";
 import { sessionUser } from "@/lib/admin";
 import { ownerListing } from "@/lib/moderation";
-import { listPlans, planPrice } from "@/lib/plans";
+import { listPlans, planOfferToken, planPrice } from "@/lib/plans";
 import { getSiteConfig } from "@/lib/site-config";
 import { CheckoutButton } from "./checkout-button";
 
@@ -46,7 +46,7 @@ export default async function ListingPlansPage({ params, searchParams }: {
             {plan.description && <p className="text-sm text-muted-foreground">{plan.description}</p>}
             <p className="text-2xl font-semibold">{planPrice(plan)}</p>
             <p className="text-sm">{`${plan.durationDays} days · ${plan.featured ? "Featured placement" : "Standard placement"}`}</p>
-            <CheckoutButton slug={slug} planKey={plan.key} />
+            <CheckoutButton slug={slug} planKey={plan.key} offerToken={planOfferToken(plan)} />
           </article>
         ))}
       </section>

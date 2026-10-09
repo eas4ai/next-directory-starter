@@ -25,11 +25,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     ? (input as Record<string, unknown>).planKey : undefined;
   const requestId = input && typeof input === "object" && !Array.isArray(input)
     ? (input as Record<string, unknown>).requestId : undefined;
+  const offerToken = input && typeof input === "object" && !Array.isArray(input)
+    ? (input as Record<string, unknown>).offerToken : undefined;
   if (typeof planKey !== "string") return Response.json({ error: "Choose a plan" }, { status: 400 });
   if (typeof requestId !== "string") return Response.json({ error: "Invalid checkout request" }, { status: 400 });
+  if (typeof offerToken !== "string") return Response.json({ error: "Invalid plan terms" }, { status: 400 });
   const stripe = new Stripe(key);
   try {
-    const checkout = await createPublishingCheckout(user.id, slug, planKey, requestId,
+    const checkout = await createPublishingCheckout(user.id, slug, planKey, offerToken, requestId,
       (settings, options) => stripe.checkout.sessions.create(settings, options));
     return Response.json(checkout);
   } catch (error) {

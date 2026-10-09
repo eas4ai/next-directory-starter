@@ -1,4 +1,5 @@
 import { database } from "@/lib/database";
+import { createHash } from "node:crypto";
 import { migrateCatalog } from "@/lib/catalog-migrations";
 import { recordAudit } from "@/lib/audit";
 import { HttpError, httpErrorResponse } from "@/lib/http-error";
@@ -107,4 +108,11 @@ export function updatePlan(key: string, changes: unknown, actorUserId: string): 
 export function planPrice(plan: PublishingPlan): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: plan.currency.toUpperCase() })
     .format(plan.amountMinor / 100);
+}
+
+export function planOfferToken(plan: Pick<PublishingPlan,
+  "key" | "amountMinor" | "currency" | "durationDays" | "featured">): string {
+  return createHash("sha256").update(JSON.stringify([
+    plan.key, plan.amountMinor, plan.currency, plan.durationDays, plan.featured,
+  ])).digest("hex");
 }

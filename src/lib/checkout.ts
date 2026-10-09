@@ -3,7 +3,7 @@ import type Stripe from "stripe";
 import { database } from "@/lib/database";
 import { migrateCatalog } from "@/lib/catalog-migrations";
 import { HttpError, httpErrorResponse } from "@/lib/http-error";
-import { planByKey } from "@/lib/plans";
+import { planByKey, planOfferToken } from "@/lib/plans";
 import { publicUrl } from "@/lib/page-metadata";
 
 migrateCatalog();
@@ -31,7 +31,8 @@ type ReservedPurchase = {
   created_at: string;
 };
 
-function reservePurchase(ownerUserId: string, listingSlug: string, planKey: string, requestId: string): ReservedPurchase {
+function reservePurchase(ownerUserId: string, listingSlug: string, planKey: string,
+  offerToken: string, requestId: string): ReservedPurchase {
   return database.transaction(() => {
     const listing = database.prepare("SELECT slug, name, status FROM listings WHERE slug = ? AND owner_user_id = ?")
       .get(listingSlug, ownerUserId) as { slug: string; name: string; status: string } | undefined;
@@ -44,10 +45,18 @@ function reservePurchase(ownerUserId: string, listingSlug: string, planKey: stri
       if (existing.listing_slug !== listingSlug || existing.plan_key !== planKey || existing.status !== "pending") {
         throw new CheckoutError(409, "Checkout request was already used");
       }
+      const reservedToken = planOfferToken({
+        key: existing.plan_key, amountMinor: existing.amount_minor, currency: existing.currency,
+        durationDays: existing.duration_days, featured: Boolean(existing.featured),
+      });
+      if (reservedToken !== offerToken) throw new CheckoutError(409, "Checkout terms changed. Refresh and review the plan");
       return existing;
     }
     const plan = planByKey(planKey);
     if (!plan || !plan.enabled) throw new CheckoutError(404, "Available plan not found");
+    if (planOfferToken(plan) !== offerToken) {
+      throw new CheckoutError(409, "Plan terms changed. Refresh and review the plan");
+    }
     const id = randomUUID();
     const createdAt = new Date().toISOString();
     database.prepare(`INSERT INTO purchases
@@ -66,13 +75,15 @@ export async function createPublishingCheckout(
   ownerUserId: string,
   listingSlug: string,
   planKey: string,
+  offerToken: string,
   requestId: string,
   createSession: CreateStripeSession,
 ): Promise<{ purchaseId: string; url: string }> {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId)) {
     throw new CheckoutError(400, "Invalid checkout request ID");
   }
-  const purchase = reservePurchase(ownerUserId, listingSlug, planKey, requestId);
+  if (!/^[0-9a-f]{64}$/.test(offerToken)) throw new CheckoutError(400, "Invalid plan terms");
+  const purchase = reservePurchase(ownerUserId, listingSlug, planKey, offerToken, requestId);
   const expiresAt = Math.floor(Date.parse(purchase.created_at) / 1000) + 3600;
   if (expiresAt <= Math.floor(Date.now() / 1000) + 60) {
     throw new CheckoutError(409, "Checkout request expired. Refresh the page and try again");

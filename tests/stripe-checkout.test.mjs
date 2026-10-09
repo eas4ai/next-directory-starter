@@ -15,7 +15,7 @@ test('Checkout reserves displayed terms and waits for delayed payment success', 
     const storage = await import('../src/lib/database.ts');
     database = storage.database;
     const { migrateCatalog } = await import('../src/lib/catalog-migrations.ts');
-    const { createPlan, updatePlan } = await import('../src/lib/plans.ts');
+    const { createPlan, updatePlan, planByKey, planOfferToken } = await import('../src/lib/plans.ts');
     const { createPublishingCheckout } = await import('../src/lib/checkout.ts');
     const { processStripeEvent } = await import('../src/lib/payment-events.ts');
     migrateCatalog();
@@ -28,20 +28,26 @@ test('Checkout reserves displayed terms and waits for delayed payment success', 
       VALUES ('draft', 'Draft', 'Summary', 'Description', 'Tools', 'https://example.org', 'draft', 'owner')`).run();
     createPlan({ key: 'featured-thirty', name: 'Featured Thirty', description: 'Prominent listing',
       amountMinor: 1200, currency: 'usd', durationDays: 30, featured: true, enabled: true }, 'admin');
+    const displayedToken = planOfferToken(planByKey('featured-thirty'));
 
     const calls = [];
+    const issued = new Map();
     const fakeStripe = async (settings, options) => {
       calls.push({ settings, options });
-      return { id: 'cs_test_approved', url: 'https://checkout.stripe.com/c/pay/cs_test_approved' };
+      if (!issued.has(options.idempotencyKey)) {
+        issued.set(options.idempotencyKey, issued.size === 0 ? 'cs_test_approved' : `cs_test_another_${issued.size}`);
+      }
+      const id = issued.get(options.idempotencyKey);
+      return { id, url: `https://checkout.stripe.com/c/pay/${id}` };
     };
-    await assert.rejects(createPublishingCheckout('other', 'mine', 'featured-thirty', randomUUID(), fakeStripe),
+    await assert.rejects(createPublishingCheckout('other', 'mine', 'featured-thirty', displayedToken, randomUUID(), fakeStripe),
       /Approved owned listing not found/);
-    await assert.rejects(createPublishingCheckout('owner', 'draft', 'featured-thirty', randomUUID(), fakeStripe),
+    await assert.rejects(createPublishingCheckout('owner', 'draft', 'featured-thirty', displayedToken, randomUUID(), fakeStripe),
       /Approved owned listing not found/);
     assert.equal(calls.length, 0);
 
     const requestId = randomUUID();
-    const result = await createPublishingCheckout('owner', 'mine', 'featured-thirty', requestId, fakeStripe);
+    const result = await createPublishingCheckout('owner', 'mine', 'featured-thirty', displayedToken, requestId, fakeStripe);
     assert.equal(result.url, 'https://checkout.stripe.com/c/pay/cs_test_approved');
     assert.equal(calls.length, 1);
     assert.equal(calls[0].settings.mode, 'payment');
@@ -62,7 +68,10 @@ test('Checkout reserves displayed terms and waits for delayed payment success', 
     updatePlan('featured-thirty', { amountMinor: 2500, durationDays: 60, featured: false }, 'admin');
     const stillOriginal = database.prepare('SELECT amount_minor, duration_days, featured FROM purchases WHERE id = ?').get(result.purchaseId);
     assert.deepEqual(stillOriginal, { amount_minor: 1200, duration_days: 30, featured: 1 });
-    const retried = await createPublishingCheckout('owner', 'mine', 'featured-thirty', requestId, fakeStripe);
+    await assert.rejects(createPublishingCheckout('owner', 'mine', 'featured-thirty', displayedToken, randomUUID(), fakeStripe),
+      /Plan terms changed/);
+    assert.equal(calls.length, 1);
+    const retried = await createPublishingCheckout('owner', 'mine', 'featured-thirty', displayedToken, requestId, fakeStripe);
     assert.equal(retried.purchaseId, result.purchaseId);
     assert.equal(calls[1].settings.line_items[0].price_data.unit_amount, 1200);
     assert.equal(calls[1].options.idempotencyKey, result.purchaseId);
@@ -71,18 +80,19 @@ test('Checkout reserves displayed terms and waits for delayed payment success', 
     database.exec(`CREATE TRIGGER reject_session_update BEFORE UPDATE OF stripe_session_id ON purchases
       BEGIN SELECT RAISE(ABORT, 'simulated local write failure'); END`);
     const interruptedId = randomUUID();
+    const currentToken = planOfferToken(planByKey('featured-thirty'));
     const interruptedCalls = [];
     const interruptedStripe = async (settings, options) => {
       interruptedCalls.push({ settings, options });
       return { id: 'cs_test_interrupted', url: 'https://checkout.stripe.com/c/pay/cs_test_interrupted' };
     };
-    await assert.rejects(createPublishingCheckout('owner', 'mine', 'featured-thirty', interruptedId, interruptedStripe),
+    await assert.rejects(createPublishingCheckout('owner', 'mine', 'featured-thirty', currentToken, interruptedId, interruptedStripe),
       /simulated local write failure/);
     const pending = database.prepare('SELECT * FROM purchases WHERE checkout_request_id = ?').get(interruptedId);
     assert.equal(pending.status, 'pending');
     assert.equal(pending.stripe_session_id, `pending:${pending.id}`);
     database.exec('DROP TRIGGER reject_session_update');
-    const recovered = await createPublishingCheckout('owner', 'mine', 'featured-thirty', interruptedId, interruptedStripe);
+    const recovered = await createPublishingCheckout('owner', 'mine', 'featured-thirty', currentToken, interruptedId, interruptedStripe);
     assert.equal(recovered.purchaseId, pending.id);
     assert.equal(interruptedCalls[0].options.idempotencyKey, pending.id);
     assert.equal(interruptedCalls[1].options.idempotencyKey, pending.id);

@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
-export function CheckoutButton({ slug, planKey }: { slug: string; planKey: string }) {
+export function CheckoutButton({ slug, planKey, offerToken }: { slug: string; planKey: string; offerToken: string }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const requestId = useRef<string | null>(null);
@@ -16,7 +16,7 @@ export function CheckoutButton({ slug, planKey }: { slug: string; planKey: strin
       const response = await fetch(`/api/owner/listings/${encodeURIComponent(slug)}/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planKey, requestId: requestId.current }),
+        body: JSON.stringify({ planKey, offerToken, requestId: requestId.current }),
       });
       const result = await response.json();
       if (!response.ok || typeof result.url !== "string") {
