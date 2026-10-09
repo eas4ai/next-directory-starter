@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -126,15 +126,23 @@ try {
   await check('FOUND-002', async () => {
     const response = await request('/');
     const html = await response.text();
-    if (!response.ok || !contains(html, appEnv.SITE_NAME) ||
-        !contains(html, appEnv.SITE_DESCRIPTION) ||
-        !html.includes(appEnv.SITE_LOGO_URL)) {
-      throw new Error('Configured identity or brand asset is absent from the public page.');
+    const header = html.match(/<header\b[^>]*>([\s\S]*?)<\/header>/i)?.[1] ?? '';
+    const title = html.match(/<title>([^<]*)<\/title>/i)?.[1] ?? '';
+    const description = html.match(/<meta\b[^>]*name="description"[^>]*>/i)?.[0] ?? '';
+    if (!response.ok || !contains(header, appEnv.SITE_NAME) ||
+        !contains(title, appEnv.SITE_NAME) ||
+        !contains(description, appEnv.SITE_DESCRIPTION) ||
+        !header.includes(appEnv.SITE_LOGO_URL)) {
+      throw new Error('Configured identity is absent from the header or page metadata.');
     }
   });
 
   await check('FOUND-003', async () => {
     if (seed.status !== 0) throw new Error('The documented db:seed command failed.');
+    const guide = readFileSync('README.md', 'utf8');
+    if (!guide.includes('npm run db:migrate') || !guide.includes('npm run db:seed')) {
+      throw new Error('The first-run guide omits migration or sample seeding.');
+    }
     const response = await request('/listings');
     const html = await response.text();
     if (!response.ok || !contains(main(html), 'Example Tool') || contains(html, 'DevList')) {
@@ -170,6 +178,10 @@ try {
     if (!category.ok || contains(main(await category.text()), 'Example Tool')) {
       throw new Error('A nonmatching category still shows a listing.');
     }
+    const tools = await request('/listings?category=Tools');
+    if (!tools.ok || !contains(main(await tools.text()), 'Example Tool')) {
+      throw new Error('A matching category omits its listing.');
+    }
     if (!adminCookie) throw new Error('Cannot verify pagination without operator-created listings.');
     for (let index = 0; index < 15; index += 1) {
       await createListing(`search-entry-${index}`);
@@ -178,10 +190,16 @@ try {
     const second = await request('/listings?page=2');
     const firstHtml = main(await first.text());
     const secondHtml = main(await second.text());
-    const firstCount = [...firstHtml.matchAll(/href="\/listings\/search-entry-\d+"/g)].length;
+    const firstCount = [...firstHtml.matchAll(/href="\/listings\/[^"?#]+"/g)].length;
     if (!first.ok || !second.ok || firstCount > 12 ||
         !secondHtml.includes('/listings/search-entry-')) {
       throw new Error('Pagination exceeded the 12-listing bound or omitted a second page.');
+    }
+    const chosen = await request('/listings?q=search-entry-14');
+    const chosenMain = main(await chosen.text());
+    if (!chosen.ok || !contains(chosenMain, 'Catalog search-entry-14') ||
+        contains(chosenMain, 'Catalog search-entry-13')) {
+      throw new Error('Query filtering omitted a match or included a nonmatch.');
     }
   });
 
@@ -190,10 +208,12 @@ try {
     const listing = await createListing('withdrawn-entry');
     const change = await request(`/api/admin/listings/${listing.slug}`, json({ status: 'draft' }, adminCookie, 'PATCH'));
     if (!change.ok) throw new Error(`Publication change returned ${change.status}.`);
-    const [index, detail] = await Promise.all([
-      request('/listings'), request(`/listings/${listing.slug}`),
+    const [index, filtered, detail] = await Promise.all([
+      request('/listings'), request(`/listings?q=${listing.slug}`),
+      request(`/listings/${listing.slug}`),
     ]);
-    if (contains(main(await index.text()), listing.name) || detail.status !== 404) {
+    if (contains(main(await index.text()), listing.name) ||
+        contains(main(await filtered.text()), listing.name) || detail.status !== 404) {
       throw new Error('An ineligible listing remains on a public route.');
     }
   });
