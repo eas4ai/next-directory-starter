@@ -34,7 +34,6 @@ const migrate = database.transaction(() => {
   );
   CREATE INDEX listings_public_order ON listings(status, name, slug);
   CREATE INDEX listings_public_category ON listings(status, category, name, slug);`);
-  insertSampleRows();
   database.prepare("INSERT INTO catalog_migrations (version) VALUES (1)").run();
 });
 

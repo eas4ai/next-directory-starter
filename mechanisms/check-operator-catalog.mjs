@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import Database from 'better-sqlite3';
 
 const ids = ['FOUND-002', 'FOUND-003', 'FOUND-004', 'DIR-003', 'DIR-004'];
 const results = Object.fromEntries(ids.map((id) => [id, false]));
@@ -119,7 +120,16 @@ try {
     SITE_LOGO_URL: 'https://example.org/operator-logo.svg',
   };
   requireCommand(['run', 'db:migrate']);
+  const catalog = new Database(join(workspace, 'catalog.db'));
+  const sampleSlug = JSON.parse(readFileSync('fixtures/sample-listings.json', 'utf8'))[0].slug;
+  const sampleCount = () => catalog.prepare('SELECT count(*) AS count FROM listings WHERE slug = ?').get(sampleSlug).count;
+  if (sampleCount() !== 0) throw new Error('Migration inserted a sample before db:seed ran.');
   const seed = command(['run', 'db:seed']);
+  const seededSampleCount = sampleCount();
+  catalog.prepare('DELETE FROM listings WHERE slug = ?').run(sampleSlug);
+  const repeatSeed = command(['run', 'db:seed']);
+  const restoredSampleCount = sampleCount();
+  catalog.close();
   requireCommand(['run', 'build']);
   await startApp();
 
@@ -138,7 +148,10 @@ try {
   });
 
   await check('FOUND-003', async () => {
-    if (seed.status !== 0) throw new Error('The documented db:seed command failed.');
+    if (seed.status !== 0 || repeatSeed.status !== 0 ||
+        seededSampleCount !== 1 || restoredSampleCount !== 1) {
+      throw new Error('db:seed did not insert and restore the sample listing.');
+    }
     const guide = readFileSync('README.md', 'utf8');
     if (!guide.includes('npm run db:migrate') || !guide.includes('npm run db:seed')) {
       throw new Error('The first-run guide omits migration or sample seeding.');
