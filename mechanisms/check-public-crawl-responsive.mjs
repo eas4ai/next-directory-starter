@@ -223,7 +223,7 @@ try {
   await check('DIR-005', async () => {
     browser = await chromium.launch({
       headless: true,
-      executablePath: process.env.CHROME_PATH ?? '/usr/bin/google-chrome',
+      ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: 'chrome' }),
       args: ['--no-sandbox'],
     });
     for (const path of ['/listings', '/listings/example-tool']) {
