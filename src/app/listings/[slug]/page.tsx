@@ -1,0 +1,26 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { publishedListingBySlug } from "@/lib/listings";
+import { getThemePreset } from "@/lib/theme";
+import { PresetExternalLinkIcon } from "@/components/preset-icon";
+
+export const instant = false;
+
+export default async function ListingPage({ params }: PageProps<"/listings/[slug]">) {
+  const { slug } = await params;
+  const listing = publishedListingBySlug(slug);
+  if (!listing) notFound();
+  const preset = getThemePreset();
+
+  return (
+    <main className="mx-auto max-w-3xl px-6 py-12">
+      <Link href="/listings" className="text-sm text-muted-foreground hover:text-foreground">← Listings</Link>
+      <p className="mt-10 text-sm font-medium uppercase tracking-widest text-muted-foreground">{listing.category}</p>
+      <h1 className="mt-3 text-4xl font-semibold tracking-tight">{listing.name}</h1>
+      <p className="mt-5 text-lg text-muted-foreground">{listing.summary}</p>
+      <p className="mt-8 leading-relaxed">{listing.description}</p>
+      <div className="mt-8"><Button asChild><a href={listing.url} target="_blank" rel="noopener noreferrer">Visit {listing.name} <PresetExternalLinkIcon library={preset.iconLibrary} /></a></Button></div>
+    </main>
+  );
+}
