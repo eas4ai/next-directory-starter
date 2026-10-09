@@ -318,13 +318,26 @@ try {
     }, adminCookie));
     const role = await request(`/api/admin/accounts/${otherId}/role`,
       json({ role: 'moderator' }, adminCookie, 'PATCH'));
+    const catalogCreate = await request('/api/admin/listings', json({
+      slug: 'audit-catalog', name: 'Audit Catalog', summary: 'An audited catalog listing.',
+      description: 'A published listing created by an administrator.', category: 'Tools',
+      url: 'https://example.org/audit-catalog', status: 'published',
+    }, adminCookie));
+    const catalogUnpublish = await request('/api/admin/listings/audit-catalog',
+      json({ status: 'draft' }, adminCookie, 'PATCH'));
+    const catalogRepublish = await request('/api/admin/listings/audit-catalog',
+      json({ status: 'published' }, adminCookie, 'PATCH'));
     const history = await request('/api/admin/audit', { headers: { Cookie: adminCookie } });
     const events = history.ok ? (await history.json()).events : null;
-    const actions = ['moderation.approve', 'article.publish', 'plan.update', 'account.role'];
-    if (!plan.ok || article.status !== 201 || !role.ok || !Array.isArray(events) ||
+    const actions = ['moderation.approve', 'article.publish', 'plan.update', 'account.role',
+      'catalog.publish', 'catalog.unpublish'];
+    if (!plan.ok || article.status !== 201 || !role.ok || catalogCreate.status !== 201 ||
+        !catalogUnpublish.ok || !catalogRepublish.ok || !Array.isArray(events) ||
         actions.some((action) => !events.some((event) =>
           event.action === action && event.actorUserId === adminId &&
-          Number.isFinite(Date.parse(event.occurredAt))))) {
+          Number.isFinite(Date.parse(event.occurredAt)))) ||
+        events.filter((event) => event.action === 'catalog.publish' &&
+          event.target === 'audit-catalog' && event.actorUserId === adminId).length !== 2) {
       throw new Error('Protected changes lack actor and time in audit history.');
     }
   });
