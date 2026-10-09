@@ -135,7 +135,7 @@ export function createArticle(input: unknown, actorId: string): Article {
         actorId, now, now, article.status === "published" ? now : null,
       );
       setTags(article.slug, article.tags);
-      if (article.status !== "published") recordAudit("article.create", actorId, article.slug);
+      recordAudit(article.status === "published" ? "article.publish" : "article.create", actorId, article.slug);
     }).immediate();
   } catch (error) {
     if (error instanceof Error && error.message.includes("UNIQUE constraint")) {
