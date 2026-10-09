@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 
 export async function isAdmin(headers: Headers): Promise<boolean> {
   const session = await auth.api.getSession({ headers });
-  return hasAnyRole(session?.user.role, ["admin"]);
+  return canAdmin(session?.user.role);
 }
 
 export async function sessionUser(headers: Headers) {
@@ -11,6 +11,10 @@ export async function sessionUser(headers: Headers) {
 
 function hasAnyRole(role: string | null | undefined, allowed: readonly string[]): boolean {
   return role?.split(",").some((value) => allowed.includes(value)) ?? false;
+}
+
+export function canAdmin(role: string | null | undefined): boolean {
+  return hasAnyRole(role, ["admin"]);
 }
 
 export function canModerate(role: string | null | undefined): boolean {

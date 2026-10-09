@@ -1,10 +1,11 @@
 import { createAccessControl } from "better-auth/plugins/access";
-import { adminAc, defaultStatements, userAc } from "better-auth/plugins/admin/access";
+import { defaultStatements, userAc } from "better-auth/plugins/admin/access";
 
 export const accessControl = createAccessControl(defaultStatements);
 
 export const roles = {
-  admin: accessControl.newRole(adminAc.statements),
+  // Application administration uses routes that can audit state changes.
+  admin: accessControl.newRole({}),
   user: accessControl.newRole(userAc.statements),
   moderator: accessControl.newRole({}),
   editor: accessControl.newRole({}),
