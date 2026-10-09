@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: commerce-and-governance
+Current: account-access
 
 ## public-starter-and-theme
 
@@ -121,3 +121,23 @@ reversal or expiry ends it; a current featured entitlement has a visible
 label and separate placement but does not reorder normal search results;
 unauthorized direct requests cannot change protected state; and the audit
 history identifies the actor and time of each named protected action.
+
+## account-access
+
+Requirements: ACC-001, ACC-002, ACC-003, ACC-004
+
+Delivery: connect Better Auth to a documented SMTP sender, require email
+verification for public accounts, add password recovery and passwordless
+magic-link sign-in for existing verified accounts, and preserve host
+administrator provisioning. Add audited account suspension and reinstatement
+that revokes sessions and removes suspended owners' listings from public
+surfaces. Update the sign-in and account-management pages and the existing
+workflow checks for the verified-account journey.
+
+Done-when: a fresh account cannot use protected routes before following its
+verification email; the first administrator can still sign in; a password
+reset invalidates the prior password and sessions; a verified account can
+use one magic link exactly once; an unknown address cannot sign up through
+magic link; and suspending an account immediately blocks its sessions and
+hides its listings until reinstatement, without suspending the final active
+administrator.

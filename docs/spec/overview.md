@@ -33,6 +33,7 @@ adapted to a subject other than developer resources.
 | Domain | File | Prefix |
 | --- | --- | --- |
 | Starter configuration, setup, and deployment | foundation.md | FOUND |
+| Account verification, recovery, magic links, and suspension | accounts.md | ACC |
 | Public discovery, search, categories, and listing pages | directory.md | DIR |
 | Accounts, ownership, submission, and moderation | publishing.md | PUB |
 | Editorial articles and taxonomy | editorial.md | EDIT |
