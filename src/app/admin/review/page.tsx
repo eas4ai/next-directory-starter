@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { canModerate, sessionUser } from "@/lib/admin";
+import { searchPublishedListings } from "@/lib/listings";
 import { reviewSubmissions } from "@/lib/moderation";
 import { getSiteConfig } from "@/lib/site-config";
 import { ReviewDecision } from "./review-decision";
@@ -18,12 +19,14 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function ReviewPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+export default async function ReviewPage({ searchParams }: { searchParams: Promise<{ page?: string; catalogPage?: string }> }) {
   await connection();
   const user = await sessionUser(await headers());
   if (!canModerate(user?.role)) notFound();
-  const requestedPage = Number((await searchParams).page ?? "1");
+  const query = await searchParams;
+  const requestedPage = Number(query.page ?? "1");
   const { submissions, page, pages } = reviewSubmissions(requestedPage);
+  const published = searchPublishedListings({ page: query.catalogPage });
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
@@ -51,19 +54,38 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
                 {submission.reason ? ` · ${submission.reason}` : ""}
               </p>
             )}
-            {submission.listingStatus === "published" && submission.status === "approved" &&
-              <SuspendButton slug={submission.slug} />}
           </section>
         ))}
         {submissions.length === 0 && <p className="rounded-lg border p-5 text-muted-foreground">No submissions yet.</p>}
       </div>
       {pages > 1 && (
         <nav className="mt-8 flex items-center justify-between text-sm" aria-label="Review pages">
-          {page > 1 ? <Link href={`/admin/review?page=${page - 1}`} className="underline">Previous</Link> : <span />}
+          {page > 1 ? <Link href={`/admin/review?page=${page - 1}&catalogPage=${published.page}`} className="underline">Previous</Link> : <span />}
           <span>Page {page} of {pages}</span>
-          {page < pages ? <Link href={`/admin/review?page=${page + 1}`} className="underline">Next</Link> : <span />}
+          {page < pages ? <Link href={`/admin/review?page=${page + 1}&catalogPage=${published.page}`} className="underline">Next</Link> : <span />}
         </nav>
       )}
+      <section className="mt-12" aria-labelledby="published-listings-heading">
+        <h2 id="published-listings-heading" className="text-2xl font-semibold">Published listings</h2>
+        <p className="mt-2 text-sm text-muted-foreground">Suspend any published listing, including operator entries.</p>
+        <div className="mt-5 space-y-4">
+          {published.listings.map((listing) => (
+            <div key={listing.slug} className="rounded-lg border p-5">
+              <p className="font-medium">{listing.name}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{listing.slug} · {listing.category}</p>
+              <SuspendButton slug={listing.slug} />
+            </div>
+          ))}
+          {published.listings.length === 0 && <p className="rounded-lg border p-5 text-muted-foreground">No published listings.</p>}
+        </div>
+        {published.pages > 1 && (
+          <nav className="mt-6 flex items-center justify-between text-sm" aria-label="Published listing pages">
+            {published.page > 1 ? <Link href={`/admin/review?page=${page}&catalogPage=${published.page - 1}`} className="underline">Previous</Link> : <span />}
+            <span>Page {published.page} of {published.pages}</span>
+            {published.page < published.pages ? <Link href={`/admin/review?page=${page}&catalogPage=${published.page + 1}`} className="underline">Next</Link> : <span />}
+          </nav>
+        )}
+      </section>
     </main>
   );
 }
