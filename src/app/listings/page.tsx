@@ -42,7 +42,7 @@ export default async function ListingsPage({ searchParams }: PageProps<"/listing
   };
 
   return (
-    <main className="mx-auto w-full max-w-[1400px] px-6 py-12">
+    <main className="mx-auto w-full max-w-[1400px] wrap-anywhere px-6 py-12">
       <JsonLd data={{
         "@context": "https://schema.org", "@type": "CollectionPage",
         name: "Listings", description: "Explore the published links in this directory.",

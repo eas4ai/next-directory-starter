@@ -26,7 +26,7 @@ export default async function ListingPage({ params }: PageProps<"/listings/[slug
   const preset = getThemePreset();
 
   return (
-    <main className="mx-auto w-full max-w-[1400px] px-6 py-12">
+    <main className="mx-auto w-full max-w-[1400px] wrap-anywhere px-6 py-12">
       <JsonLd data={{
         "@context": "https://schema.org", "@type": "Thing",
         name: listing.name, description: listing.description, url: listing.url,
@@ -37,7 +37,7 @@ export default async function ListingPage({ params }: PageProps<"/listings/[slug
       <h1 className="mt-3 text-4xl font-semibold tracking-tight">{listing.name}</h1>
       <p className="mt-5 text-lg text-muted-foreground">{listing.summary}</p>
       <p className="mt-8 leading-relaxed">{listing.description}</p>
-      <div className="mt-8"><Button asChild><a href={listing.url} target="_blank" rel="noopener noreferrer">Visit {listing.name} <PresetExternalLinkIcon library={preset.iconLibrary} /></a></Button></div>
+      <div className="mt-8"><Button asChild className="h-auto min-h-8 max-w-full whitespace-normal wrap-anywhere text-center"><a href={listing.url} target="_blank" rel="noopener noreferrer">Visit {listing.name} <PresetExternalLinkIcon library={preset.iconLibrary} /></a></Button></div>
     </main>
   );
 }
