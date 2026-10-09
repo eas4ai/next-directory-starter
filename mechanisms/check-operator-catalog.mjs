@@ -188,8 +188,10 @@ try {
       throw new Error('A nonmatching query still shows a listing.');
     }
     const category = await request('/listings?category=no-such-category');
-    if (!category.ok || contains(main(await category.text()), 'Example Tool')) {
-      throw new Error('A nonmatching category still shows a listing.');
+    const categoryMain = main(await category.text());
+    if (!category.ok || contains(categoryMain, 'Example Tool') ||
+        !/<option\b[^>]*value="no-such-category"[^>]*selected/i.test(categoryMain)) {
+      throw new Error('A nonmatching category shows a listing or hides the active filter.');
     }
     const tools = await request('/listings?category=Tools');
     if (!tools.ok || !contains(main(await tools.text()), 'Example Tool')) {
@@ -207,6 +209,11 @@ try {
     if (!first.ok || !second.ok || firstCount > 12 ||
         !secondHtml.includes('/listings/search-entry-')) {
       throw new Error('Pagination exceeded the 12-listing bound or omitted a second page.');
+    }
+    const beyond = await request('/listings?page=999999');
+    const beyondText = main(await beyond.text()).replace(/<[^>]*>/g, '');
+    if (!beyond.ok || !contains(beyondText, 'Page 2 of 2')) {
+      throw new Error('An out-of-range page did not resolve to the final page.');
     }
     const chosen = await request('/listings?q=search-entry-14');
     const chosenMain = main(await chosen.text());

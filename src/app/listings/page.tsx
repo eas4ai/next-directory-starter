@@ -25,6 +25,8 @@ export default async function ListingsPage({ searchParams }: PageProps<"/listing
   const page = one(params.page);
   const result = searchPublishedListings({ q, category, page });
   const categories = publishedCategories();
+  const selectedCategory = categories.find((item) => item.toLowerCase() === category.toLowerCase()) ?? category;
+  const unknownCategory = Boolean(category) && !categories.includes(selectedCategory);
   const preset = getThemePreset();
   const pageHref = (number: number) => {
     const query = new URLSearchParams();
@@ -48,8 +50,9 @@ export default async function ListingsPage({ searchParams }: PageProps<"/listing
         </label>
         <label className="grid gap-2 text-sm font-medium" htmlFor="directory-category">
           Category
-          <select id="directory-category" name="category" defaultValue={category} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+          <select id="directory-category" name="category" defaultValue={selectedCategory} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
             <option value="">All categories</option>
+            {unknownCategory && <option value={selectedCategory}>Unknown category: {selectedCategory}</option>}
             {categories.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
         </label>
