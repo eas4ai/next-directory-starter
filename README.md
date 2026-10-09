@@ -40,6 +40,16 @@ npm run account:provision -- --email moderator@example.com --name "Moderator" --
 
 The command prompts for a password and asks for confirmation if accounts already exist. Moderators sign in through `/owner/sign-in` and then open `/admin/review`. Every approval or rejection requires a reason; prior decisions remain in review history. The review view also lets a moderator suspend any published listing. A suspended listing immediately leaves public search and its detail route; its pending revision is rejected, and the owner cannot edit or resubmit it.
 
+## Articles
+
+An administrator can edit articles at `/admin/articles`. To give a separate account article editing access without administrator controls, provision it against the same database:
+
+```sh
+npm run account:provision -- --email editor@example.com --name "Editor" --role editor
+```
+
+Editors sign in through `/owner/sign-in` and follow **Edit articles** to save drafts or publish and unpublish articles. Published articles appear at `/articles`; drafts return a missing response on public routes. Article bodies are plain text and preserve line breaks.
+
 ## Deploying
 
 Set `BETTER_AUTH_URL` and `SITE_URL` to the site's public HTTPS origin. Set `BETTER_AUTH_SECRET` to a unique secret and `DATABASE_URL` to a writable, persistent SQLite file, then run `npm run db:migrate` and provision an administrator using the same environment as the running application. Back up the SQLite file. The ignored `.runtime/directory.db` default is intended for local development; production storage must survive builds and deployments.

@@ -24,6 +24,7 @@ export default async function CatalogPage() {
       <h1 className="text-3xl font-semibold tracking-tight">Catalog</h1>
       <p className="mt-3 text-muted-foreground">Create listings and manage their publication state.</p>
       <Link href="/admin/review" className="mt-3 inline-block text-sm underline">Review owner submissions</Link>
+      <Link href="/admin/articles" className="ml-4 mt-3 inline-block text-sm underline">Edit articles</Link>
       <CatalogEditor initialListings={allListings()} />
     </main>
   );
