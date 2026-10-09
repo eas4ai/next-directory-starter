@@ -16,7 +16,7 @@ export const LISTINGS_PER_PAGE = 12;
 migrateCatalog();
 
 export function publishedListingBySlug(slug: string): Listing | undefined {
-  return database.prepare("SELECT * FROM listings WHERE slug = ?")
+  return database.prepare("SELECT * FROM listings WHERE slug = ? AND status = 'published'")
     .get(slug) as Listing | undefined;
 }
 
