@@ -28,6 +28,7 @@ export default async function CatalogPage() {
       <Link href="/admin/taxonomy" className="ml-4 mt-3 inline-block text-sm underline">Categories and tags</Link>
       <Link href="/admin/plans" className="ml-4 mt-3 inline-block text-sm underline">Publishing plans</Link>
       <Link href="/admin/accounts" className="ml-4 mt-3 inline-block text-sm underline">Accounts and roles</Link>
+      <Link href="/admin/audit" className="ml-4 mt-3 inline-block text-sm underline">Audit history</Link>
       <CatalogEditor initialListings={allListings()} />
     </main>
   );

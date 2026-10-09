@@ -1,6 +1,7 @@
 import { database } from "@/lib/database";
 import { migrateCatalog } from "@/lib/catalog-migrations";
 import { HttpError, httpErrorResponse } from "@/lib/http-error";
+import { recordAudit } from "@/lib/audit";
 
 migrateCatalog();
 
@@ -134,6 +135,7 @@ export function createArticle(input: unknown, actorId: string): Article {
         actorId, now, now, article.status === "published" ? now : null,
       );
       setTags(article.slug, article.tags);
+      recordAudit(article.status === "published" ? "article.publish" : "article.create", actorId, article.slug);
     }).immediate();
   } catch (error) {
     if (error instanceof Error && error.message.includes("UNIQUE constraint")) {
@@ -144,7 +146,7 @@ export function createArticle(input: unknown, actorId: string): Article {
   return articleBySlug(article.slug)!;
 }
 
-export function updateArticle(slug: string, changes: unknown): Article {
+export function updateArticle(slug: string, changes: unknown, actorId: string): Article {
   if (!changes || typeof changes !== "object" || Array.isArray(changes)) {
     throw new ArticleError(400, "Invalid article changes");
   }
@@ -160,6 +162,8 @@ export function updateArticle(slug: string, changes: unknown): Article {
       article.title, article.summary, article.body, article.status, now, publishedAt, slug,
     );
     setTags(slug, article.tags);
+    recordAudit(article.status === "published" ? "article.publish" :
+      current.status === "published" ? "article.unpublish" : "article.update", actorId, slug);
     return articleBySlug(slug)!;
   }).immediate();
 }
