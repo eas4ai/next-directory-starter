@@ -27,8 +27,13 @@ function storedName(kind: TaxonKind, name: string): string | undefined {
 
 export function listTaxa(kind: TaxonKind): Taxon[] {
   if (kind === "category") {
-    return database.prepare(`SELECT c.name, COUNT(l.slug) AS usageCount FROM categories c
-      LEFT JOIN listings l ON l.category = c.name GROUP BY c.name ORDER BY c.name COLLATE NOCASE`)
+    return database.prepare(`WITH used AS (
+        SELECT slug, category FROM listings
+        UNION SELECT slug, json_extract(payload, '$.category') FROM owner_drafts
+        UNION SELECT slug, json_extract(payload, '$.category') FROM submissions WHERE status = 'pending'
+      )
+      SELECT c.name, COUNT(used.slug) AS usageCount FROM categories c
+      LEFT JOIN used ON used.category = c.name GROUP BY c.name ORDER BY c.name COLLATE NOCASE`)
       .all() as Taxon[];
   }
   return database.prepare(`SELECT t.name, COUNT(a.article_slug) AS usageCount FROM tags t
@@ -72,9 +77,16 @@ export function deleteTaxon(kind: TaxonKind, original: string): void {
     const name = storedName(kind, original);
     if (!name) throw new TaxonomyError(404, "Name not found");
     const used = kind === "category"
-      ? database.prepare("SELECT 1 FROM listings WHERE category = ? LIMIT 1").get(name)
-      : database.prepare("SELECT 1 FROM article_tags WHERE tag_name = ? LIMIT 1").get(name);
-    if (used) throw new TaxonomyError(409, "Remove this name from content before deleting it");
+      ? (database.prepare(`SELECT
+          EXISTS(SELECT 1 FROM listings WHERE category = ?) OR
+          EXISTS(SELECT 1 FROM owner_drafts WHERE json_extract(payload, '$.category') = ?) OR
+          EXISTS(SELECT 1 FROM submissions WHERE status = 'pending'
+            AND json_extract(payload, '$.category') = ?) AS used`)
+          .get(name, name, name) as { used: number }).used
+      : Boolean(database.prepare("SELECT 1 FROM article_tags WHERE tag_name = ? LIMIT 1").get(name));
+    if (used) {
+      throw new TaxonomyError(409, "Remove this name from content before deleting it");
+    }
     database.prepare(`DELETE FROM ${table[kind]} WHERE name = ?`).run(name);
   }).immediate();
 }
