@@ -33,10 +33,9 @@ async function freePort() {
 }
 
 async function startApp() {
-  const port = await freePort();
-  origin = `http://127.0.0.1:${port}`;
-  app = spawn('npm', ['run', 'start', '--', '-p', String(port)], {
-    env: { ...appEnv, SITE_URL: origin, NEXT_PUBLIC_SITE_URL: origin },
+  const port = new URL(origin).port;
+  app = spawn('npm', ['run', 'start', '--', '-p', port], {
+    env: appEnv,
     detached: true,
     stdio: 'ignore',
   });
@@ -63,9 +62,9 @@ async function request(path, options = {}) {
 }
 
 async function signIn(email) {
-  const response = await request('/api/auth/sign-in', {
+  const response = await request('/api/auth/sign-in/email', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Origin: origin },
     body: JSON.stringify({ email, password }),
   });
   assert.equal(response.status, 200);
@@ -76,23 +75,26 @@ async function signIn(email) {
 
 const json = (body, cookie) => ({
   method: 'POST',
-  headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) },
+  headers: { 'Content-Type': 'application/json', Origin: origin, ...(cookie ? { Cookie: cookie } : {}) },
   body: JSON.stringify(body),
 });
 
 before(async () => {
   workspace = mkdtempSync(join(tmpdir(), 'directory-theme-'));
+  origin = `http://127.0.0.1:${await freePort()}`;
   appEnv = {
     ...process.env,
     CI: '1',
     DATABASE_URL: `file:${join(workspace, 'directory.db')}`,
-    AUTH_SECRET: randomBytes(32).toString('hex'),
+    BETTER_AUTH_SECRET: randomBytes(32).toString('hex'),
+    BETTER_AUTH_URL: origin,
   };
   command(['run', 'build']);
   command(['run', 'db:migrate']);
-  command(['run', 'account:provision', '--', '--email', adminEmail, '--password', password, '--role', 'admin']);
-  command(['run', 'account:provision', '--', '--email', memberEmail, '--password', password, '--role', 'member']);
+  command(['run', 'account:provision', '--', '--email', adminEmail, '--password', password, '--role', 'admin', '--yes']);
   await startApp();
+  const member = await request('/api/auth/sign-up/email', json({ name: 'Member', email: memberEmail, password }));
+  assert.equal(member.status, 200, await member.text());
 });
 
 after(async () => {
@@ -101,6 +103,10 @@ after(async () => {
 });
 
 test('ADM-004 only authenticated administrators can open or change the theme', async () => {
+  const initial = { theme: 'red' };
+  const admin = await signIn(adminEmail);
+  const initialSave = await request('/api/admin/theme', json(initial, admin));
+  assert.equal(initialSave.status, 200);
   const guestPage = await request('/admin/theme');
   const guestSave = await request('/api/admin/theme', json({ theme: 'blue' }));
   assert.ok([302, 303, 307, 308, 401, 403].includes(guestPage.status));
@@ -110,8 +116,9 @@ test('ADM-004 only authenticated administrators can open or change the theme', a
   const memberSave = await request('/api/admin/theme', json({ theme: 'blue' }, member));
   assert.equal(memberPage.status, 403);
   assert.equal(memberSave.status, 403);
-  const admin = await signIn(adminEmail);
   assert.equal((await request('/admin/theme', { headers: { Cookie: admin } })).status, 200);
+  const saved = await (await request('/api/admin/theme', { headers: { Cookie: admin } })).json();
+  assert.deepEqual(saved.preset, initial);
 });
 
 test('ADM-005 the editor exposes and previews every pinned shadcn preset choice', async () => {
@@ -177,12 +184,12 @@ test('ADM-006 the saved theme reaches public and admin pages after restart', asy
 test('ADM-007 first-admin provisioning works without public self-promotion', async () => {
   const admin = await signIn(adminEmail);
   const member = await signIn(memberEmail);
-  const adminAccount = await (await request('/api/auth/me', { headers: { Cookie: admin } })).json();
-  const memberAccount = await (await request('/api/auth/me', { headers: { Cookie: member } })).json();
-  assert.equal(adminAccount.role, 'admin');
-  assert.equal(memberAccount.role, 'member');
-  const selfPromotion = await request('/api/auth/me', json({ role: 'admin' }, member));
+  const adminAccount = await (await request('/api/auth/get-session', { headers: { Cookie: admin } })).json();
+  const memberAccount = await (await request('/api/auth/get-session', { headers: { Cookie: member } })).json();
+  assert.equal(adminAccount.user.role, 'admin');
+  assert.equal(memberAccount.user.role, 'user');
+  const selfPromotion = await request('/api/auth/admin/set-role', json({ userId: memberAccount.user.id, role: 'admin' }, member));
   assert.ok([400, 403, 404, 405].includes(selfPromotion.status));
-  const after = await (await request('/api/auth/me', { headers: { Cookie: member } })).json();
-  assert.equal(after.role, 'member');
+  const after = await (await request('/api/auth/get-session', { headers: { Cookie: member } })).json();
+  assert.equal(after.user.role, 'user');
 });
