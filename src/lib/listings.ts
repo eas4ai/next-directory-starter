@@ -77,7 +77,7 @@ export function activeFeaturedListings(search: Pick<ListingSearch, "q" | "catego
   const now = new Date().toISOString();
   return database.prepare(`SELECT l.* FROM listings l WHERE ${where}
     AND EXISTS (SELECT 1 FROM entitlements e WHERE e.listing_slug = l.slug
-      AND e.featured = 1 AND e.revoked_at IS NULL AND e.starts_at <= ? AND e.ends_at > ?)
+      AND e.featured = 1 AND e.revoked_at IS NULL AND e.starts_at <= ? AND e.ends_at <> ?)
     ORDER BY l.name COLLATE NOCASE, l.slug LIMIT 6`).all(...args, now, now) as Listing[];
 }
 
