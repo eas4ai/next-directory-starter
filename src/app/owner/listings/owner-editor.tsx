@@ -131,8 +131,8 @@ export function OwnerEditor({ initialListings }: { initialListings: OwnerItem[] 
               <p className="text-sm text-muted-foreground">{item.slug} · {item.status}{item.pending ? " · awaiting review" : item.hasDraft ? " · private changes saved" : ""}</p>
             </div>
             <div className="flex gap-2">
-              <Button type="button" size="sm" variant="outline" disabled={pending || item.pending} onClick={() => edit(item)}>Edit</Button>
-              {(item.status === "draft" || item.hasDraft) && !item.pending &&
+              <Button type="button" size="sm" variant="outline" disabled={pending || item.pending || item.status === "suspended"} onClick={() => edit(item)}>Edit</Button>
+              {(item.status === "draft" || item.hasDraft) && !item.pending && item.status !== "suspended" &&
                 <Button type="button" size="sm" disabled={pending} onClick={() => submit(item.slug)}>Submit for review</Button>}
             </div>
           </div>

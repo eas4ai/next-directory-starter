@@ -120,6 +120,7 @@ export function createOwnerListing(userId: string, input: unknown): Listing {
 export function updateOwnerListing(userId: string, slug: string, changes: unknown): Listing {
   return database.transaction(() => {
     const current = ownedListing(userId, slug);
+    if (current.status === "suspended") throw new ModerationError(409, "Suspended listings cannot be edited");
     if (pendingSubmission(slug)) throw new ModerationError(409, "Wait for the current review");
     if (!changes || typeof changes !== "object" || Array.isArray(changes)) {
       throw new ModerationError(400, "Invalid listing changes");
@@ -145,6 +146,7 @@ export function updateOwnerListing(userId: string, slug: string, changes: unknow
 export function submitOwnerListing(userId: string, slug: string): ReviewSubmission {
   return database.transaction(() => {
     const current = ownedListing(userId, slug);
+    if (current.status === "suspended") throw new ModerationError(409, "Suspended listings cannot be submitted");
     if (pendingSubmission(slug)) throw new ModerationError(409, "Listing already awaits review");
     const draft = database.prepare("SELECT payload FROM owner_drafts WHERE slug = ?").get(slug) as { payload: string } | undefined;
     if (current.status !== "draft" && !draft) throw new ModerationError(400, "Save changes before submitting");
@@ -212,5 +214,6 @@ export function suspendPublishedListing(slug: string, actorId: string, reason: s
       WHERE slug = ? AND status = 'pending'`).run(
       `Suspended: ${reason}`, new Date().toISOString(), actorId, slug,
     );
+    database.prepare("DELETE FROM owner_drafts WHERE slug = ?").run(slug);
   }).immediate();
 }

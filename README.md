@@ -38,7 +38,7 @@ The first administrator can review submissions at `/admin/review`. To create a m
 npm run account:provision -- --email moderator@example.com --name "Moderator" --role moderator
 ```
 
-The command prompts for a password and asks for confirmation if accounts already exist. Moderators sign in through `/owner/sign-in` and then open `/admin/review`. Every approval or rejection requires a reason; prior decisions remain in review history. The review view also lets a moderator suspend a published listing. A suspended listing immediately leaves public search and its detail route.
+The command prompts for a password and asks for confirmation if accounts already exist. Moderators sign in through `/owner/sign-in` and then open `/admin/review`. Every approval or rejection requires a reason; prior decisions remain in review history. The review view also lets a moderator suspend any published listing. A suspended listing immediately leaves public search and its detail route; its pending revision is rejected, and the owner cannot edit or resubmit it.
 
 ## Deploying
 
