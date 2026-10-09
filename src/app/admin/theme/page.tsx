@@ -4,6 +4,7 @@ import { isAdmin } from "@/lib/admin";
 import { getThemePreset, presetCss, themeOptions } from "@/lib/theme";
 import { ThemeEditor } from "./theme-editor";
 import type { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Theme | Directory Starter",
@@ -23,6 +24,7 @@ export default async function ThemePage() {
         <p className="text-sm font-medium text-muted-foreground">Site settings</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Theme</h1>
         <p className="mt-3 text-muted-foreground">Choose a preset and preview it before saving it for the directory.</p>
+        <Link href="/admin/catalog" className="mt-3 inline-block text-sm underline">Manage listings</Link>
       </div>
       <ThemeEditor options={themeOptions} initialPreset={preset} initialCss={presetCss(preset, ".theme-preview")} />
     </main>
