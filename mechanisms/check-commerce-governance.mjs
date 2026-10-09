@@ -294,9 +294,15 @@ try {
     const rolePage = await request('/admin/accounts', { headers: { Cookie: adminCookie } });
     const adminRole = await request(`/api/admin/accounts/${otherId}/role`,
       json({ role: 'editor' }, adminCookie, 'PATCH'));
+    const nativeSetRole = await request('/api/auth/admin/set-role',
+      json({ userId: otherId, role: 'admin' }, adminCookie));
+    const nativeUpdateRole = await request('/api/auth/admin/update-user',
+      json({ userId: otherId, data: { role: 'admin' } }, adminCookie));
     if (![401, 403].includes(ownerPlan.status) ||
         ![401, 403, 404].includes(otherCheckout.status) ||
         ![401, 403].includes(ownerRole.status) || ![401, 403].includes(theme.status) ||
+        ![401, 403].includes(nativeSetRole.status) ||
+        ![401, 403].includes(nativeUpdateRole.status) ||
         !rolePage.ok || !adminRole.ok) {
       throw new Error('Direct-request permissions or administrator role control are incomplete.');
     }
