@@ -3,8 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { publishedArticleBySlug } from "@/lib/articles";
-import { pageMetadata } from "@/lib/page-metadata";
+import { pageMetadata, publicUrl } from "@/lib/page-metadata";
 import { getSiteConfig } from "@/lib/site-config";
+import { JsonLd } from "@/components/json-ld";
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -21,6 +22,13 @@ export default async function ArticlePage({ params }: Params) {
   if (!article) notFound();
   return (
     <main className="mx-auto w-full max-w-[1400px] px-6 py-12">
+      <JsonLd data={{
+        "@context": "https://schema.org", "@type": "Article",
+        headline: article.title, description: article.summary,
+        articleBody: article.body, url: publicUrl(`/articles/${article.slug}`),
+        ...(article.publishedAt ? { datePublished: article.publishedAt } : {}),
+        ...(article.tags.length > 0 ? { keywords: article.tags } : {}),
+      }} />
       <Link href="/articles" className="text-sm text-muted-foreground hover:text-foreground">← Articles</Link>
       <article className="mt-10">
         <h1 className="text-4xl font-semibold tracking-tight">{article.title}</h1>
