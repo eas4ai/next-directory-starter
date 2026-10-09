@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 
 function publicUrl(path: string): string {
-  const configured = process.env.SITE_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  const base = new URL(configured);
+  const configured = process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || process.env.BETTER_AUTH_URL;
+  if (!configured && process.env.NODE_ENV === "production") {
+    throw new Error("Set SITE_URL to the public site origin before serving production pages.");
+  }
+  const base = new URL(configured || "http://localhost:3000");
   if (!["http:", "https:"].includes(base.protocol) || base.username || base.password || base.search || base.hash || base.pathname !== "/") {
     throw new Error("SITE_URL must be an HTTP or HTTPS origin without a path, query, or fragment.");
   }

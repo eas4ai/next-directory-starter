@@ -11,4 +11,3 @@ const file = url.slice("file:".length);
 if (file !== ":memory:") mkdirSync(dirname(file), { recursive: true });
 
 export const database = new Database(file);
-database.pragma("journal_mode = WAL");
