@@ -221,13 +221,22 @@ try {
   await check('COM-002', async () => {
     if (!planCreated) throw new Error('The publishing plan is unavailable for payment checks.');
     const purchaseId = pendingPurchase('cs_test_contract_one', 'pi_test_contract_one');
+    const validUnsigned = signedEvent('checkout.session.completed', {
+      id: 'cs_test_contract_one', object: 'checkout.session', mode: 'payment', payment_status: 'paid',
+      client_reference_id: purchaseId, amount_total: 1200, currency: 'usd',
+      payment_intent: 'pi_test_contract_one',
+    });
+    const unsigned = await sendEvent(validUnsigned, false);
+    const beforeUnsigned = withDatabase((database) => database.prepare(
+      'SELECT COUNT(*) AS count FROM entitlements WHERE purchase_id = ?').get(purchaseId).count);
+    if (unsigned.status !== 400 || beforeUnsigned !== 0) {
+      throw new Error('An unsigned matching payment activated or bypassed verification.');
+    }
     const event = signedEvent('checkout.session.completed', {
       id: 'cs_test_wrong', object: 'checkout.session', mode: 'payment', payment_status: 'paid',
       client_reference_id: purchaseId, amount_total: 1200, currency: 'usd',
       payment_intent: 'pi_test_contract_one',
     });
-    const unsigned = await sendEvent(event, false);
-    if (unsigned.status !== 400) throw new Error('Unsigned payment evidence was accepted.');
     const mismatched = await sendEvent(event);
     const before = withDatabase((database) => database.prepare(
       'SELECT COUNT(*) AS count FROM entitlements WHERE purchase_id = ?').get(purchaseId).count);
