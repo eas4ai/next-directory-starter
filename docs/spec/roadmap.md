@@ -29,8 +29,8 @@ Requirements: FOUND-002, FOUND-003, FOUND-004, DIR-003, DIR-004
 
 Delivery: replace the source-file sample catalog with migrated SQLite tables
 for listings and categories. Provide repeatable sample seeding, documented
-first-run and migration commands, and authenticated operator controls for site
-identity and listings. The public directory reads eligible rows
+first-run and migration commands, documented site identity settings, and
+authenticated operator controls for listings. The public directory reads eligible rows
 from the database, supports query and category filters with bounded pages, and
 reflects publication changes on the index and detail routes. Preserve the
 existing theme editor and server-rendered public pages.
