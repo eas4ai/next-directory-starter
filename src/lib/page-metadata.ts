@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getSiteConfig } from "@/lib/site-config";
 
 function publicUrl(path: string): string {
   const configured = process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || process.env.BETTER_AUTH_URL;
@@ -14,11 +15,12 @@ function publicUrl(path: string): string {
 
 export function pageMetadata(path: string, title: string, description: string): Metadata {
   const url = publicUrl(path);
+  const site = getSiteConfig();
   return {
     title,
     description,
     alternates: { canonical: url },
-    openGraph: { type: "website", siteName: "Directory Starter", title, description, url },
+    openGraph: { type: "website", siteName: site.name, title, description, url },
     twitter: { card: "summary", title, description },
   };
 }

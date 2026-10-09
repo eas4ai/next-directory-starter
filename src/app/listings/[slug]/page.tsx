@@ -6,6 +6,7 @@ import { getThemePreset } from "@/lib/theme";
 import { PresetExternalLinkIcon } from "@/components/preset-icon";
 import { connection } from "next/server";
 import { pageMetadata } from "@/lib/page-metadata";
+import { getSiteConfig } from "@/lib/site-config";
 
 export const instant = false;
 
@@ -14,7 +15,7 @@ export async function generateMetadata({ params }: PageProps<"/listings/[slug]">
   const { slug } = await params;
   const listing = publishedListingBySlug(slug);
   if (!listing) notFound();
-  return pageMetadata(`/listings/${listing.slug}`, `${listing.name} | Directory Starter`, listing.summary);
+  return pageMetadata(`/listings/${listing.slug}`, `${listing.name} | ${getSiteConfig().name}`, listing.summary);
 }
 
 export default async function ListingPage({ params }: PageProps<"/listings/[slug]">) {

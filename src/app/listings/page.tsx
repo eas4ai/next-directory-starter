@@ -7,10 +7,11 @@ import { connection } from "next/server";
 import { pageMetadata } from "@/lib/page-metadata";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getSiteConfig } from "@/lib/site-config";
 
 export async function generateMetadata() {
   await connection();
-  return pageMetadata("/listings", "Listings | Directory Starter", "Explore the published links in this directory.");
+  return pageMetadata("/listings", `Listings | ${getSiteConfig().name}`, "Explore the published links in this directory.");
 }
 
 function one(value: string | string[] | undefined): string {
