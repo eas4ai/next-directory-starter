@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: owner-moderation
+Current: editorial-publishing
 
 ## public-starter-and-theme
 
@@ -59,3 +59,22 @@ a submitted draft enters a private review queue; a moderator's rejection and
 reason are visible in review history; approval publishes the reviewed version;
 the prior approved version remains public during a proposed revision; and a
 suspended listing disappears from public search and its detail URL at once.
+
+## editorial-publishing
+
+Requirements: EDIT-001, EDIT-002, EDIT-003
+
+Delivery: add a migrated article and tag model, an editor role, and protected
+article and taxonomy controls. Let an authorized editor save, publish, and
+unpublish articles. Serve published articles on public index and detail routes.
+Let an operator add listing categories and article tags through administration,
+and make new categories available in directory navigation. Expose a feed that
+contains published articles only. Preserve owner moderation and the existing
+public directory.
+
+Done-when: an editor can save a draft that returns a missing response on public
+routes, publish it to a reachable article page, and unpublish it again; a
+non-editor cannot make the same changes by direct request; an operator can add
+a category and a tag without code edits and see the category in directory
+navigation; and the feed contains every published article in the test set and
+no draft or unpublished article.
