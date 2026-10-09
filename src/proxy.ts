@@ -45,4 +45,4 @@ export async function proxy(request: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/admin/theme/:path*", "/admin/catalog/:path*", "/admin/review/:path*", "/admin/articles/:path*", "/admin/taxonomy/:path*", "/owner/listings/:path*", "/listings/:slug", "/articles/:slug"] };
+export const config = { matcher: ["/admin/theme/:path*", "/admin/catalog/:path*", "/admin/review/:path*", "/admin/articles/:path*", "/admin/taxonomy/:path*", "/admin/plans/:path*", "/admin/accounts/:path*", "/owner/listings/:path*", "/listings/:slug", "/articles/:slug"] };
