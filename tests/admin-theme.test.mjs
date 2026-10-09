@@ -168,6 +168,7 @@ test('ADM-005 the editor exposes and previews every pinned shadcn preset choice'
   assert.ok(preview.css && preview.css.includes('--primary'));
   assert.match(preview.css, /--preset-body-font:/);
   assert.match(preview.css, /--preset-icon-library:/);
+  assert.match(preview.css, /--sidebar: oklch\([^)]* \/ 0\.85\)/);
   assert.deepEqual(preview.preset, chosen);
   const alternate = await (await request('/api/admin/theme/preview', json({ ...chosen, theme: 'blue' }, admin))).json();
   assert.notEqual(alternate.css, preview.css);
