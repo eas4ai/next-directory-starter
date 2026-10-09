@@ -175,6 +175,12 @@ try {
       throw new Error('An authorized editor has no article workspace or a member can open it.');
     }
     await createArticle('private-draft');
+    const longArticle = await request('/api/admin/articles', json({
+      ...article('long-draft'), body: 'x'.repeat(50_000),
+    }, editorCookie));
+    if (longArticle.status !== 201) {
+      throw new Error(`A valid 50,000-character article body was rejected with ${longArticle.status}.`);
+    }
     const privateDetail = await request('/articles/private-draft');
     const guestCreate = await request('/api/admin/articles', json(article('guest-article')));
     const memberCreate = await request('/api/admin/articles', json(article('member-article'), memberCookie));
