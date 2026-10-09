@@ -3,6 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { publishedListings } from "@/lib/listings";
 import { getThemePreset } from "@/lib/theme";
 import { PresetExternalLinkIcon } from "@/components/preset-icon";
+import { connection } from "next/server";
+import { pageMetadata } from "@/lib/page-metadata";
+
+export async function generateMetadata() {
+  await connection();
+  return pageMetadata("/listings", "Listings | Directory Starter", "Explore the published links in this sample directory.");
+}
 
 export default function ListingsPage() {
   const preset = getThemePreset();
