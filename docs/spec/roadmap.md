@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: public-crawl-and-responsive
+Current: commerce-and-governance
 
 ## public-starter-and-theme
 
@@ -97,3 +97,27 @@ the sitemap; robots points to that sitemap and excludes private routes; missing
 content returns 404; query-result variants are nonindexable; structured data
 matches the rendered page; and directory index and detail pages remain readable
 without horizontal scrolling at 320 pixels in light and dark modes.
+
+## commerce-and-governance
+
+Requirements: COM-001, COM-002, COM-003, ADM-001, ADM-002
+
+Delivery: add migrated publishing plans with price, currency, duration, and
+placement terms. Show an approved listing's owner those terms before starting
+one-time Stripe-hosted Checkout. Keep the selected terms with the purchase;
+only verified, matching payment events may grant or revoke an entitlement,
+and repeated events must have no additional effect. Show currently entitled
+featured listings in a labelled section separate from ordinary results,
+without changing the ordinary order. Give administrators controls for plans
+and account roles, enforce permissions on direct requests across existing
+review, editorial, commerce, and site configuration actions, and record the
+actor and time for moderation, publication, plan-setting, and role changes.
+Store provider credentials outside the database and source tree.
+
+Done-when: a plan's price and publication duration are visible to the owner
+before checkout; an unsigned or mismatched event cannot activate a listing;
+a verified event grants one entitlement despite replay, while a verified
+reversal or expiry ends it; a current featured entitlement has a visible
+label and separate placement but does not reorder normal search results;
+unauthorized direct requests cannot change protected state; and the audit
+history identifies the actor and time of each named protected action.
