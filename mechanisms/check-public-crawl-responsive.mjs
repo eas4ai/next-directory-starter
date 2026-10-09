@@ -117,8 +117,8 @@ async function check(id, run) {
   }
 }
 
-async function mobileMetrics(path, mode) {
-  const context = await browser.newContext({ viewport: { width: 320, height: 740 }, colorScheme: mode });
+async function viewportMetrics(path, mode, width) {
+  const context = await browser.newContext({ viewport: { width, height: 740 }, colorScheme: mode });
   try {
     const page = await context.newPage();
     await page.goto(`${origin}${path}`, { waitUntil: 'domcontentloaded' });
@@ -137,15 +137,19 @@ async function mobileMetrics(path, mode) {
         const channel = value / 255;
         return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
       }).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
-      const foreground = rgb(body.color);
       const background = rgb(body.backgroundColor);
-      const levels = [lightness(foreground), lightness(background)].sort((a, b) => b - a);
+      const contrast = (foreground) => {
+        const levels = [lightness(rgb(foreground)), lightness(background)].sort((a, b) => b - a);
+        return (levels[0] + 0.05) / (levels[1] + 0.05);
+      };
+      const muted = document.querySelector('main .text-muted-foreground');
       return {
         width: window.innerWidth,
         scrollWidth: document.documentElement.scrollWidth,
         heading: document.querySelector('main h1')?.textContent?.trim() ?? '',
         mainWidth: document.querySelector('main')?.getBoundingClientRect().width ?? 0,
-        contrast: (levels[0] + 0.05) / (levels[1] + 0.05),
+        contrast: contrast(body.color),
+        mutedContrast: muted ? contrast(getComputedStyle(muted).color) : 0,
         background: background.join(','),
       };
     });
@@ -242,16 +246,21 @@ try {
       args: ['--no-sandbox'],
     });
     for (const path of ['/listings', '/listings/example-tool']) {
-      const light = await mobileMetrics(path, 'light');
-      const dark = await mobileMetrics(path, 'dark');
+      const light = await viewportMetrics(path, 'light', 320);
+      const dark = await viewportMetrics(path, 'dark', 320);
       for (const [mode, metrics] of [['light', light], ['dark', dark]]) {
         if (metrics.width !== 320 || metrics.scrollWidth > 320 || metrics.mainWidth > 320 ||
-            !metrics.heading || metrics.contrast < 4.5) {
+            !metrics.heading || metrics.contrast < 4.5 || metrics.mutedContrast < 4.5) {
           throw new Error(`${path} is clipped or unreadable at 320px in ${mode} mode: ${JSON.stringify(metrics)}.`);
         }
       }
       if (light.background === dark.background) {
         throw new Error(`${path} does not respond to light and dark preference.`);
+      }
+      const wide = await viewportMetrics(path, 'light', 1600);
+      if (wide.width !== 1600 || wide.scrollWidth > 1600 ||
+          wide.mainWidth < 1390 || wide.mainWidth > 1400) {
+        throw new Error(`${path} does not respect the 1400px content cap: ${JSON.stringify(wide)}.`);
       }
     }
   });
