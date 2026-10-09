@@ -146,6 +146,15 @@ const migrate = database.transaction(() => {
     CREATE INDEX audit_events_recent ON audit_events(occurred_at DESC, id DESC);`);
     database.prepare("INSERT INTO catalog_migrations (version) VALUES (4)").run();
   }
+
+  const checkoutRetryInstalled = database.prepare("SELECT version FROM catalog_migrations WHERE version = 5").get();
+  if (!checkoutRetryInstalled) {
+    database.exec(`ALTER TABLE purchases ADD COLUMN checkout_request_id TEXT;
+    ALTER TABLE purchases ADD COLUMN stripe_product_name TEXT;
+    CREATE UNIQUE INDEX purchases_checkout_request ON purchases(owner_user_id, checkout_request_id)
+      WHERE checkout_request_id IS NOT NULL;`);
+    database.prepare("INSERT INTO catalog_migrations (version) VALUES (5)").run();
+  }
 });
 
 export function migrateCatalog(): void {

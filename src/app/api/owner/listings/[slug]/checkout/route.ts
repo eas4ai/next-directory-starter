@@ -23,10 +23,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   catch (error) { return requestJsonErrorResponse(error); }
   const planKey = input && typeof input === "object" && !Array.isArray(input)
     ? (input as Record<string, unknown>).planKey : undefined;
+  const requestId = input && typeof input === "object" && !Array.isArray(input)
+    ? (input as Record<string, unknown>).requestId : undefined;
   if (typeof planKey !== "string") return Response.json({ error: "Choose a plan" }, { status: 400 });
+  if (typeof requestId !== "string") return Response.json({ error: "Invalid checkout request" }, { status: 400 });
   const stripe = new Stripe(key);
   try {
-    const checkout = await createPublishingCheckout(user.id, slug, planKey,
+    const checkout = await createPublishingCheckout(user.id, slug, planKey, requestId,
       (settings, options) => stripe.checkout.sessions.create(settings, options));
     return Response.json(checkout);
   } catch (error) {
