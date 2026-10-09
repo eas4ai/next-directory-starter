@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:migrate": "auth migrate --yes --config ./src/lib/auth.ts",
+    "db:migrate": "auth migrate --yes --config ./src/lib/auth.ts && tsx scripts/migrate-catalog.ts",
+    "db:seed": "tsx scripts/seed-catalog.ts",
     "account:provision": "auth create-admin --config ./src/lib/auth.ts"
   },
   "dependencies": {
