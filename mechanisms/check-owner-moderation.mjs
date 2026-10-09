@@ -4,7 +4,6 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import Database from 'better-sqlite3';
 
 const ids = ['PUB-001', 'PUB-002', 'PUB-003', 'PUB-004', 'PUB-005', 'ADM-003'];
 const results = Object.fromEntries(ids.map((id) => [id, false]));
@@ -98,13 +97,8 @@ async function identities() {
   adminCookie = await signIn(adminEmail, password);
   ownerACookie = await signUp('owner-a@example.invalid', password);
   ownerBCookie = await signUp('owner-b@example.invalid', password);
-  await signUp('moderator@example.invalid', password);
-  const db = new Database(join(workspace, 'directory.db'));
-  try {
-    db.prepare('UPDATE "user" SET role = ? WHERE email = ?').run('moderator', 'moderator@example.invalid');
-  } finally {
-    db.close();
-  }
+  requireCommand(['run', 'account:provision', '--', '--email', 'moderator@example.invalid',
+    '--password', password, '--role', 'moderator', '--yes']);
   moderatorCookie = await signIn('moderator@example.invalid', password);
 }
 
@@ -197,6 +191,14 @@ try {
   });
 
   await check('PUB-003', async () => {
+    const reviewPage = await request('/admin/review', { headers: { Cookie: moderatorCookie } });
+    const themePage = await request('/admin/theme', { headers: { Cookie: moderatorCookie } });
+    const catalogPage = await request('/admin/catalog', { headers: { Cookie: moderatorCookie } });
+    const themeWrite = await request('/api/admin/theme', json({}, moderatorCookie));
+    if (!reviewPage.ok || themePage.status !== 403 || catalogPage.status !== 403 ||
+        ![401, 403].includes(themeWrite.status)) {
+      throw new Error('The provisioned moderator cannot review or gained administrator access.');
+    }
     await createDraft('rejected-entry');
     const rejectedId = await submit('rejected-entry');
     const ownerDecision = await request(`/api/admin/submissions/${rejectedId}/decision`,
