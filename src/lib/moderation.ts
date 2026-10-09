@@ -69,6 +69,13 @@ function pendingSubmission(slug: string): boolean {
   return Boolean(database.prepare("SELECT 1 FROM submissions WHERE slug = ? AND status = 'pending'").get(slug));
 }
 
+function existingCategory(name: string, status = 400): string {
+  const row = database.prepare("SELECT name FROM categories WHERE name = ? COLLATE NOCASE")
+    .get(name) as { name: string } | undefined;
+  if (!row) throw new ModerationError(status, "Choose an existing category");
+  return row.name;
+}
+
 export function ownerListings(userId: string): (Listing & { hasDraft: boolean; pending: boolean })[] {
   const rows = database.prepare(`SELECT l.*,
     EXISTS(SELECT 1 FROM owner_drafts d WHERE d.slug = l.slug) AS has_draft,
@@ -91,7 +98,7 @@ export function createOwnerListing(userId: string, input: unknown): Listing {
   if (!listing) throw new ModerationError(400, "Invalid listing");
   try {
     database.transaction(() => {
-      database.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)").run(listing.category);
+      listing.category = existingCategory(listing.category);
       database.prepare(`INSERT INTO listings
         (slug, name, summary, description, category, url, status, owner_user_id)
         VALUES (?, ?, ?, ?, ?, ?, 'draft', ?)`).run(
@@ -120,8 +127,8 @@ export function updateOwnerListing(userId: string, slug: string, changes: unknow
     const base = draft ? JSON.parse(draft.payload) as Listing : current;
     const listing = parseListing({ ...base, ...changes, slug, status: current.status });
     if (!listing) throw new ModerationError(400, "Invalid listing changes");
+    listing.category = existingCategory(listing.category);
     if (current.status === "draft") {
-      database.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)").run(listing.category);
       database.prepare(`UPDATE listings SET name = ?, summary = ?, description = ?, category = ?, url = ?
         WHERE slug = ? AND owner_user_id = ?`).run(listing.name, listing.summary,
         listing.description, listing.category, listing.url, slug, userId);
@@ -182,7 +189,7 @@ export function decideSubmission(id: string, actorId: string, decision: "approve
     if (decision === "approve") {
       if (current.status === "suspended") throw new ModerationError(409, "Suspended listing cannot be approved");
       const proposed = JSON.parse(row.payload) as Listing;
-      database.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)").run(proposed.category);
+      proposed.category = existingCategory(proposed.category, 409);
       database.prepare(`UPDATE listings SET name = ?, summary = ?, description = ?, category = ?,
         url = ?, status = 'published' WHERE slug = ? AND owner_user_id = ?`).run(
         proposed.name, proposed.summary, proposed.description, proposed.category,
