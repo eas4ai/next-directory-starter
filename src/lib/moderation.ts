@@ -4,6 +4,7 @@ import { migrateCatalog } from "@/lib/catalog-migrations";
 import { parseListing } from "@/lib/catalog-input";
 import type { Listing } from "@/lib/listings";
 import { HttpError, httpErrorResponse } from "@/lib/http-error";
+import { recordAudit } from "@/lib/audit";
 
 migrateCatalog();
 
@@ -200,6 +201,7 @@ export function decideSubmission(id: string, actorId: string, decision: "approve
     database.prepare(`UPDATE submissions SET status = ?, reason = ?, decided_at = ?, decided_by = ?
       WHERE id = ? AND status = 'pending'`).run(decision === "approve" ? "approved" : "rejected",
       reason, new Date().toISOString(), actorId, id);
+    recordAudit(decision === "approve" ? "moderation.approve" : "moderation.reject", actorId, row.slug);
   }).immediate();
 }
 
@@ -213,5 +215,6 @@ export function suspendPublishedListing(slug: string, actorId: string, reason: s
       `Suspended: ${reason}`, new Date().toISOString(), actorId, slug,
     );
     database.prepare("DELETE FROM owner_drafts WHERE slug = ?").run(slug);
+    recordAudit("moderation.suspend", actorId, slug);
   }).immediate();
 }

@@ -23,7 +23,7 @@ export async function PATCH(request: Request, { params }: Params) {
   try { input = await requestJson(request, MAX_ARTICLE_JSON_LENGTH); }
   catch (error) { return requestJsonErrorResponse(error); }
   try {
-    return Response.json({ article: updateArticle((await params).slug, input) });
+    return Response.json({ article: updateArticle((await params).slug, input, user.id) });
   } catch (error) {
     return articleErrorResponse(error);
   }
