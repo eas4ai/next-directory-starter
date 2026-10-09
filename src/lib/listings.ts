@@ -1,5 +1,6 @@
 import { database } from "@/lib/database";
 import { migrateCatalog } from "@/lib/catalog-migrations";
+import { recordAudit } from "@/lib/audit";
 
 export type Listing = {
   slug: string;
@@ -93,7 +94,7 @@ export function activeFeaturedSlugs(slugs: string[]): Set<string> {
   return new Set(rows.map((row) => row.listing_slug));
 }
 
-export function createListing(listing: Listing): void {
+export function createListing(listing: Listing, actorUserId: string): void {
   database.transaction(() => {
     database.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)").run(listing.category);
     database.prepare(`INSERT INTO listings
@@ -102,16 +103,25 @@ export function createListing(listing: Listing): void {
       listing.slug, listing.name, listing.summary, listing.description,
       listing.category, listing.url, listing.status,
     );
-  })();
+    recordAudit(listing.status === "published" ? "catalog.publish" : "catalog.create", actorUserId, listing.slug);
+  }).immediate();
 }
 
-export function updateListing(listing: Listing): void {
+export function updateListing(listing: Listing, actorUserId: string): void {
   database.transaction(() => {
+    const current = database.prepare("SELECT status FROM listings WHERE slug = ?")
+      .get(listing.slug) as { status: Listing["status"] } | undefined;
+    if (!current) throw new Error("Listing not found");
     database.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)").run(listing.category);
     database.prepare(`UPDATE listings SET name = ?, summary = ?, description = ?,
       category = ?, url = ?, status = ? WHERE slug = ?`).run(
       listing.name, listing.summary, listing.description, listing.category,
       listing.url, listing.status, listing.slug,
     );
-  })();
+    const action = listing.status === "published" && current.status !== "published"
+      ? "catalog.publish" : current.status === "published" && listing.status === "draft"
+        ? "catalog.unpublish" : listing.status === "suspended" && current.status !== "suspended"
+          ? "catalog.suspend" : "catalog.update";
+    recordAudit(action, actorUserId, listing.slug);
+  }).immediate();
 }
