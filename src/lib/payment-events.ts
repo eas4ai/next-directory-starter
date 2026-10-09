@@ -34,10 +34,13 @@ function settle(event: Stripe.Event): void {
     .get(id) as PurchaseRow | undefined;
   if (!purchase || session.id !== purchase.stripe_session_id ||
       session.object !== "checkout.session" || session.mode !== "payment" ||
-      session.payment_status !== "paid" || session.amount_total !== purchase.amount_minor ||
-      session.currency !== purchase.currency || typeof session.payment_intent !== "string" ||
-      (purchase.stripe_payment_intent_id && purchase.stripe_payment_intent_id !== session.payment_intent)) {
+      session.amount_total !== purchase.amount_minor || session.currency !== purchase.currency) {
     throw new PaymentEventError(409, "Checkout does not match the pending purchase");
+  }
+  if (event.type === "checkout.session.completed" && session.payment_status === "unpaid") return;
+  if (session.payment_status !== "paid" || typeof session.payment_intent !== "string" ||
+      (purchase.stripe_payment_intent_id && purchase.stripe_payment_intent_id !== session.payment_intent)) {
+    throw new PaymentEventError(409, "Checkout payment is not complete or does not match");
   }
   if (purchase.status === "paid" || purchase.status === "refunded") return;
   const startsAt = new Date();

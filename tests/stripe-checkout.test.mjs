@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-test('Checkout uses approved ownership and snapshots the displayed plan terms', async () => {
+test('Checkout reserves displayed terms and waits for delayed payment success', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'directory-checkout-contract-'));
   const previous = { database: process.env.DATABASE_URL, site: process.env.SITE_URL };
   process.env.DATABASE_URL = `file:${join(dir, 'directory.db')}`;
@@ -17,6 +17,7 @@ test('Checkout uses approved ownership and snapshots the displayed plan terms', 
     const { migrateCatalog } = await import('../src/lib/catalog-migrations.ts');
     const { createPlan, updatePlan } = await import('../src/lib/plans.ts');
     const { createPublishingCheckout } = await import('../src/lib/checkout.ts');
+    const { processStripeEvent } = await import('../src/lib/payment-events.ts');
     migrateCatalog();
     database.prepare('INSERT INTO categories (name) VALUES (?)').run('Tools');
     database.prepare(`INSERT INTO listings
@@ -87,6 +88,22 @@ test('Checkout uses approved ownership and snapshots the displayed plan terms', 
     assert.equal(interruptedCalls[1].options.idempotencyKey, pending.id);
     assert.equal(database.prepare('SELECT stripe_session_id FROM purchases WHERE id = ?').get(pending.id).stripe_session_id,
       'cs_test_interrupted');
+
+    const session = {
+      id: 'cs_test_approved', object: 'checkout.session', mode: 'payment',
+      client_reference_id: result.purchaseId, amount_total: 1200, currency: 'usd',
+    };
+    const unpaid = { id: 'evt_unpaid', type: 'checkout.session.completed',
+      data: { object: { ...session, payment_status: 'unpaid', payment_intent: null } } };
+    processStripeEvent(unpaid);
+    assert.equal(database.prepare('SELECT status FROM purchases WHERE id = ?').get(result.purchaseId).status, 'pending');
+    assert.equal(database.prepare('SELECT COUNT(*) AS count FROM entitlements WHERE purchase_id = ?').get(result.purchaseId).count, 0);
+    const paid = { id: 'evt_async_paid', type: 'checkout.session.async_payment_succeeded',
+      data: { object: { ...session, payment_status: 'paid', payment_intent: 'pi_test_approved' } } };
+    processStripeEvent(paid);
+    processStripeEvent(paid);
+    assert.equal(database.prepare('SELECT status FROM purchases WHERE id = ?').get(result.purchaseId).status, 'paid');
+    assert.equal(database.prepare('SELECT COUNT(*) AS count FROM entitlements WHERE purchase_id = ?').get(result.purchaseId).count, 1);
   } finally {
     database?.close();
     if (previous.database === undefined) delete process.env.DATABASE_URL;
