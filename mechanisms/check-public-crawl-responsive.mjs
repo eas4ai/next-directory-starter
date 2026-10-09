@@ -10,6 +10,7 @@ import { XMLParser, XMLValidator } from 'fast-xml-parser';
 const ids = ['SEO-003', 'SEO-004', 'SEO-005', 'DIR-005'];
 const results = Object.fromEntries(ids.map((id) => [id, false]));
 const workspace = mkdtempSync(join(tmpdir(), 'directory-crawl-check-'));
+const articleBody = 'Visible body for crawl-article. </script><script id="json-ld-injection">alert(1)</script>';
 let app;
 let browser;
 let origin;
@@ -80,7 +81,7 @@ async function prepareContent() {
   for (const [slug, status] of [['crawl-article', 'published'], ['draft-article', 'draft']]) {
     const article = await request('/api/admin/articles', json({
       slug, title: `Article ${slug}`, summary: `Summary for ${slug}`,
-      body: `Visible body for ${slug}.`, status, tags: [],
+      body: slug === 'crawl-article' ? articleBody : `Visible body for ${slug}.`, status, tags: [],
     }, adminCookie));
     if (article.status !== 201) throw new Error(`Article setup returned ${article.status}.`);
   }
@@ -210,12 +211,26 @@ try {
         throw new Error('Listing structured data disagrees with its visible listing.');
       }
       if (path === '/articles/crawl-article' && !data.some((entry) =>
-        entry.headline === 'Article crawl-article' && entry.description === 'Summary for crawl-article')) {
+        entry.headline === 'Article crawl-article' && entry.description === 'Summary for crawl-article' &&
+        entry.articleBody === articleBody && entry.url === `${origin}/articles/crawl-article`)) {
         throw new Error('Article structured data disagrees with its visible article.');
+      }
+      if (path === '/articles/crawl-article' && html.includes('<script id="json-ld-injection">')) {
+        throw new Error('Article content terminates its JSON-LD script.');
       }
       if (['/', '/listings', '/articles'].includes(path) &&
           !data.some((entry) => entry.name === visible)) {
         throw new Error(`${path} structured name disagrees with its visible heading or site identity.`);
+      }
+      if (path === '/listings' && !data.some((entry) =>
+        entry.mainEntity?.itemListElement?.some((item) =>
+          item.name === 'Example Tool' && item.url === `${origin}/listings/example-tool`))) {
+        throw new Error('Listing index structured links disagree with visible listings.');
+      }
+      if (path === '/articles' && !data.some((entry) =>
+        entry.mainEntity?.itemListElement?.some((item) =>
+          item.name === 'Article crawl-article' && item.url === `${origin}/articles/crawl-article`))) {
+        throw new Error('Article index structured links disagree with visible articles.');
       }
     }
   });
