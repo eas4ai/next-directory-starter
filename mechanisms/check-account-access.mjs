@@ -189,10 +189,15 @@ try {
       throw new Error('Reset request response reveals account existence.');
     }
     const link = await mailLink(email, before);
-    const token = new URL(link).searchParams.get('token');
-    if (!token) throw new Error('Reset message has no token.');
     const resetPage = await request(link);
-    if (!resetPage.ok && resetPage.status !== 302) throw new Error('Reset link has no usable page.');
+    if (resetPage.status !== 302) throw new Error('Reset link did not redirect to the password form.');
+    const resetLocation = new URL(resetPage.headers.get('location'), origin);
+    const token = resetLocation.searchParams.get('token');
+    if (resetLocation.pathname !== '/owner/reset-password' || !token) {
+      throw new Error('Reset link has no usable password form or token.');
+    }
+    const form = await request(resetLocation);
+    if (!form.ok) throw new Error('Reset password form is unavailable.');
     const reset = await request('/api/auth/reset-password', json({ token, newPassword: nextPassword }));
     if (!reset.ok) throw new Error('Valid password reset was rejected.');
     const old = await signIn(email);
@@ -206,7 +211,7 @@ try {
     const expiredLink = await mailLink(email, beforeExpired);
     withDb((db) => db.prepare('UPDATE verification SET expiresAt = ?').run(0));
     const expired = await request('/api/auth/reset-password',
-      json({ token: new URL(expiredLink).searchParams.get('token'), newPassword: password }));
+      json({ token: new URL(expiredLink).pathname.split('/').at(-1), newPassword: password }));
     if (old.response.ok || !fresh.response.ok || !fresh.cookie || oldSession.ok || replay.ok || expired.ok) {
       throw new Error('Password reset left old credentials/session usable or accepted token replay.');
     }
