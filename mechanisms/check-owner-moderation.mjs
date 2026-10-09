@@ -169,6 +169,12 @@ try {
 
   await check('PUB-001', async () => {
     await createDraft('owned-entry');
+    const signInPage = await request('/owner/sign-in');
+    const ownerPage = await request('/owner/listings', { headers: { Cookie: ownerACookie } });
+    if (!signInPage.ok || !contains(await signInPage.text(), 'password') ||
+        !ownerPage.ok || !contains(await ownerPage.text(), 'owned-entry')) {
+      throw new Error('An owner cannot sign in and manage their listing from a private workspace.');
+    }
     const path = '/api/owner/listings/owned-entry';
     const otherGet = await request(path, { headers: { Cookie: ownerBCookie } });
     const otherWrite = await request(path, json({ name: 'Stolen name' }, ownerBCookie, 'PATCH'));
@@ -237,11 +243,13 @@ try {
   await check('PUB-005', async () => {
     await createDraft('suspended-entry');
     await decide(await submit('suspended-entry'), 'approve', 'Initial approval');
+    const ownerAttempt = await request('/api/admin/listings/suspended-entry/suspend',
+      json({ reason: 'Owner bypass' }, ownerACookie));
     const response = await request('/api/admin/listings/suspended-entry/suspend',
       json({ reason: 'Unsafe destination' }, moderatorCookie));
     const detail = await request('/listings/suspended-entry');
     const search = await request('/listings?q=suspended-entry');
-    if (!response.ok || detail.status !== 404 ||
+    if (![401, 403].includes(ownerAttempt.status) || !response.ok || detail.status !== 404 ||
         contains(await search.text(), 'Owner suspended-entry')) {
       throw new Error('A moderator cannot suspend immediately or the listing remains public.');
     }
@@ -251,11 +259,13 @@ try {
     await createDraft('pending-review-entry');
     await submit('pending-review-entry');
     await createDraft('history-entry');
-    await decide(await submit('history-entry'), 'reject', 'Duplicate resource');
+    const historyId = await submit('history-entry');
+    await decide(historyId, 'reject', 'Duplicate resource');
+    const history = (await reviewRecords()).find((item) => item.id === historyId);
     const page = await request('/admin/review', { headers: { Cookie: adminCookie } });
     const html = await page.text();
     const guest = await request('/admin/review');
-    if (!page.ok || !contains(html, 'pending-review-entry') ||
+    if (!history?.decidedAt || !history?.decidedBy || !page.ok || !contains(html, 'pending-review-entry') ||
         !contains(html, 'Duplicate resource') || guest.status === 200) {
       throw new Error('The administrator review view omits pending work, history, or access control.');
     }
