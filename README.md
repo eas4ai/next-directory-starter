@@ -58,6 +58,8 @@ The article RSS feed is available at `/feed.xml`. It includes published articles
 
 Administrators configure price, currency, duration, featured placement, and availability at `/admin/plans`. Approved listing owners see current plans from **My listings → Publishing plans** before they leave for Stripe-hosted Checkout. Each checkout saves the selected terms with its pending purchase; later plan edits do not change that purchase. Set `STRIPE_SECRET_KEY` in the environment to enable checkout. A return to the site is only a receipt of the browser navigation; payment confirmation is handled by the signed webhook.
 
+Configure a Stripe webhook destination at `https://your-site.example/api/webhooks/stripe` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, and `charge.refunded`. Put that destination's signing secret in `STRIPE_WEBHOOK_SECRET`. The handler verifies the raw body signature and matching purchase details before granting a time-limited entitlement. Repeated events have no additional effect; a verified full refund revokes the entitlement. Test mode and live mode have separate API keys and webhook secrets.
+
 ## Deploying
 
 Set `BETTER_AUTH_URL` and `SITE_URL` to the site's public HTTPS origin. Set `BETTER_AUTH_SECRET` to a unique secret and `DATABASE_URL` to a writable, persistent SQLite file, then run `npm run db:migrate` and provision an administrator using the same environment as the running application. Back up the SQLite file. The ignored `.runtime/directory.db` default is intended for local development; production storage must survive builds and deployments.
