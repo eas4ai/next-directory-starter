@@ -85,6 +85,13 @@ async function prepareContent() {
     }, adminCookie));
     if (article.status !== 201) throw new Error(`Article setup returned ${article.status}.`);
   }
+  const longListing = await request('/api/admin/listings', json({
+    slug: 'long-name', name: 'W'.repeat(120),
+    summary: 'A published listing with a valid unbroken name.',
+    description: 'This long name tests the narrow directory layout.',
+    category: 'Tools', url: 'https://example.org/long-name', status: 'published',
+  }, adminCookie));
+  if (longListing.status !== 201) throw new Error(`Long-name setup returned ${longListing.status}.`);
 }
 
 function xmlEntries(xml) {
@@ -245,7 +252,7 @@ try {
       ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: 'chrome' }),
       args: ['--no-sandbox'],
     });
-    for (const path of ['/listings', '/listings/example-tool']) {
+    for (const path of ['/listings', '/listings/example-tool', '/listings/long-name']) {
       const light = await viewportMetrics(path, 'light', 320);
       const dark = await viewportMetrics(path, 'dark', 320);
       for (const [mode, metrics] of [['light', light], ['dark', dark]]) {
