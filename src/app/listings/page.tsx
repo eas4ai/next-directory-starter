@@ -9,9 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getSiteConfig } from "@/lib/site-config";
 
-export async function generateMetadata() {
+export async function generateMetadata({ searchParams }: PageProps<"/listings">) {
   await connection();
-  return pageMetadata("/listings", `Listings | ${getSiteConfig().name}`, "Explore the published links in this directory.");
+  const hasQuery = Object.keys(await searchParams).length > 0;
+  return {
+    ...pageMetadata("/listings", `Listings | ${getSiteConfig().name}`, "Explore the published links in this directory."),
+    ...(hasQuery ? { robots: { index: false, follow: true } } : {}),
+  };
 }
 
 function one(value: string | string[] | undefined): string {

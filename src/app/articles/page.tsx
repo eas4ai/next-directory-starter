@@ -5,9 +5,13 @@ import { listArticles } from "@/lib/articles";
 import { pageMetadata } from "@/lib/page-metadata";
 import { getSiteConfig } from "@/lib/site-config";
 
-export async function generateMetadata(): Promise<Metadata> {
+export async function generateMetadata({ searchParams }: PageProps<"/articles">): Promise<Metadata> {
   await connection();
-  return pageMetadata("/articles", `Articles | ${getSiteConfig().name}`, "Read published articles from this directory.");
+  const hasQuery = Object.keys(await searchParams).length > 0;
+  return {
+    ...pageMetadata("/articles", `Articles | ${getSiteConfig().name}`, "Read published articles from this directory."),
+    ...(hasQuery ? { robots: { index: false, follow: true } } : {}),
+  };
 }
 
 export default async function ArticlesPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
