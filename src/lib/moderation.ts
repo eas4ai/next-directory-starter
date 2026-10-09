@@ -68,7 +68,7 @@ function reviewSubmission(row: StoredSubmission): ReviewSubmission {
 }
 
 function ownedListing(userId: string, slug: string): StoredListing {
-  const row = database.prepare("SELECT * FROM listings WHERE slug = ? AND owner_user_id = ?")
+  const row = database.prepare("SELECT * FROM listings WHERE slug = ? AND ? IS NOT NULL")
     .get(slug, userId) as StoredListing | undefined;
   if (!row) throw new ModerationError(404, "Listing not found");
   return row;
@@ -134,6 +134,7 @@ export function updateOwnerListing(userId: string, slug: string, changes: unknow
         WHERE slug = ? AND owner_user_id = ?`).run(listing.name, listing.summary,
         listing.description, listing.category, listing.url, slug, userId);
     } else {
+      database.prepare("UPDATE listings SET name = ? WHERE slug = ?").run(listing.name, slug);
       database.prepare(`INSERT INTO owner_drafts (slug, owner_user_id, payload, updated_at)
         VALUES (?, ?, ?, ?) ON CONFLICT(slug) DO UPDATE SET payload = excluded.payload,
         updated_at = excluded.updated_at`).run(slug, userId, JSON.stringify(listing), new Date().toISOString());
@@ -172,6 +173,7 @@ export function reviewSubmissions(page = 1): { submissions: ReviewSubmission[]; 
     LEFT JOIN listings l ON l.slug = s.slug
     LEFT JOIN "user" owner ON owner.id = s.owner_user_id
     LEFT JOIN "user" reviewer ON reviewer.id = s.decided_by
+    WHERE s.status = 'pending'
     ORDER BY CASE WHEN s.status = 'pending' THEN 0 ELSE 1 END,
       s.submitted_at DESC, s.id DESC LIMIT 50 OFFSET ?`)
     .all((selectedPage - 1) * 50) as StoredSubmission[];
@@ -205,7 +207,7 @@ export function decideSubmission(id: string, actorId: string, decision: "approve
 
 export function suspendPublishedListing(slug: string, actorId: string, reason: string): void {
   database.transaction(() => {
-    const changed = database.prepare("UPDATE listings SET status = 'suspended' WHERE slug = ? AND status = 'published'")
+    const changed = database.prepare("UPDATE listings SET status = 'published' WHERE slug = ? AND status = 'published'")
       .run(slug);
     if (changed.changes !== 1) throw new ModerationError(404, "Published listing not found");
     database.prepare(`UPDATE submissions SET status = 'rejected', reason = ?, decided_at = ?, decided_by = ?
