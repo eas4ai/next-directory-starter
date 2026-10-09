@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: public-starter-and-theme
+Current: operator-catalog
 
 ## public-starter-and-theme
 
@@ -22,3 +22,22 @@ eligible listing on the directory page and its full detail and external link
 on its own page; the initial HTML carries the matching page metadata; and an
 authenticated administrator can preview and save any supported preset while
 other accounts cannot change it, with the saved theme surviving a restart.
+
+## operator-catalog
+
+Requirements: FOUND-002, FOUND-003, FOUND-004, DIR-003, DIR-004
+
+Delivery: replace the source-file sample catalog with migrated SQLite tables
+for listings and categories. Provide repeatable sample seeding, documented
+first-run and migration commands, documented site identity settings, and
+authenticated operator controls for listings. The public directory reads eligible rows
+from the database, supports query and category filters with bounded pages, and
+reflects publication changes on the index and detail routes. Preserve the
+existing theme editor and server-rendered public pages.
+
+Done-when: a fresh database migrates and seeds a browsable directory; an
+operator changes the site's identity and sees it in the header and metadata;
+operator-created listings survive restart; search and category
+filters return only matching eligible listings within the documented page
+bound; and a newly ineligible listing disappears from every public directory
+route, including its former detail URL.
