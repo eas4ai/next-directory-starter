@@ -37,7 +37,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               {site.logoUrl && <img src={site.logoUrl} alt="" className="size-7 object-contain" />}
               {site.name}
             </Link>
-            <Link href="/listings" className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm" style={{ background: "var(--sidebar-accent)", color: "var(--sidebar-accent-foreground)" }}>Listings <PresetExternalLinkIcon library={preset.iconLibrary} /></Link>
+            <div className="flex items-center gap-2">
+              <Link href="/owner/listings" className="rounded-md px-3 py-2 text-sm">Submit a link</Link>
+              <Link href="/listings" className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm" style={{ background: "var(--sidebar-accent)", color: "var(--sidebar-accent-foreground)" }}>Listings <PresetExternalLinkIcon library={preset.iconLibrary} /></Link>
+            </div>
           </nav>
         </header>
         {children}

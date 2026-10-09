@@ -6,6 +6,7 @@ import { allListings } from "@/lib/listings";
 import { CatalogEditor } from "./catalog-editor";
 import { connection } from "next/server";
 import { getSiteConfig } from "@/lib/site-config";
+import Link from "next/link";
 
 export async function generateMetadata(): Promise<Metadata> {
   await connection();
@@ -22,6 +23,7 @@ export default async function CatalogPage() {
     <main className="mx-auto max-w-5xl px-6 py-10">
       <h1 className="text-3xl font-semibold tracking-tight">Catalog</h1>
       <p className="mt-3 text-muted-foreground">Create listings and manage their publication state.</p>
+      <Link href="/admin/review" className="mt-3 inline-block text-sm underline">Review owner submissions</Link>
       <CatalogEditor initialListings={allListings()} />
     </main>
   );

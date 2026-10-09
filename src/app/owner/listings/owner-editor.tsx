@@ -1,0 +1,154 @@
+"use client";
+
+import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import type { Listing } from "@/lib/listings";
+
+type OwnerItem = Listing & { hasDraft: boolean; pending: boolean };
+
+function ListingFields({ value, includeSlug }: { value?: Listing; includeSlug?: boolean }) {
+  return (
+    <div className="grid gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        {includeSlug && <label className="grid gap-2 text-sm font-medium">Slug<Input name="slug" required pattern="[a-z0-9]+(-[a-z0-9]+)*" maxLength={80} /></label>}
+        <label className="grid gap-2 text-sm font-medium">Name<Input name="name" defaultValue={value?.name} required maxLength={120} /></label>
+        <label className="grid gap-2 text-sm font-medium">Category<Input name="category" defaultValue={value?.category} required maxLength={80} /></label>
+        <label className="grid gap-2 text-sm font-medium">External URL<Input name="url" type="url" defaultValue={value?.url} required maxLength={2048} /></label>
+      </div>
+      <label className="grid gap-2 text-sm font-medium">Summary<Input name="summary" defaultValue={value?.summary} required maxLength={280} /></label>
+      <label className="grid gap-2 text-sm font-medium">Description
+        <textarea name="description" defaultValue={value?.description} required maxLength={5000} className="min-h-28 rounded-md border border-input bg-background px-3 py-2 text-sm" />
+      </label>
+    </div>
+  );
+}
+
+export function OwnerEditor({ initialListings }: { initialListings: OwnerItem[] }) {
+  const router = useRouter();
+  const [editing, setEditing] = useState<Listing | null>(null);
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState("");
+
+  async function create(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    setPending(true);
+    setMessage("");
+    try {
+      const response = await fetch("/api/owner/listings", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.fromEntries(new FormData(form))),
+      });
+      if (!response.ok) {
+        setMessage((await response.json()).error ?? "Could not save the draft.");
+        return;
+      }
+      form.reset();
+      setMessage("Draft saved. Submit it when it is ready for review.");
+      router.refresh();
+    } catch {
+      setMessage("Could not connect to the server. Try again.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function edit(item: OwnerItem) {
+    setMessage("");
+    try {
+      const response = await fetch(`/api/owner/listings/${encodeURIComponent(item.slug)}`);
+      if (!response.ok) {
+        setMessage("Could not open this listing.");
+        return;
+      }
+      const data = await response.json() as { listing: Listing; proposal: Listing | null };
+      setEditing(data.proposal ?? data.listing);
+    } catch {
+      setMessage("Could not connect to the server. Try again.");
+    }
+  }
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editing) return;
+    setPending(true);
+    setMessage("");
+    try {
+      const response = await fetch(`/api/owner/listings/${encodeURIComponent(editing.slug)}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))),
+      });
+      if (!response.ok) {
+        setMessage((await response.json()).error ?? "Could not save changes.");
+        return;
+      }
+      const data = await response.json() as { listing: Listing };
+      setEditing(data.listing);
+      setMessage("Changes saved privately. Submit them for review when ready.");
+      router.refresh();
+    } catch {
+      setMessage("Could not connect to the server. Try again.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function submit(slug: string) {
+    setPending(true);
+    setMessage("");
+    try {
+      const response = await fetch(`/api/owner/listings/${encodeURIComponent(slug)}/submit`, { method: "POST" });
+      if (!response.ok) {
+        setMessage((await response.json()).error ?? "Could not submit this listing.");
+        return;
+      }
+      setEditing(null);
+      setMessage("Submitted for review.");
+      router.refresh();
+    } catch {
+      setMessage("Could not connect to the server. Try again.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="mt-8 space-y-10">
+      <form onSubmit={create} className="space-y-4 rounded-lg border p-6">
+        <h2 className="text-xl font-semibold">New private draft</h2>
+        <ListingFields includeSlug />
+        <Button type="submit" disabled={pending}>Save draft</Button>
+      </form>
+      {message && <p role="status" className="text-sm text-muted-foreground">{message}</p>}
+      <section className="space-y-3">
+        <h2 className="text-xl font-semibold">Your listings</h2>
+        {initialListings.map((item) => (
+          <div key={item.slug} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
+            <div>
+              <p className="font-medium">{item.name}</p>
+              <p className="text-sm text-muted-foreground">{item.slug} · {item.status}{item.pending ? " · awaiting review" : item.hasDraft ? " · private changes saved" : ""}</p>
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" size="sm" variant="outline" disabled={pending || item.pending} onClick={() => edit(item)}>Edit</Button>
+              {(item.status === "draft" || item.hasDraft) && !item.pending &&
+                <Button type="button" size="sm" disabled={pending} onClick={() => submit(item.slug)}>Submit for review</Button>}
+            </div>
+          </div>
+        ))}
+        {initialListings.length === 0 && <p className="text-sm text-muted-foreground">You have no listings yet.</p>}
+      </section>
+      {editing && (
+        <form key={editing.slug} onSubmit={save} className="space-y-4 rounded-lg border p-6">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-xl font-semibold">Edit {editing.slug}</h2>
+            <Button type="button" variant="ghost" onClick={() => setEditing(null)}>Close</Button>
+          </div>
+          <ListingFields value={editing} />
+          <Button type="submit" disabled={pending}>Save changes</Button>
+        </form>
+      )}
+    </div>
+  );
+}
