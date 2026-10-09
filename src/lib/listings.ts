@@ -1,3 +1,5 @@
+import records from "../../fixtures/sample-listings.json";
+
 export type Listing = {
   slug: string;
   name: string;
@@ -8,27 +10,20 @@ export type Listing = {
   status: "published" | "draft";
 };
 
-// Replace these examples with your directory's own source of listings.
-export const sampleListings: Listing[] = [
-  {
-    slug: "example-tool",
-    name: "Example Tool",
-    summary: "A sample link for your directory",
-    description: "Example Tool is a sample listing that shows how a published link appears in the directory.",
-    category: "Tools",
-    url: "https://example.org/tool",
-    status: "published",
-  },
-  {
-    slug: "hidden-draft",
-    name: "Hidden Draft",
-    summary: "A draft listing that is not public",
-    description: "This sample is reserved for testing publication rules.",
-    category: "Tools",
-    url: "https://example.org/draft",
-    status: "draft",
-  },
-];
+export const sampleListings: Listing[] = records.map((record): Listing => {
+  if (record.status !== "published" && record.status !== "draft") {
+    throw new Error(`Unknown status for listing ${record.slug}`);
+  }
+  return {
+    slug: record.slug,
+    name: record.title,
+    summary: record.summary,
+    description: record.description,
+    category: record.category,
+    url: record.url,
+    status: record.status,
+  };
+});
 
 export const publishedListings = sampleListings.filter((listing) => listing.status === "published");
 

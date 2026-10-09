@@ -27,4 +27,4 @@ The provisioning command prompts for a password. Open [the administrator sign-in
 
 Set `BETTER_AUTH_URL` and `SITE_URL` to the site's public HTTPS origin. Set `BETTER_AUTH_SECRET` to a unique secret and `DATABASE_URL` to a writable, persistent SQLite file, then run `npm run db:migrate` and provision an administrator using the same environment as the running application. Back up the SQLite file. The ignored `.runtime/directory.db` default is intended for local development; production storage must survive builds and deployments.
 
-Run `npm run build` and `npm run start` to serve the production build. The current sample records live in `src/lib/listings.ts`.
+Run `npm run build` and `npm run start` to serve the production build. Replace the sample records in `fixtures/sample-listings.json` with your own listings; records marked `draft` stay off public pages.
