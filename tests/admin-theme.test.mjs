@@ -216,6 +216,7 @@ test('ADM-007 first-admin provisioning works without public self-promotion', asy
   assert.match(signInHtml, /Administrator sign in/);
   assert.match(signInHtml, /name="email"/);
   assert.match(signInHtml, /name="password"/);
+  assert.match(signInHtml.match(/<form\b[^>]*>/)?.[0] ?? '', /method="post"/);
   const admin = adminCookie;
   const member = memberCookie;
   const adminAccount = await (await request('/api/auth/get-session', { headers: { Cookie: admin } })).json();
