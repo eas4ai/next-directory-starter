@@ -126,7 +126,7 @@ export function ThemeEditor({ options, initialPreset, initialCss }: Props) {
             <div className="flex gap-1" aria-label="Chart colors">
               {[1, 2, 3, 4, 5].map((index) => <span key={index} className="h-6 flex-1 rounded-sm" style={{ background: `var(--chart-${index})` }} />)}
             </div>
-            <div className="rounded-lg border px-4 py-3 text-sm" style={{ background: "var(--sidebar)", color: "var(--sidebar-foreground)", borderColor: "var(--sidebar-border)", opacity: "var(--preset-menu-opacity)" }}>
+            <div className="rounded-lg border px-4 py-3 text-sm" style={{ background: "var(--sidebar)", color: "var(--sidebar-foreground)", borderColor: "var(--sidebar-border)" }}>
               <span className="rounded px-2 py-1" style={{ background: "var(--sidebar-accent)", color: "var(--sidebar-accent-foreground)" }}>Menu preview</span>
             </div>
           </div>

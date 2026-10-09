@@ -63,8 +63,8 @@ const radii: Record<string, string> = {
   default: "0.625rem", none: "0", small: "0.375rem", medium: "0.625rem", large: "0.875rem",
 };
 
-function color(lightness: number, chroma: number, hue: number): string {
-  return `oklch(${lightness} ${chroma} ${hue})`;
+function color(lightness: number, chroma: number, hue: number, alpha?: number): string {
+  return `oklch(${lightness} ${chroma} ${hue}${alpha === undefined ? "" : ` / ${alpha}`})`;
 }
 
 function fontName(slug: string): string {
@@ -96,7 +96,10 @@ function variables(preset: ThemePreset, dark: boolean): Record<string, string> {
   const primaryForeground = dark ? color(0.14, 0.02, themeHue) : color(0.99, 0.005, themeHue);
   const menuInverted = preset.menuColor.startsWith("inverted");
   const menuTranslucent = preset.menuColor.endsWith("translucent");
-  const menuBackground = menuInverted ? color(dark ? 0.93 : 0.21, baseChroma, baseHue) : card;
+  const menuAlpha = menuTranslucent ? 0.85 : undefined;
+  const menuBackground = menuInverted
+    ? color(dark ? 0.93 : 0.21, baseChroma, baseHue, menuAlpha)
+    : color(dark ? 0.22 : 1, baseChroma * 0.5, baseHue, menuAlpha);
   const menuForeground = menuInverted ? color(dark ? 0.2 : 0.97, baseChroma, baseHue) : foreground;
   const menuAccent = preset.menuAccent === "bold" ? primary : muted;
   const menuAccentForeground = preset.menuAccent === "bold" ? primaryForeground : menuForeground;
@@ -128,7 +131,6 @@ function variables(preset: ThemePreset, dark: boolean): Record<string, string> {
     "preset-heading-font": fontFamily(preset.fontHeading === "inherit" ? preset.font : preset.fontHeading),
     "preset-control-height": controlHeight,
     "preset-shadow": shadow,
-    "preset-menu-opacity": menuTranslucent ? "0.85" : "1",
     "preset-icon-library": `"${preset.iconLibrary}"`,
   };
 }
