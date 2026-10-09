@@ -21,7 +21,10 @@ let origin;
 
 function requireCommand(args) {
   const result = spawnSync('npm', args, { env: appEnv, encoding: 'utf8', timeout: 120_000 });
-  if (result.status !== 0) throw new Error(`npm ${args[1] ?? args[0]} exited ${result.status}.`);
+  if (result.status !== 0) {
+    if (args.includes('build')) process.stderr.write(`${(result.stderr ?? '').slice(-1500)}\n`);
+    throw new Error(`npm ${args[1] ?? args[0]} exited ${result.status}.`);
+  }
 }
 
 async function freePort() {
@@ -245,6 +248,8 @@ try {
   await startApp();
 
   await check('ACC-004', async () => {
+    withDb((db) => db.prepare('UPDATE "user" SET role = ? WHERE email = ?')
+      .run('user', 'first-admin@example.invalid'));
     const admin = await provision('suspend-admin@example.invalid', 'admin');
     const owner = await provision('suspend-owner@example.invalid');
     const listing = {
@@ -272,10 +277,11 @@ try {
       json({ suspended: true, reason: 'Fixture' }, admin.cookie, 'PATCH'));
     const audit = withDb((db) => db.prepare(`SELECT actor_user_id FROM audit_events
       WHERE action = 'account.suspend' AND target = ? ORDER BY occurred_at DESC LIMIT 1`).get(owner.id));
-    if (oldSession.ok || newSession.response.ok || publicPage.ok || finalAdmin.ok ||
-        audit?.actor_user_id !== admin.id) {
-      throw new Error('Suspension left access/public content, removed final admin, or lacks audit.');
-    }
+    if (oldSession.ok) throw new Error('Suspended account retained an existing session.');
+    if (newSession.response.ok) throw new Error('Suspended account signed in again.');
+    if (publicPage.ok) throw new Error('Suspended account listing remains public.');
+    if (finalAdmin.ok) throw new Error('Final active administrator was suspended.');
+    if (audit?.actor_user_id !== admin.id) throw new Error('Suspension lacks actor audit record.');
     const restored = await request(`/api/admin/accounts/${owner.id}/suspension`,
       json({ suspended: false }, admin.cookie, 'PATCH'));
     const restoredPage = await request('/listings/suspension-check');

@@ -13,11 +13,14 @@ export type Listing = {
 };
 
 export const LISTINGS_PER_PAGE = 12;
+export const PUBLIC_LISTING_PREDICATE = `l.status = 'published' AND NOT EXISTS (
+  SELECT 1 FROM "user" owner WHERE owner.id = l.owner_user_id AND owner.banned = 1
+)`;
 
 migrateCatalog();
 
 export function publishedListingBySlug(slug: string): Listing | undefined {
-  return database.prepare("SELECT * FROM listings WHERE slug = ? AND status = 'published'")
+  return database.prepare(`SELECT l.* FROM listings l WHERE l.slug = ? AND ${PUBLIC_LISTING_PREDICATE}`)
     .get(slug) as Listing | undefined;
 }
 
@@ -41,7 +44,7 @@ export type ListingSearch = { q?: string; category?: string; page?: string };
 function publicFilter(q: string, category: string): { where: string; args: string[] } {
   const query = q.trim().slice(0, 120);
   const chosenCategory = category.trim().slice(0, 80);
-  const where = ["l.status = 'published'"];
+  const where = [PUBLIC_LISTING_PREDICATE];
   const args: string[] = [];
   if (query) {
     const pattern = `%${query.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
@@ -87,7 +90,7 @@ export function activeFeaturedSlugs(slugs: string[]): Set<string> {
   const placeholders = slugs.map(() => "?").join(", ");
   const now = new Date().toISOString();
   const rows = database.prepare(`SELECT DISTINCT e.listing_slug FROM entitlements e
-    JOIN listings l ON l.slug = e.listing_slug AND l.status = 'published'
+    JOIN listings l ON l.slug = e.listing_slug AND ${PUBLIC_LISTING_PREDICATE}
     WHERE e.listing_slug IN (${placeholders}) AND e.featured = 1
       AND e.revoked_at IS NULL AND e.starts_at <= ? AND e.ends_at > ?`)
     .all(...slugs, now, now) as { listing_slug: string }[];
