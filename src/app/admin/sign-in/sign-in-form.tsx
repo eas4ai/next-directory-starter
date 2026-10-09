@@ -42,7 +42,7 @@ export function SignInForm() {
         <CardDescription>Use the administrator account provisioned for this directory.</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={submit} className="space-y-5">
+        <form method="post" onSubmit={submit} className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="admin-email">Email</Label>
             <Input id="admin-email" name="email" type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} />
