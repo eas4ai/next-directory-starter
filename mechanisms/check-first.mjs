@@ -91,22 +91,35 @@ async function checkFoundation() {
 }
 
 async function checkPublic(origin) {
+  const samples = JSON.parse(readFileSync('fixtures/sample-listings.json', 'utf8'));
+  const published = samples.filter((listing) => listing.status === 'published');
+  const drafts = samples.filter((listing) => listing.status === 'draft');
+  if (published.length === 0) return;
+
   const index = await fetch(`${origin}/listings`);
-  const detail = await fetch(`${origin}/listings/example-tool`);
-  const draft = await fetch(`${origin}/listings/hidden-draft`);
   const indexHtml = await index.text();
-  const detailHtml = await detail.text();
   const indexMain = main(indexHtml);
-  const detailMain = main(detailHtml);
-  const indexContent = index.ok && contains(indexMain, 'Example Tool') &&
-    contains(indexMain, 'A sample link for your directory') &&
-    contains(indexMain, 'Tools') && !contains(indexMain, 'Hidden Draft');
-  const detailContent = detail.ok && contains(detailMain, 'Example Tool') &&
-    contains(detailMain, 'A sample link for your directory') &&
-    contains(detailMain, 'Tools') && contains(detailMain, 'https://example.org/tool');
+  const details = await Promise.all(published.map(async (listing) => {
+    const response = await fetch(`${origin}/listings/${encodeURIComponent(listing.slug)}`);
+    return { listing, response, html: await response.text() };
+  }));
+  const draftStatuses = await Promise.all(drafts.map(async (listing) =>
+    (await fetch(`${origin}/listings/${encodeURIComponent(listing.slug)}`)).status));
+  const indexContent = index.ok && published.every((listing) =>
+    contains(indexMain, listing.title) && contains(indexMain, listing.summary) &&
+    contains(indexMain, listing.category) &&
+    indexHtml.includes(`href="/listings/${encodeURIComponent(listing.slug)}"`)) &&
+    drafts.every((listing) => !contains(indexMain, listing.title));
+  const detailContent = details.every(({ listing, response, html }) => {
+    const detailMain = main(html);
+    return response.ok && contains(detailMain, listing.title) &&
+      contains(detailMain, listing.summary) && contains(detailMain, listing.description) &&
+      contains(detailMain, listing.category) &&
+      detailMain.includes(listing.url.replaceAll('&', '&amp;'));
+  });
 
   if (group === 'directory') {
-    result['DIR-001'] = indexContent && draft.status === 404;
+    result['DIR-001'] = indexContent && draftStatuses.every((status) => status === 404);
     result['DIR-002'] = detailContent;
   } else {
     result['SEO-001'] = indexContent && detailContent;
@@ -117,14 +130,16 @@ async function checkPublic(origin) {
     const ogDescription = (html) => attribute(tag(html, 'meta', 'property', 'og:description'), 'content');
     const ogUrl = (html) => attribute(tag(html, 'meta', 'property', 'og:url'), 'content');
     const ix = canonical(indexHtml);
-    const dt = canonical(detailHtml);
-    result['SEO-002'] = Boolean(index.ok && detail.ok && title(indexHtml) &&
-      title(detailHtml) && contains(title(detailHtml), 'Example Tool') &&
-      desc(indexHtml) && desc(detailHtml) && ix === `${origin}/listings` &&
-      dt === `${origin}/listings/example-tool` && ix !== dt &&
-      ogTitle(indexHtml) && contains(ogTitle(detailHtml), 'Example Tool') &&
-      ogDescription(indexHtml) && ogDescription(detailHtml) &&
-      ogUrl(indexHtml) === ix && ogUrl(detailHtml) === dt);
+    const detailMetadata = details.every(({ listing, response, html }) => {
+      const expectedUrl = `${origin}/listings/${encodeURIComponent(listing.slug)}`;
+      return response.ok && contains(title(html), listing.title) &&
+        desc(html) === listing.summary && canonical(html) === expectedUrl &&
+        contains(ogTitle(html), listing.title) &&
+        ogDescription(html) === listing.summary && ogUrl(html) === expectedUrl;
+    });
+    result['SEO-002'] = Boolean(index.ok && title(indexHtml) && desc(indexHtml) &&
+      ix === `${origin}/listings` && ogTitle(indexHtml) &&
+      ogDescription(indexHtml) && ogUrl(indexHtml) === ix && detailMetadata);
   }
 }
 
