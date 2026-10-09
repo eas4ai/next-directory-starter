@@ -30,14 +30,14 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       <head><style id="site-preset">{presetCss(preset, ":root")}</style></head>
       <body>
         <header className="border-b" style={{ background: "var(--sidebar)", color: "var(--sidebar-foreground)", borderColor: "var(--sidebar-border)" }}>
-          <nav className="mx-auto flex w-full max-w-[1400px] items-center justify-between px-6 py-4" aria-label="Main navigation">
-            <Link href="/" className="inline-flex items-center gap-2 font-semibold tracking-tight">
+          <nav className="mx-auto flex w-full max-w-[1400px] flex-wrap items-center justify-between gap-2 px-6 py-4" aria-label="Main navigation">
+            <Link href="/" className="inline-flex min-w-0 items-center gap-2 break-words font-semibold tracking-tight">
               {/* Operator assets can use any host, so a fixed image optimizer allowlist would block valid sites. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               {site.logoUrl && <img src={site.logoUrl} alt="" className="size-7 object-contain" />}
               {site.name}
             </Link>
-            <div className="flex items-center gap-2">
+            <div className="flex w-full flex-wrap items-center gap-1 sm:w-auto sm:gap-2">
               <Link href="/owner/listings" className="rounded-md px-3 py-2 text-sm">Submit a link</Link>
               <Link href="/articles" className="rounded-md px-3 py-2 text-sm">Articles</Link>
               <Link href="/listings" className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm" style={{ background: "var(--sidebar-accent)", color: "var(--sidebar-accent-foreground)" }}>Listings <PresetExternalLinkIcon library={preset.iconLibrary} /></Link>
