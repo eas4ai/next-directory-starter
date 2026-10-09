@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import Link from "next/link";
 import type { Listing } from "@/lib/listings";
 
 type OwnerItem = Listing & { hasDraft: boolean; pending: boolean };
@@ -131,6 +132,7 @@ export function OwnerEditor({ initialListings }: { initialListings: OwnerItem[] 
               <p className="text-sm text-muted-foreground">{item.slug} · {item.status}{item.pending ? " · awaiting review" : item.hasDraft ? " · private changes saved" : ""}</p>
             </div>
             <div className="flex gap-2">
+              {item.status === "published" && <Button asChild size="sm" variant="outline"><Link href={`/owner/listings/${encodeURIComponent(item.slug)}/plans`}>Publishing plans</Link></Button>}
               <Button type="button" size="sm" variant="outline" disabled={pending || item.pending || item.status === "suspended"} onClick={() => edit(item)}>Edit</Button>
               {(item.status === "draft" || item.hasDraft) && !item.pending && item.status !== "suspended" &&
                 <Button type="button" size="sm" disabled={pending} onClick={() => submit(item.slug)}>Submit for review</Button>}
