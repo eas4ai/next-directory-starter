@@ -30,7 +30,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       <head><style id="site-preset">{presetCss(preset, ":root")}</style></head>
       <body>
         <header className="border-b" style={{ background: "var(--sidebar)", color: "var(--sidebar-foreground)", borderColor: "var(--sidebar-border)" }}>
-          <nav className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4" aria-label="Main navigation">
+          <nav className="mx-auto flex w-full max-w-[1400px] items-center justify-between px-6 py-4" aria-label="Main navigation">
             <Link href="/" className="inline-flex items-center gap-2 font-semibold tracking-tight">
               {/* Operator assets can use any host, so a fixed image optimizer allowlist would block valid sites. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
