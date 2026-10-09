@@ -15,7 +15,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { decision, reason } = input as Record<string, unknown>;
   if ((decision !== "approve" && decision !== "reject") ||
       typeof reason !== "string" || reason.length > 500 ||
-      false) {
+      (decision === "reject" && !reason.trim())) {
     return Response.json({ error: "Invalid decision or reason" }, { status: 400 });
   }
   try {
