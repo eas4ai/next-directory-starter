@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: editorial-publishing
+Current: public-crawl-and-responsive
 
 ## public-starter-and-theme
 
@@ -78,3 +78,22 @@ non-editor cannot make the same changes by direct request; an operator can add
 a category and a tag without code edits and see the category in directory
 navigation; and the feed contains every published article in the test set and
 no draft or unpublished article.
+
+## public-crawl-and-responsive
+
+Requirements: SEO-003, SEO-004, SEO-005, DIR-005
+
+Delivery: generate a request-current sitemap and robots policy for eligible
+public pages. Keep missing and ineligible content at a missing HTTP response,
+and mark filtered or paginated result variants so crawlers do not index them as
+canonical pages. Add structured data whose identity, links, and descriptions
+match the visible public content. Verify public directory and detail layouts at
+320 pixels in light and dark modes, preserving the 1400-pixel maximum width on
+larger screens.
+
+Done-when: a published listing and article appear in the sitemap while drafts,
+suspended listings, and private routes do not; changing eligibility updates
+the sitemap; robots points to that sitemap and excludes private routes; missing
+content returns 404; query-result variants are nonindexable; structured data
+matches the rendered page; and directory index and detail pages remain readable
+without horizontal scrolling at 320 pixels in light and dark modes.
