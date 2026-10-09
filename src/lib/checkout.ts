@@ -54,6 +54,9 @@ function reservePurchase(ownerUserId: string, listingSlug: string, planKey: stri
     }
     const plan = planByKey(planKey);
     if (!plan || !plan.enabled) throw new CheckoutError(404, "Available plan not found");
+    if (planOfferToken(plan) !== offerToken) {
+      throw new CheckoutError(409, "Plan terms changed. Refresh and review the plan");
+    }
     const id = randomUUID();
     const createdAt = new Date().toISOString();
     database.prepare(`INSERT INTO purchases
