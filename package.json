@@ -37,6 +37,7 @@
     "auth": "^1.7.7",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.4.0",
+    "fast-xml-parser": "^5.11.2",
     "shadcn": "4.21.4",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.15",

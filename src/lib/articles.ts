@@ -118,7 +118,7 @@ export function listArticles(page = 1, publishedOnly = false): { articles: Artic
 
 export function publishedArticleFeedRows(): IterableIterator<ArticleFeedRow> {
   return database.prepare(`SELECT slug, title, summary, published_at FROM articles
-    ORDER BY published_at DESC, slug`)
+    WHERE status = 'published' ORDER BY published_at DESC, slug`)
     .iterate() as IterableIterator<ArticleFeedRow>;
 }
 

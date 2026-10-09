@@ -4,7 +4,14 @@ import { getSiteConfig } from "@/lib/site-config";
 import { connection } from "next/server";
 
 function xml(value: string): string {
-  return value.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "")
+  const valid = Array.from(value, (character) => {
+    const point = character.codePointAt(0)!;
+    return point === 9 || point === 10 || point === 13 ||
+      (point >= 32 && point <= 0xd7ff) ||
+      (point >= 0xe000 && point <= 0xfffd) ||
+      (point >= 0x10000 && point <= 0x10ffff) ? character : "";
+  }).join("");
+  return valid
     .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;").replaceAll("'", "&apos;");
 }
