@@ -23,6 +23,14 @@ const run = (command, args) => spawnSync(command, args, {
 const text = (value) => typeof value === 'string' ? value : '';
 const contains = (html, value) => html.toLowerCase().includes(value.toLowerCase());
 const main = (html) => html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i)?.[1] ?? '';
+const atLeast = (value, floor) => {
+  const version = text(value).match(/(\d+)\.(\d+)\.(\d+)/)?.slice(1).map(Number);
+  if (!version) return false;
+  for (let part = 0; part < 3; part += 1) {
+    if (version[part] !== floor[part]) return version[part] > floor[part];
+  }
+  return true;
+};
 
 function tag(html, name, attribute, value) {
   const tags = html.match(new RegExp(`<${name}\\b[^>]*>`, 'gi')) ?? [];
@@ -71,13 +79,14 @@ async function checkFoundation() {
   const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
   const config = JSON.parse(readFileSync('components.json', 'utf8'));
   const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-  const next = text(deps.next).match(/(\d+)\.(\d+)\.(\d+)/);
-  const currentAtStart = next && (Number(next[1]) > 16 ||
-    (Number(next[1]) === 16 && Number(next[2]) >= 4));
+  const currentAtStart = atLeast(deps.next, [16, 4, 0]) &&
+    atLeast(deps.react, [19, 3, 0]) &&
+    atLeast(deps['react-dom'], [19, 3, 0]) &&
+    atLeast(deps.shadcn, [4, 21, 4]);
   const uiPath = ['src/components/ui', 'components/ui'].find(existsSync);
   const hasUi = uiPath && readdirSync(uiPath).some((name) => name.endsWith('.tsx'));
-  result['FOUND-001'] = Boolean(currentAtStart && deps.react && deps['react-dom'] &&
-    deps.typescript && config.tailwind?.cssVariables === true && hasUi &&
+  result['FOUND-001'] = Boolean(currentAtStart && deps.typescript &&
+    config.tailwind?.cssVariables === true && hasUi &&
     run('npm', ['run', 'build']).status === 0);
 }
 
