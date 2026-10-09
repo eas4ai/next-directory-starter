@@ -29,9 +29,10 @@ export function listingBySlug(slug: string): Listing | undefined {
   return database.prepare("SELECT * FROM listings WHERE slug = ?").get(slug) as Listing | undefined;
 }
 
-export function publishedCategories(): string[] {
-  return (database.prepare("SELECT DISTINCT category FROM listings WHERE status = 'published' ORDER BY category COLLATE NOCASE")
-    .all() as { category: string }[]).map((row) => row.category);
+export function directoryCategories(): string[] {
+  const rows = database.prepare("SELECT name FROM categories ORDER BY name COLLATE NOCASE")
+    .all() as { name: string }[];
+  return rows.map(({ name }) => name);
 }
 
 export type ListingSearch = { q?: string; category?: string; page?: string };
