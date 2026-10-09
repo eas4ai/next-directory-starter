@@ -103,7 +103,8 @@ after(async () => {
 });
 
 test('ADM-004 only authenticated administrators can open or change the theme', async () => {
-  const initial = { theme: 'red' };
+  const { DEFAULT_PRESET_CONFIG } = await import('shadcn/preset');
+  const initial = { ...DEFAULT_PRESET_CONFIG, theme: 'red', mode: 'system' };
   const admin = await signIn(adminEmail);
   const initialSave = await request('/api/admin/theme', json(initial, admin));
   assert.equal(initialSave.status, 200);
@@ -152,7 +153,13 @@ test('ADM-005 the editor exposes and previews every pinned shadcn preset choice'
   assert.equal(previewResponse.status, 200);
   const preview = await previewResponse.json();
   assert.ok(preview.css && preview.css.includes('--primary'));
+  assert.match(preview.css, /--preset-body-font:/);
+  assert.match(preview.css, /--preset-icon-library:/);
   assert.deepEqual(preview.preset, chosen);
+  const alternate = await (await request('/api/admin/theme/preview', json({ ...chosen, theme: 'blue' }, admin))).json();
+  assert.notEqual(alternate.css, preview.css);
+  const invalid = await request('/api/admin/theme', json({ ...chosen, style: 'unknown-style' }, admin));
+  assert.equal(invalid.status, 400);
   const save = await request('/api/admin/theme', json(chosen, admin));
   assert.equal(save.status, 200);
   const saved = await (await request('/api/admin/theme', { headers: { Cookie: admin } })).json();
