@@ -247,6 +247,15 @@ try {
   });
 
   await check('PUB-005', async () => {
+    const operatorCreate = await request('/api/admin/listings',
+      json({ ...draft('operator-entry'), status: 'published' }, adminCookie));
+    if (operatorCreate.status !== 201) throw new Error(`Operator listing creation returned ${operatorCreate.status}.`);
+    const moderatorPage = await request('/admin/review', { headers: { Cookie: moderatorCookie } });
+    const moderatorHtml = await moderatorPage.text();
+    if (!moderatorPage.ok || !contains(moderatorHtml, 'operator-entry') ||
+        !contains(moderatorHtml, 'Suspend operator-entry')) {
+      throw new Error('The moderator has no suspension control for an operator-created listing.');
+    }
     await createDraft('suspended-entry');
     await decide(await submit('suspended-entry'), 'approve', 'Initial approval');
     const ownerAttempt = await request('/api/admin/listings/suspended-entry/suspend',
