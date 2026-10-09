@@ -5,7 +5,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: Request, { params }: Params) {
   const user = await sessionUser(request.headers);
-  if (!canAdmin(user?.role)) return Response.json({ error: "Forbidden" }, { status: 403 });
+  if (!user || !canAdmin(user.role)) return Response.json({ error: "Forbidden" }, { status: 403 });
   if (!sameOrigin(request)) return Response.json({ error: "Invalid origin" }, { status: 403 });
   let input: unknown;
   try {
