@@ -15,7 +15,7 @@ export default async function ArticlesPage({ searchParams }: { searchParams: Pro
   const requestedPage = Number((await searchParams).page ?? "1");
   const { articles, page, pages } = listArticles(requestedPage, true);
   return (
-    <main className="mx-auto max-w-5xl px-6 py-12">
+    <main className="mx-auto w-full max-w-[1400px] px-6 py-12">
       <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">← Home</Link>
       <h1 className="mt-8 text-4xl font-semibold tracking-tight">Articles</h1>
       <p className="mt-3 max-w-2xl text-muted-foreground">Stories and updates from this directory.</p>

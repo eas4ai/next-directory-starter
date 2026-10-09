@@ -37,7 +37,7 @@ export default async function ListingsPage({ searchParams }: PageProps<"/listing
   };
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-12">
+    <main className="mx-auto w-full max-w-[1400px] px-6 py-12">
       <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">← Home</Link>
       <div className="mt-8">
         <h1 className="text-4xl font-semibold tracking-tight">Listings</h1>

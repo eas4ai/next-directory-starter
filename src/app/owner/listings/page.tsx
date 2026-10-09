@@ -22,7 +22,7 @@ export default async function OwnerListingsPage() {
   const user = await sessionUser(await headers());
   if (!user) redirect("/owner/sign-in");
   return (
-    <main className="mx-auto max-w-5xl px-6 py-10">
+    <main className="mx-auto w-full max-w-[1400px] px-6 py-10">
       <Link href="/listings" className="text-sm text-muted-foreground hover:text-foreground">← Directory</Link>
       <h1 className="mt-7 text-3xl font-semibold tracking-tight">My listings</h1>
       <p className="mt-3 text-muted-foreground">Save drafts, submit them for review, and propose updates to approved listings.</p>

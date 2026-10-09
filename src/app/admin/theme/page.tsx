@@ -24,7 +24,7 @@ export default async function ThemePage() {
   const preset = getThemePreset();
 
   return (
-    <main className="mx-auto max-w-7xl px-6 py-10">
+    <main className="mx-auto w-full max-w-[1400px] px-6 py-10">
       <div className="mb-8 max-w-2xl">
         <p className="text-sm font-medium text-muted-foreground">Site settings</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Theme</h1>

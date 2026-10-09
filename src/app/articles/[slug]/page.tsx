@@ -20,7 +20,7 @@ export default async function ArticlePage({ params }: Params) {
   const article = publishedArticleBySlug((await params).slug);
   if (!article) notFound();
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
+    <main className="mx-auto w-full max-w-[1400px] px-6 py-12">
       <Link href="/articles" className="text-sm text-muted-foreground hover:text-foreground">← Articles</Link>
       <article className="mt-10">
         <h1 className="text-4xl font-semibold tracking-tight">{article.title}</h1>

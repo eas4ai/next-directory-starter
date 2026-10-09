@@ -25,7 +25,7 @@ export default async function ListingPage({ params }: PageProps<"/listings/[slug
   const preset = getThemePreset();
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
+    <main className="mx-auto w-full max-w-[1400px] px-6 py-12">
       <Link href="/listings" className="text-sm text-muted-foreground hover:text-foreground">← Listings</Link>
       <p className="mt-10 text-sm font-medium uppercase tracking-widest text-muted-foreground">{listing.category}</p>
       <h1 className="mt-3 text-4xl font-semibold tracking-tight">{listing.name}</h1>
