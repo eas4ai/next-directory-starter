@@ -29,6 +29,8 @@ type ArticleRow = {
   published_at: string | null;
 };
 
+export type ArticleFeedRow = Pick<ArticleRow, "slug" | "title" | "summary" | "published_at">;
+
 export class ArticleError extends HttpError {}
 export const articleErrorResponse = httpErrorResponse;
 
@@ -112,6 +114,12 @@ export function listArticles(page = 1, publishedOnly = false): { articles: Artic
     .all((selectedPage - 1) * 20) as ArticleRow[];
   const tagMap = tagsByArticle(rows.map((row) => row.slug));
   return { articles: rows.map((row) => fromRow(row, tagMap.get(row.slug) ?? [])), page: selectedPage, pages };
+}
+
+export function publishedArticleFeedRows(): IterableIterator<ArticleFeedRow> {
+  return database.prepare(`SELECT slug, title, summary, published_at FROM articles
+    WHERE status = 'published' ORDER BY published_at DESC, slug`)
+    .iterate() as IterableIterator<ArticleFeedRow>;
 }
 
 export function createArticle(input: unknown, actorId: string): Article {

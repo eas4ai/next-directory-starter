@@ -52,6 +52,8 @@ Editors sign in through `/owner/sign-in` and follow **Edit articles** to save dr
 
 Administrators manage listing categories and article tags at `/admin/taxonomy`. A newly added category appears in the directory filter even before it has listings. Rename carries existing listings and pending owner proposals to the new category. Names in use must be removed from content before deletion. Editors can assign an existing tag to an article using the comma-separated tag field.
 
+The article RSS feed is available at `/feed.xml`. It includes published articles and updates when an editor publishes or unpublishes one.
+
 ## Deploying
 
 Set `BETTER_AUTH_URL` and `SITE_URL` to the site's public HTTPS origin. Set `BETTER_AUTH_SECRET` to a unique secret and `DATABASE_URL` to a writable, persistent SQLite file, then run `npm run db:migrate` and provision an administrator using the same environment as the running application. Back up the SQLite file. The ignored `.runtime/directory.db` default is intended for local development; production storage must survive builds and deployments.
