@@ -4,10 +4,11 @@ import { directoryCategories, searchPublishedListings } from "@/lib/listings";
 import { getThemePreset } from "@/lib/theme";
 import { PresetExternalLinkIcon } from "@/components/preset-icon";
 import { connection } from "next/server";
-import { pageMetadata } from "@/lib/page-metadata";
+import { pageMetadata, publicUrl } from "@/lib/page-metadata";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getSiteConfig } from "@/lib/site-config";
+import { JsonLd } from "@/components/json-ld";
 
 export async function generateMetadata({ searchParams }: PageProps<"/listings">) {
   await connection();
@@ -42,6 +43,15 @@ export default async function ListingsPage({ searchParams }: PageProps<"/listing
 
   return (
     <main className="mx-auto w-full max-w-[1400px] px-6 py-12">
+      <JsonLd data={{
+        "@context": "https://schema.org", "@type": "CollectionPage",
+        name: "Listings", description: "Explore the published links in this directory.",
+        url: publicUrl("/listings"),
+        mainEntity: { "@type": "ItemList", itemListElement: result.listings.map((listing, index) => ({
+          "@type": "ListItem", position: index + 1,
+          name: listing.name, url: publicUrl(`/listings/${listing.slug}`),
+        })) },
+      }} />
       <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">← Home</Link>
       <div className="mt-8">
         <h1 className="text-4xl font-semibold tracking-tight">Listings</h1>

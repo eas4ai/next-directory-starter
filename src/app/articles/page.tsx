@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 import { listArticles } from "@/lib/articles";
-import { pageMetadata } from "@/lib/page-metadata";
+import { pageMetadata, publicUrl } from "@/lib/page-metadata";
 import { getSiteConfig } from "@/lib/site-config";
+import { JsonLd } from "@/components/json-ld";
 
 export async function generateMetadata({ searchParams }: PageProps<"/articles">): Promise<Metadata> {
   await connection();
@@ -20,6 +21,15 @@ export default async function ArticlesPage({ searchParams }: { searchParams: Pro
   const { articles, page, pages } = listArticles(requestedPage, true);
   return (
     <main className="mx-auto w-full max-w-[1400px] px-6 py-12">
+      <JsonLd data={{
+        "@context": "https://schema.org", "@type": "CollectionPage",
+        name: "Articles", description: "Stories and updates from this directory.",
+        url: publicUrl("/articles"),
+        mainEntity: { "@type": "ItemList", itemListElement: articles.map((article, index) => ({
+          "@type": "ListItem", position: index + 1,
+          name: article.title, url: publicUrl(`/articles/${article.slug}`),
+        })) },
+      }} />
       <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">← Home</Link>
       <h1 className="mt-8 text-4xl font-semibold tracking-tight">Articles</h1>
       <p className="mt-3 max-w-2xl text-muted-foreground">Stories and updates from this directory.</p>
