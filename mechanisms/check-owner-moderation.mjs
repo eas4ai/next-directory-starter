@@ -212,10 +212,11 @@ try {
     await decide(approvedId, 'approve', 'Useful resource');
     const records = await reviewRecords();
     const rejected = records.find((item) => item.id === rejectedId);
+    const rejectedPage = await request('/listings/rejected-entry');
     const published = await request('/listings/approved-entry');
     if (!rejected || rejected.status !== 'rejected' ||
         !JSON.stringify(rejected).includes('Needs a clearer description') ||
-        published.status !== 200) {
+        rejectedPage.status !== 404 || published.status !== 200) {
       throw new Error('A moderator decision lacks its reason or approval did not publish.');
     }
   });
