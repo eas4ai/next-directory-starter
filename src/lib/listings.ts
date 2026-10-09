@@ -44,7 +44,7 @@ export function searchPublishedListings({ q = "", category = "", page = "1" }: L
 } {
   const query = q.trim().slice(0, 120);
   const chosenCategory = category.trim().slice(0, 80);
-  const pageNumber = /^\d{1,6}$/.test(page) ? Math.max(1, Number(page)) : 1;
+  const requestedPage = /^\d{1,6}$/.test(page) ? Math.max(1, Number(page)) : 1;
   const where = ["status = 'published'"];
   const args: string[] = [];
   if (query) {
@@ -59,10 +59,12 @@ export function searchPublishedListings({ q = "", category = "", page = "1" }: L
   const filter = where.join(" AND ");
   const total = (database.prepare(`SELECT COUNT(*) AS count FROM listings WHERE ${filter}`)
     .get(...args) as { count: number }).count;
+  const pages = Math.max(1, Math.ceil(total / LISTINGS_PER_PAGE));
+  const pageNumber = Math.min(requestedPage, pages);
   const listings = database.prepare(`SELECT * FROM listings WHERE ${filter}
     ORDER BY name COLLATE NOCASE, slug LIMIT ? OFFSET ?`)
     .all(...args, LISTINGS_PER_PAGE, (pageNumber - 1) * LISTINGS_PER_PAGE) as Listing[];
-  return { listings, total, page: pageNumber, pages: Math.max(1, Math.ceil(total / LISTINGS_PER_PAGE)) };
+  return { listings, total, page: pageNumber, pages };
 }
 
 export function createListing(listing: Listing): void {
