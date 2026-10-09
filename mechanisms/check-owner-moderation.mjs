@@ -205,8 +205,11 @@ try {
       json({ decision: 'approve', reason: 'Owner bypass' }, ownerACookie));
     const noReason = await request(`/api/admin/submissions/${rejectedId}/decision`,
       json({ decision: 'reject', reason: '' }, moderatorCookie));
-    if (![401, 403].includes(ownerDecision.status) || noReason.status !== 400) {
-      throw new Error('An owner can decide a submission or a rejection can omit its reason.');
+    const noApprovalReason = await request(`/api/admin/submissions/${rejectedId}/decision`,
+      json({ decision: 'approve', reason: '' }, moderatorCookie));
+    if (![401, 403].includes(ownerDecision.status) || noReason.status !== 400 ||
+        noApprovalReason.status !== 400) {
+      throw new Error('An owner can decide a submission or a decision can omit its reason.');
     }
     await decide(rejectedId, 'reject', 'Needs a clearer description');
     await createDraft('approved-entry');
