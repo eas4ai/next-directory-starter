@@ -4,17 +4,24 @@ import { getThemePreset, presetCss, themeOptions } from "@/lib/theme";
 import Link from "next/link";
 import { PresetExternalLinkIcon } from "@/components/preset-icon";
 import { connection } from "next/server";
+import { getSiteConfig } from "@/lib/site-config";
 
-export const metadata: Metadata = {
-  title: "Directory Starter",
-  description: "A curated directory of useful links.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  await connection();
+  const site = getSiteConfig();
+  return {
+    title: site.name,
+    description: site.description,
+    icons: site.iconUrl ? { icon: site.iconUrl } : undefined,
+  };
+}
 
 export const instant = false;
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   await connection();
   const preset = getThemePreset();
+  const site = getSiteConfig();
   const presetCode = (Object.keys(themeOptions) as (keyof typeof themeOptions)[])
     .map((field) => preset[field]).join(".");
 
@@ -24,7 +31,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       <body>
         <header className="border-b" style={{ background: "var(--sidebar)", color: "var(--sidebar-foreground)", borderColor: "var(--sidebar-border)" }}>
           <nav className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4" aria-label="Main navigation">
-            <Link href="/" className="font-semibold tracking-tight">Directory Starter</Link>
+            <Link href="/" className="inline-flex items-center gap-2 font-semibold tracking-tight">
+              {/* Operator assets can use any host, so a fixed image optimizer allowlist would block valid sites. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {site.logoUrl && <img src={site.logoUrl} alt="" className="size-7 object-contain" />}
+              {site.name}
+            </Link>
             <Link href="/listings" className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm" style={{ background: "var(--sidebar-accent)", color: "var(--sidebar-accent-foreground)" }}>Listings <PresetExternalLinkIcon library={preset.iconLibrary} /></Link>
           </nav>
         </header>

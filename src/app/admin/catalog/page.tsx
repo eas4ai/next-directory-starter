@@ -4,12 +4,17 @@ import type { Metadata } from "next";
 import { isAdmin } from "@/lib/admin";
 import { allListings } from "@/lib/listings";
 import { CatalogEditor } from "./catalog-editor";
+import { connection } from "next/server";
+import { getSiteConfig } from "@/lib/site-config";
 
-export const metadata: Metadata = {
-  title: "Catalog | Directory Starter",
-  description: "Administrator listing controls.",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  await connection();
+  return {
+    title: `Catalog | ${getSiteConfig().name}`,
+    description: "Administrator listing controls.",
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function CatalogPage() {
   if (!(await isAdmin(await headers()))) notFound();

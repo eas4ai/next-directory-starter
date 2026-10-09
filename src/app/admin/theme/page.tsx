@@ -5,12 +5,17 @@ import { getThemePreset, presetCss, themeOptions } from "@/lib/theme";
 import { ThemeEditor } from "./theme-editor";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { connection } from "next/server";
+import { getSiteConfig } from "@/lib/site-config";
 
-export const metadata: Metadata = {
-  title: "Theme | Directory Starter",
-  description: "Administrator theme settings.",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  await connection();
+  return {
+    title: `Theme | ${getSiteConfig().name}`,
+    description: "Administrator theme settings.",
+    robots: { index: false, follow: false },
+  };
+}
 
 export const instant = false;
 
