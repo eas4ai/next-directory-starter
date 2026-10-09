@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: operator-catalog
+Current: owner-moderation
 
 ## public-starter-and-theme
 
@@ -41,3 +41,21 @@ operator-created listings survive restart; search and category
 filters return only matching eligible listings within the documented page
 bound; and a newly ineligible listing disappears from every public directory
 route, including its former detail URL.
+
+## owner-moderation
+
+Requirements: PUB-001, PUB-002, PUB-003, PUB-004, PUB-005, ADM-003
+
+Delivery: extend the migrated catalog with owner identity, private drafts,
+submissions, and review history. Give signed-in owners a listing workspace that
+allows editing only their own content. Let authorized moderators review,
+approve, reject with a reason, and immediately suspend published listings.
+Keep an approved version public while an owner's proposed changes await a
+decision. Give administrators a view of pending submissions and prior reviews.
+Preserve the existing operator catalog and public eligibility rules.
+
+Done-when: two owner accounts cannot read or edit each other's private work;
+a submitted draft enters a private review queue; a moderator's rejection and
+reason are visible in review history; approval publishes the reviewed version;
+the prior approved version remains public during a proposed revision; and a
+suspended listing disappears from public search and its detail URL at once.
