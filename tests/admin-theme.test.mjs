@@ -184,7 +184,7 @@ test('ADM-006 the saved theme reaches public and admin pages after restart', asy
   const chosen = {
     style: 'vega', baseColor: 'stone', theme: 'blue', chartColor: 'blue',
     iconLibrary: 'remixicon', font: 'lora', fontHeading: 'playfair-display',
-    radius: 'large', menuAccent: 'bold', menuColor: 'inverted', mode: 'dark',
+    radius: 'large', menuAccent: 'bold', menuColor: 'default-translucent', mode: 'dark',
   };
   assert.equal((await request('/api/admin/theme', json(chosen, admin))).status, 200);
   await stopApp();
@@ -200,6 +200,9 @@ test('ADM-006 the saved theme reaches public and admin pages after restart', asy
     assert.match(html, /--radius: 0\.875rem/);
     assert.match(html, /--preset-body-font: "Lora"/);
     assert.match(html, /--preset-heading-font: "Playfair Display"/);
+    const sidebarColor = html.match(/--sidebar: ([^;]+)/)?.[1] ?? '';
+    assert.match(sidebarColor, /^oklch\([^)]* \/ 0\.85\)$/);
+    assert.match(html.match(/<header\b[^>]*>/)?.[0] ?? '', /background:var\(--sidebar\)/);
   }
   const persisted = await (await request('/api/admin/theme', { headers: { Cookie: adminAgain } })).json();
   assert.deepEqual(persisted.preset, chosen);
