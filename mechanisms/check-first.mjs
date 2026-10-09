@@ -130,7 +130,7 @@ async function checkPublic(origin) {
 
 function checkTheme() {
   for (const id of groups.theme) {
-    const test = run('node', ['--test', '--test-name-pattern', id, 'tests/admin-theme.test.mjs']);
+    const test = run('node', ['--test', '--test-reporter=tap', '--test-name-pattern', id, 'tests/admin-theme.test.mjs']);
     result[id] = test.status === 0 && /^# pass [1-9]\d*$/m.test(text(test.stdout)) &&
       /^# fail 0$/m.test(text(test.stdout));
   }
