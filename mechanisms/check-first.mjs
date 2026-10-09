@@ -137,9 +137,12 @@ async function checkPublic(origin) {
         contains(ogTitle(html), listing.title) &&
         ogDescription(html) === listing.summary && ogUrl(html) === expectedUrl;
     });
+    const originTest = run('node', ['--import', 'tsx', '--test', '--test-reporter=tap', 'tests/page-metadata.test.mjs']);
     result['SEO-002'] = Boolean(index.ok && title(indexHtml) && desc(indexHtml) &&
       ix === `${origin}/listings` && ogTitle(indexHtml) &&
-      ogDescription(indexHtml) && ogUrl(indexHtml) === ix && detailMetadata);
+      ogDescription(indexHtml) && ogUrl(indexHtml) === ix && detailMetadata &&
+      originTest.status === 0 && /^# pass [1-9]\d*$/m.test(text(originTest.stdout)) &&
+      /^# fail 0$/m.test(text(originTest.stdout)));
   }
 }
 
