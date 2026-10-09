@@ -67,6 +67,32 @@ const migrate = database.transaction(() => {
     CREATE INDEX listings_owner ON listings(owner_user_id, name COLLATE NOCASE);`);
     database.prepare("INSERT INTO catalog_migrations (version) VALUES (2)").run();
   }
+
+  const editorialInstalled = database.prepare("SELECT version FROM catalog_migrations WHERE version = 3").get();
+  if (!editorialInstalled) {
+    database.exec(`CREATE TABLE articles (
+      slug TEXT PRIMARY KEY NOT NULL,
+      title TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      body TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('draft', 'published')),
+      author_user_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      published_at TEXT
+    );
+    CREATE INDEX articles_public_order ON articles(status, published_at DESC, slug);
+    CREATE TABLE tags (
+      name TEXT PRIMARY KEY NOT NULL
+    );
+    CREATE TABLE article_tags (
+      article_slug TEXT NOT NULL REFERENCES articles(slug) ON DELETE CASCADE,
+      tag_name TEXT NOT NULL REFERENCES tags(name),
+      PRIMARY KEY (article_slug, tag_name)
+    );
+    CREATE INDEX article_tags_by_tag ON article_tags(tag_name, article_slug);`);
+    database.prepare("INSERT INTO catalog_migrations (version) VALUES (3)").run();
+  }
 });
 
 export function migrateCatalog(): void {

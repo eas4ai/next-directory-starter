@@ -7,4 +7,5 @@ export const roles = {
   admin: accessControl.newRole(adminAc.statements),
   user: accessControl.newRole(userAc.statements),
   moderator: accessControl.newRole({}),
+  editor: accessControl.newRole({}),
 };

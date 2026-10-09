@@ -3,21 +3,12 @@ import { database } from "@/lib/database";
 import { migrateCatalog } from "@/lib/catalog-migrations";
 import { parseListing } from "@/lib/catalog-input";
 import type { Listing } from "@/lib/listings";
+import { HttpError, httpErrorResponse } from "@/lib/http-error";
 
 migrateCatalog();
 
-export class ModerationError extends Error {
-  constructor(public status: number, message: string) {
-    super(message);
-  }
-}
-
-export function moderationErrorResponse(error: unknown): Response {
-  if (error instanceof ModerationError) {
-    return Response.json({ error: error.message }, { status: error.status });
-  }
-  throw error;
-}
+export class ModerationError extends HttpError {}
+export const moderationErrorResponse = httpErrorResponse;
 
 type StoredListing = Listing & { owner_user_id: string | null };
 type StoredSubmission = {
