@@ -12,11 +12,13 @@ export function OwnerAuthForm() {
   const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
     setError("");
+    setMessage("");
     const values = Object.fromEntries(new FormData(event.currentTarget));
     const email = String(values.email);
     const password = String(values.password);
@@ -26,6 +28,10 @@ export function OwnerAuthForm() {
         : await authClient.signUp.email({ email, password, name: String(values.name) });
       if (result.error) {
         setError(result.error.message ?? "Unable to continue. Check your details.");
+        return;
+      }
+      if (mode === "sign-up") {
+        setMessage("Check your email for a verification link, then sign in.");
         return;
       }
       router.replace("/owner/listings");
@@ -49,11 +55,12 @@ export function OwnerAuthForm() {
           <label className="grid gap-2 text-sm font-medium">Email<Input name="email" type="email" required autoComplete="email" /></label>
           <label className="grid gap-2 text-sm font-medium">Password<Input name="password" type="password" minLength={8} required autoComplete={mode === "sign-in" ? "current-password" : "new-password"} /></label>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          {message && <p role="status" className="text-sm text-muted-foreground">{message}</p>}
           <Button type="submit" disabled={pending} className="w-full">
             {pending ? "Please wait…" : mode === "sign-in" ? "Sign in" : "Create account"}
           </Button>
         </form>
-        <Button type="button" variant="link" className="px-0" onClick={() => { setMode(mode === "sign-in" ? "sign-up" : "sign-in"); setError(""); }}>
+        <Button type="button" variant="link" className="px-0" onClick={() => { setMode(mode === "sign-in" ? "sign-up" : "sign-in"); setError(""); setMessage(""); }}>
           {mode === "sign-in" ? "Need an account? Create one" : "Already have an account? Sign in"}
         </Button>
       </CardContent>

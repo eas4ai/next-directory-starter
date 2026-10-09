@@ -13,6 +13,8 @@ cp .env.example .env.local
 
 Edit `.env.local`. Set `BETTER_AUTH_SECRET` to a unique value from `openssl rand -base64 32`. Keep `BETTER_AUTH_URL` and `SITE_URL` equal to the URL at which you will open the site. The example values work for local development at `http://localhost:3000`.
 
+Set `RESEND_API_KEY` and `RESEND_FROM` using a verified Resend sending domain. Public account creation sends a verification link through Resend and cannot sign the new account in until the link is used. Configure the sender before opening public registration.
+
 Set `SITE_NAME` and `SITE_DESCRIPTION` to identify your directory. Set `SITE_LOGO_URL` and `SITE_ICON_URL` to site-relative paths or HTTP(S) asset URLs. Put site-relative assets in `public/` and refer to them with paths such as `/brand/logo.svg`. These settings change the public header and page metadata without editing application code.
 
 Initialize the database, seed sample listings, and create the first administrator:
