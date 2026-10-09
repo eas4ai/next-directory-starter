@@ -40,7 +40,7 @@ export function SuspendButton({ slug }: { slug: string }) {
       <label className="grid min-w-48 flex-1 gap-2 text-sm font-medium">Suspension reason
         <Input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} />
       </label>
-      <Button type="button" variant="destructive" disabled={pending} onClick={suspend}>Suspend listing</Button>
+      <Button type="button" variant="destructive" aria-label={`Suspend ${slug}`} disabled={pending} onClick={suspend}>Suspend listing</Button>
       {message && <p role="alert" className="w-full text-sm text-destructive">{message}</p>}
     </div>
   );
