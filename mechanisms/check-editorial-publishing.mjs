@@ -221,6 +221,43 @@ try {
     if (!listings.ok || !contains(await listings.text(), 'Research</option>')) {
       throw new Error('An added category is absent from directory navigation.');
     }
+    const draftCategory = await request('/api/admin/categories',
+      json({ name: 'Draft Only' }, adminCookie));
+    const pendingCategory = await request('/api/admin/categories',
+      json({ name: 'Pending Only' }, adminCookie));
+    const owned = await request('/api/owner/listings', json({
+      slug: 'taxonomy-owner', name: 'Taxonomy owner', summary: 'A link under review.',
+      description: 'Used to test category references in private owner work.',
+      category: 'Research', url: 'https://example.invalid/taxonomy-owner',
+    }, memberCookie));
+    if (draftCategory.status !== 201 || pendingCategory.status !== 201 || owned.status !== 201) {
+      throw new Error(`Could not prepare owner taxonomy proposal: categories ${draftCategory.status}/${pendingCategory.status}, owner ${owned.status}.`);
+    }
+    const ownerHeaders = { Cookie: memberCookie, Origin: origin };
+    const adminHeaders = { Cookie: adminCookie, Origin: origin };
+    const firstSubmit = await request('/api/owner/listings/taxonomy-owner/submit',
+      { method: 'POST', headers: ownerHeaders });
+    if (!firstSubmit.ok) throw new Error('Could not submit the owner listing.');
+    const firstId = (await firstSubmit.json()).submission.id;
+    const approved = await request(`/api/admin/submissions/${firstId}/decision`,
+      json({ decision: 'approve', reason: 'Test approval' }, adminCookie));
+    if (!approved.ok) throw new Error('Could not approve the owner listing.');
+    const draftEdit = await request('/api/owner/listings/taxonomy-owner',
+      json({ category: 'Draft Only' }, memberCookie, 'PATCH'));
+    const deleteDraft = await request('/api/admin/categories/Draft%20Only',
+      { method: 'DELETE', headers: adminHeaders });
+    if (!draftEdit.ok || deleteDraft.status !== 409) {
+      throw new Error('A category referenced by an owner draft can be deleted.');
+    }
+    const pendingEdit = await request('/api/owner/listings/taxonomy-owner',
+      json({ category: 'Pending Only' }, memberCookie, 'PATCH'));
+    const secondSubmit = await request('/api/owner/listings/taxonomy-owner/submit',
+      { method: 'POST', headers: ownerHeaders });
+    const deletePending = await request('/api/admin/categories/Pending%20Only',
+      { method: 'DELETE', headers: adminHeaders });
+    if (!pendingEdit.ok || !secondSubmit.ok || deletePending.status !== 409) {
+      throw new Error('A category referenced by a pending owner submission can be deleted.');
+    }
     const tag = await request('/api/admin/tags', json({ name: 'Release Notes' }, adminCookie));
     if (tag.status !== 201) throw new Error(`Article tag creation returned ${tag.status}.`);
     await ensureEditor();
