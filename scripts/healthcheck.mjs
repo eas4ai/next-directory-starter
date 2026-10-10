@@ -16,4 +16,7 @@ async function main() {
   if (!response.ok) throw new Error(`Public directory returned HTTP ${response.status}`);
 }
 
-main().catch(() => { process.exitCode = 1; });
+main().catch((error) => {
+  process.stderr.write(`Health check failed: ${error instanceof Error ? error.message : String(error)}\n`);
+  process.exitCode = 1;
+});
