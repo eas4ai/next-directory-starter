@@ -21,3 +21,8 @@ Status: Agreed 2026-10-09
 Falsifier: An operator-created listing disappears after a server restart, or a fresh database cannot apply the documented migrations.
 Mechanism: foundation-storage
 Status: Agreed 2026-10-09
+
+[FOUND-005] The distributable starter includes the MIT license with the established copyright holder and preserves required notices for reused source and assets without bundling proprietary reference code, branding, or listings.
+Falsifier: The distribution lacks the MIT grant or copyright notice, omits a required notice for copied material, or includes proprietary reference source, assets, branding, or production records.
+Mechanism: operator-adoption
+Status: Agreed 2026-10-10

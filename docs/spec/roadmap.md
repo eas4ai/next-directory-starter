@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: seo-operations
+Current: operator-adoption
 
 ## public-starter-and-theme
 
@@ -233,3 +233,24 @@ unsafe redirects and query-bearing 404 records are rejected; old published
 article slugs redirect safely; an administrator sees reproducible findings and
 accurate previews; and Markdown versions track publication and eligibility on
 every request without exposing private revisions.
+
+## operator-adoption
+
+Requirements: ADM-008, ADM-009, UI-001, FOUND-005, OPS-001, OPS-002
+
+Delivery: add a truthful staff overview with publication counts, review work,
+bounded audit activity, and capability-aware navigation. Let an administrator
+combine predefined staff capabilities on verified accounts while preserving
+existing administrator, moderator, editor, account suspension, and theme
+behavior. Give each visitor a saved light or dark choice that overrides only
+the operator's preset mode. Include the selected MIT license and required
+notices. Provide tested backup, isolated restore, and upgrade guidance for
+the SQLite database, media, and billing encryption key.
+
+Done-when: overview counts match current eligible content and pending review
+records, with no protected data or actions exposed to the wrong role; direct
+requests follow the same capability matrix as navigation and retain the final
+administrator; two visitors can keep different readable appearances across
+reload and initial HTML; the distribution carries the correct MIT notice;
+and a disposable installation can follow the documented backup, restore, and
+upgrade path without losing content, media, or encrypted settings.

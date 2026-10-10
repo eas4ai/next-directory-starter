@@ -36,3 +36,13 @@ Status: Agreed 2026-10-09
 Falsifier: A fresh installation has no documented admin provisioning path, or a visitor can self-assign the administrator role.
 Mechanism: admin-theme
 Status: Agreed 2026-10-09
+
+[ADM-008] An authenticated staff member can open an administration overview with current public listing and article counts, pending submission work, and links to permitted destinations. At most five recent audit entries are shown only to accounts allowed to inspect audit history; unavailable data is shown as an error rather than a false zero. The overview and its navigation work by keyboard and at 320-pixel width.
+Falsifier: A suspended listing or unpublished article counts as public, a pending revision is omitted, a guest reads the overview, a staff member sees protected audit data or a forbidden link, more than five entries appear, a failed count appears as zero, or a visible destination cannot be reached by keyboard at 320 pixels.
+Mechanism: operator-adoption
+Status: Agreed 2026-10-10
+
+[ADM-009] An administrator can assign multiple predefined staff capabilities to a verified account: listing moderation, article editing, catalog management, taxonomy management, and billing management. The existing administrator role retains all capabilities; account access, theme, SEO, and audit controls remain administrator-only. Each protected page and direct request enforces its capability, role changes are audited, suspension removes access, and the final active administrator cannot lose that role.
+Falsifier: One delegated capability grants an unrelated action or protected data, a hidden link is the only denial, an unverified or suspended account uses a staff capability, an ordinary account grants itself a capability, a role change lacks an audit entry, or the final active administrator can be demoted.
+Mechanism: operator-adoption
+Status: Agreed 2026-10-10
