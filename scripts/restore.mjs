@@ -18,7 +18,8 @@ async function main() {
   }
   const files = ['database.db', 'billing.key',
     ...regularFiles(join(backup, 'media')).map((file) => relative(backup, file))];
-  if (files.some((file) => !/^[a-f0-9]{64}$/.test(manifest.hashes[file]))) {
+  if (files.length !== Object.keys(manifest.hashes).length ||
+      files.some((file) => !/^[a-f0-9]{64}$/.test(manifest.hashes[file]))) {
     throw new Error('Backup file list does not match manifest');
   }
   for (const file of files) {
