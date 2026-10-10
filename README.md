@@ -56,7 +56,7 @@ npm run account:provision -- --email editor@example.com --name "Editor" --role e
 
 Editors sign in through `/owner/sign-in` and follow **Edit articles**. Article bodies and listing descriptions accept Markdown; raw HTML, executable links, and embedded remote images are not rendered. Editors can save an article revision, open its private preview, and publish it explicitly. Saving a revision of an already published article leaves the public version in place until publication; stale editor tabs are asked to refresh. Published articles appear at `/articles`; drafts return a missing response on public routes.
 
-Administrators manage listing categories and article tags at `/admin/taxonomy`. A newly added category appears in the directory filter even before it has listings. Rename carries existing listings and pending owner proposals to the new category. Names in use must be removed from content before deletion. Editors can assign an existing tag to an article using the comma-separated tag field.
+Administrators manage listing categories, article categories, and article tags separately at `/admin/taxonomy`. A newly added listing category appears in the directory filter even before it has listings. Rename carries existing listings and pending owner proposals to the new category. Names in use must be removed from content before deletion. Editors can assign an article category and existing tags to an article. Visitors can search published articles and browse article category and tag filters at `/articles`; each page contains at most 20 articles.
 
 The article RSS feed is available at `/feed.xml`. It includes published articles and updates when an editor publishes or unpublishes one.
 

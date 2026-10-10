@@ -34,7 +34,8 @@ function TaxonomySection({ kind, title, items }: { kind: TaxonKind; title: strin
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
-  const endpoint = kind === "category" ? "/api/admin/categories" : "/api/admin/tags";
+  const endpoint = kind === "category" ? "/api/admin/categories" :
+    kind === "article-category" ? "/api/admin/article-categories" : "/api/admin/tags";
 
   async function change(method: "POST" | "PATCH" | "DELETE", name: string, next?: string) {
     setPending(true);
@@ -74,7 +75,7 @@ function TaxonomySection({ kind, title, items }: { kind: TaxonKind; title: strin
         <label className="grid min-w-48 flex-1 gap-2 text-sm font-medium">New name
           <Input name="name" required maxLength={80} />
         </label>
-        <Button type="submit" disabled={pending}>Add {kind}</Button>
+        <Button type="submit" disabled={pending}>Add {kind === "article-category" ? "article category" : kind}</Button>
       </form>
       <div className="mt-6 space-y-3">
         {items.map((item) => (
@@ -89,10 +90,13 @@ function TaxonomySection({ kind, title, items }: { kind: TaxonKind; title: strin
   );
 }
 
-export function TaxonomyEditor({ categories, tags }: { categories: Taxon[]; tags: Taxon[] }) {
+export function TaxonomyEditor({ categories, articleCategories, tags }: {
+  categories: Taxon[]; articleCategories: Taxon[]; tags: Taxon[];
+}) {
   return (
     <div className="mt-8 grid gap-6 lg:grid-cols-2">
-      <TaxonomySection kind="category" title="Categories" items={categories} />
+      <TaxonomySection kind="category" title="Listing categories" items={categories} />
+      <TaxonomySection kind="article-category" title="Article categories" items={articleCategories} />
       <TaxonomySection kind="tag" title="Tags" items={tags} />
     </div>
   );

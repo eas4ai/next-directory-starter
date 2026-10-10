@@ -321,6 +321,17 @@ function migrateArticleRevisions(): void {
   }).immediate();
 }
 
+function migrateArticleCategories(): void {
+  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 12").get()) return;
+  database.transaction(() => {
+    database.exec(`CREATE TABLE article_categories (name TEXT PRIMARY KEY NOT NULL);
+      ALTER TABLE articles ADD COLUMN category TEXT REFERENCES article_categories(name);
+      ALTER TABLE article_revisions ADD COLUMN category TEXT REFERENCES article_categories(name);
+      CREATE INDEX articles_public_category ON articles(status, category, published_at DESC, slug);`);
+    database.prepare("INSERT INTO catalog_migrations (version) VALUES (12)").run();
+  }).immediate();
+}
+
 export function migrateCatalog(): void {
   migrate.immediate();
   migratePlanModes();
@@ -328,6 +339,7 @@ export function migrateCatalog(): void {
   migratePaymentLifecycle();
   migratePaymentOutcomes();
   migrateArticleRevisions();
+  migrateArticleCategories();
 }
 
 export function seedCatalog(): void {

@@ -6,6 +6,7 @@ import { connection } from "next/server";
 import { canEditArticles, sessionUser } from "@/lib/admin";
 import { listArticles } from "@/lib/articles";
 import { getSiteConfig } from "@/lib/site-config";
+import { listTaxa } from "@/lib/taxonomy";
 import { ArticleEditor } from "./article-editor";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -29,7 +30,8 @@ export default async function AdminArticlesPage({ searchParams }: { searchParams
       {user?.role?.split(",").includes("admin") && <Link href="/admin/taxonomy" className="ml-4 text-sm underline">Categories and tags</Link>}
       <h1 className="mt-7 text-3xl font-semibold tracking-tight">Articles</h1>
       <p className="mt-3 text-muted-foreground">Save drafts and control which articles appear publicly.</p>
-      <ArticleEditor initialArticles={articles} />
+      <ArticleEditor initialArticles={articles}
+        categories={listTaxa("article-category").map((category) => category.name)} />
       {pages > 1 && (
         <nav className="mt-8 flex items-center justify-between text-sm" aria-label="Editor pages">
           {page > 1 ? <Link href={`/admin/articles?page=${page - 1}`} className="underline">Previous</Link> : <span />}

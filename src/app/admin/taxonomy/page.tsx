@@ -25,7 +25,8 @@ export default async function TaxonomyPage() {
       <Link href="/admin/catalog" className="text-sm text-muted-foreground hover:text-foreground">← Catalog</Link>
       <h1 className="mt-7 text-3xl font-semibold tracking-tight">Categories and Tags</h1>
       <p className="mt-3 text-muted-foreground">Organize listings and articles without changing source code.</p>
-      <TaxonomyEditor categories={listTaxa("category")} tags={listTaxa("tag")} />
+      <TaxonomyEditor categories={listTaxa("category")}
+        articleCategories={listTaxa("article-category")} tags={listTaxa("tag")} />
     </main>
   );
 }
