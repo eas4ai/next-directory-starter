@@ -150,6 +150,12 @@ try {
       featured: true, enabled: true,
     }, adminCookie));
     if (annual.status !== 201) throw new Error(`An annual plan was rejected (HTTP ${annual.status}).`);
+    const once = await request('/api/admin/plans', json({
+      key: 'single-featured', name: 'Single Featured', description: 'Thirty days of placement.',
+      mode: 'test', billingMode: 'one-time', amountMinor: 900, currency: 'usd', durationDays: 30,
+      featured: true, enabled: true,
+    }, adminCookie));
+    if (once.status !== 201) throw new Error(`A one-time plan was rejected (HTTP ${once.status}).`);
     const disabled = await request('/api/admin/plans', json({
       key: 'hidden-monthly', name: 'Hidden Monthly', description: 'Should not be offered.',
       mode: 'test', billingMode: 'monthly', amountMinor: 1500, currency: 'usd', durationDays: null,
@@ -162,15 +168,31 @@ try {
       featured: false, enabled: true,
     }, adminCookie));
     if (live.status !== 201) throw new Error('Live-mode plan could not be saved.');
+    const all = await request('/api/admin/plans', { headers: { Cookie: adminCookie } });
+    const planRows = (await all.json())?.plans;
+    const terms = (key) => planRows?.find((plan) => plan.key === key);
+    if (!all.ok || terms('free-basic')?.billingMode !== 'free' ||
+        terms('free-basic')?.amountMinor !== 0 || terms('free-basic')?.durationDays !== null ||
+        terms('monthly-featured')?.mode !== 'test' || terms('monthly-featured')?.billingMode !== 'monthly' ||
+        terms('monthly-featured')?.amountMinor !== 1200 || terms('monthly-featured')?.durationDays !== null ||
+        terms('annual-featured')?.billingMode !== 'annual' ||
+        terms('annual-featured')?.amountMinor !== 12000 || terms('annual-featured')?.durationDays !== null ||
+        terms('single-featured')?.billingMode !== 'one-time' ||
+        terms('single-featured')?.durationDays !== 30 || terms('live-only')?.mode !== 'live') {
+      throw new Error('Saved free, one-time, monthly, annual, or mode-specific plan terms differ from the administrator input.');
+    }
     const owner = await approvedListing('payment-foundation-entry');
     const ordinary = await request('/listings/payment-foundation-entry');
     if (!ordinary.ok) throw new Error('Approval no longer publishes the free ordinary listing.');
     const plansPage = await request('/owner/listings/payment-foundation-entry/plans',
       { headers: { Cookie: owner } });
     const html = await plansPage.text();
+    const rendered = html.replace(/<!--.*?-->/g, '');
     if (!plansPage.ok || !html.includes('Free Basic') || !html.includes('Monthly Featured') ||
-        !html.includes('Annual Featured') || !html.toLowerCase().includes('monthly') ||
-        !html.toLowerCase().includes('annual') || html.includes('Hidden Monthly') ||
+        !html.includes('Annual Featured') || !html.includes('Single Featured') ||
+        !rendered.includes('$12.00 / month') || !rendered.includes('$120.00 / year') ||
+        !html.includes('Monthly renewal') || !html.includes('Annual renewal') ||
+        !html.includes('30 days') || html.includes('Hidden Monthly') ||
         html.includes('Live Only')) {
       throw new Error('The owner cannot review eligible free and recurring terms by mode.');
     }
@@ -184,10 +206,15 @@ try {
     if (!planChange.ok) throw new Error('Plan terms cannot be edited.');
     const purchase = new Database(databasePath);
     try {
-      const retained = purchase.prepare(`SELECT amount_minor, currency, featured FROM purchases
+      const retained = purchase.prepare(`SELECT plan_name, plan_description, plan_mode, billing_mode,
+        amount_minor, currency, accepted_duration_days, featured FROM purchases
         WHERE listing_slug = ? AND plan_key = ? ORDER BY created_at DESC LIMIT 1`)
         .get('payment-foundation-entry', 'free-basic');
-      if (!retained || retained.amount_minor !== 0 || retained.currency !== 'usd' || retained.featured !== 0) {
+      if (!retained || retained.plan_name !== 'Free Basic' ||
+          retained.plan_description !== 'Ordinary publication.' || retained.plan_mode !== 'test' ||
+          retained.billing_mode !== 'free' || retained.amount_minor !== 0 ||
+          retained.currency !== 'usd' || retained.accepted_duration_days !== null ||
+          retained.featured !== 0) {
         throw new Error('Free purchase terms changed with the plan or were not recorded.');
       }
     } finally { purchase.close(); }
