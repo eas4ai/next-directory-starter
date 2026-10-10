@@ -40,6 +40,25 @@ The sample seed is repeatable and leaves existing listings unchanged. The public
 
 Visitors can use the **Appearance** button in the header to choose light or dark mode. That choice is saved in their own browser cookie and applied to the initial page response on later visits. Without a valid choice, the administrator's theme mode applies; the selected colors, fonts, and other preset controls stay the same.
 
+### Custom theme SDK
+
+The pinned shadcn/ui preset remains the default. To add a theme, follow the
+`ThemeDefinition` shape in `src/themes/studio.ts`, choose a unique lowercase ID,
+and register the definition in `src/themes/index.ts`. The type and the runtime
+`defineTheme` check require every semantic color in light and dark mode,
+typography, radius, shadow, control height, spacing, page widths, and a social
+card palette. The SDK emits those values through `/theme.css`; components use
+the resulting CSS variables, while grid and flex structure stay in classes.
+
+The selection lives separately from the saved preset. Selecting a custom theme
+does not overwrite any pinned preset control, and the visitor's mode choice
+still affects only light or dark colors. If an installed theme is removed,
+the site falls back to the saved preset. Run
+`node --import tsx --test --test-name-pattern THM-001 tests/theme-sdk.test.mjs`,
+`npx tsc --noEmit`, and `npm run build` when adding a theme. The focused test
+checks validation, stylesheet output, and computed public and admin colors in
+a production browser.
+
 ## Owner submissions and review
 
 Owners create an account or sign in at `/owner/sign-in`. Their private workspace at `/owner/listings` lets them save a draft, submit it, and propose changes to an approved listing. A submitted snapshot stays in review while the approved version remains public. Owners cannot read or edit another owner's private work.

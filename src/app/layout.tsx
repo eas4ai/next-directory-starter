@@ -8,6 +8,7 @@ import { getSiteConfig } from "@/lib/site-config";
 import { getSeoSettings } from "@/lib/seo-settings";
 import { cookies } from "next/headers";
 import { AppearanceSwitch } from "@/components/appearance-switch";
+import { getThemeSelection } from "@/lib/theme-selection";
 
 export async function generateMetadata(): Promise<Metadata> {
   await connection();
@@ -29,6 +30,7 @@ export const instant = false;
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   await connection();
   const preset = getThemePreset();
+  const selection = getThemeSelection();
   const site = getSiteConfig();
   const savedMode = (await cookies()).get("site_appearance")?.value;
   const presetMode = preset.mode === "light" || preset.mode === "dark" ? preset.mode : "system";
@@ -37,8 +39,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     .map((field) => preset[field]).join(".");
 
   return (
-    <html lang="en" className={mode === "dark" ? "dark" : ""} data-mode={mode} data-site-preset={presetCode}>
-      <head><style id="site-preset">{presetCss(preset, ":root")}</style></head>
+    <html lang="en" className={mode === "dark" ? "dark" : ""} data-mode={mode} data-site-preset={presetCode}
+      data-theme={selection.themeId} data-template={selection.templateId}>
+      <head><style id="site-preset">{presetCss(preset, ":root")}</style><link rel="stylesheet" href="/theme.css" /></head>
       <body>
         <header className="border-b" style={{ background: "var(--sidebar)", color: "var(--sidebar-foreground)", borderColor: "var(--sidebar-border)" }}>
           <nav className="mx-auto flex w-full max-w-[1400px] flex-wrap items-center justify-between gap-2 px-6 py-4" aria-label="Main navigation">
