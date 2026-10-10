@@ -28,7 +28,7 @@ export function articleMarkdown(article: Article): string {
 
 export const markdownHeaders = {
   "Content-Type": "text/markdown; charset=utf-8",
-  "Cache-Control": "private, no-store, max-age=0",
+  "Cache-Control": "public, max-age=60",
   "X-Robots-Tag": "noindex, nofollow",
   "X-Content-Type-Options": "nosniff",
 };
