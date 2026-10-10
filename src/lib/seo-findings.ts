@@ -14,7 +14,7 @@ export class SeoFindingError extends HttpError {}
 
 export type SeoFinding = {
   code: "missing-title" | "duplicate-title" | "short-description" |
-    "long-title" | "missing-social-image";
+    "long-title";
   path: string;
   message: string;
   action: string;
@@ -34,7 +34,7 @@ function preview(path: string, title: string, description: string,
   overrides?: SeoOverrides, images?: { published?: string; generated?: string }): SeoPreview {
   const metadata = pageMetadata(path, title, description, overrides, images);
   const graph = metadata.openGraph as {
-    title?: string; description?: string; url?: string; images?: string[];
+    title?: string; description?: string; url?: string; images?: Array<{ url: string }>;
   } | undefined;
   return {
     path,
@@ -46,7 +46,7 @@ function preview(path: string, title: string, description: string,
     social: {
       title: String(graph?.title ?? metadata.title ?? ""),
       description: String(graph?.description ?? metadata.description ?? ""),
-      image: graph?.images?.[0] ?? null,
+      image: graph?.images?.[0]?.url ?? null,
       url: String(graph?.url ?? publicUrl(path)),
     },
   };
@@ -110,11 +110,6 @@ export function seoFindings(requestedPage = 1): {
   const { rows, page, pages } = candidates(requestedPage);
   const settings = getSeoSettings();
   const findings: SeoFinding[] = [];
-  if (page === 1 && !settings.socialImage && !getSiteConfig().socialImage) {
-    findings.push({ code: "missing-social-image", path: "/",
-      message: "The site has no default social image.",
-      action: "Set a default social image in Search settings.", editPath: "/admin/seo" });
-  }
   const duplicateCount = database.prepare(duplicateCountSql);
   for (const row of rows) {
     const path = `/${row.kind === "listing" ? "listings" : "articles"}/${row.slug}`;

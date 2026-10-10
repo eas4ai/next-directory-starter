@@ -323,7 +323,7 @@ test('THM-004 protected branding, metadata, cards and restored assets', async ()
   let home = await (await fetch(origin)).text();
   assert.match(home, /Copper Atlas/);
   assert.match(home, /Find good tools and stories/);
-  assert.match(home, /property="og:image" content="https:\/\/cdn\.example\.com\/fallback\.png"/);
+  assert.ok(home.includes(`property="og:image" content="${origin}/social-card?path=%2F"`));
 
   const logo = await sharp({ create: { width: 60, height: 40, channels: 4,
     background: '#197c6d' } }).png().toBuffer();
@@ -353,7 +353,9 @@ test('THM-004 protected branding, metadata, cards and restored assets', async ()
   home = await (await fetch(origin)).text();
   assert.ok(home.includes(`src="${logoPath}"`));
   assert.ok(home.includes(`href="${iconPath}"`));
-  assert.ok(home.includes(`content="${origin}${socialPath}"`));
+  assert.equal(socialPath, (await (await fetch(`${origin}/api/admin/branding`,
+    { headers: { Cookie: adminCookie } })).json()).branding.socialImage);
+  assert.ok(home.includes(`content="${origin}/social-card?path=%2F"`));
 
   const browser = await chromium.launch({ headless: true,
     ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: 'chrome' }),
@@ -413,10 +415,9 @@ test('THM-004 protected branding, metadata, cards and restored assets', async ()
   });
   assert.equal(seo.status, 200);
   home = await (await fetch(origin)).text();
-  assert.ok(home.includes(`content="${origin}/brand/seo-default.png"`));
+  assert.ok(home.includes(`content="${origin}/social-card?path=%2F"`));
   const listing = await (await fetch(`${origin}/listings/example-tool`)).text();
-  assert.ok(listing.includes(`content="${origin}/brand/seo-default.png"`),
-    'search setting must take priority over a generated listing card');
+  assert.ok(listing.includes(`content="${origin}/social-card?path=%2Flistings%2Fexample-tool"`));
 
   const nextBrand = { ...namedBrand, name: 'Copper Atlas',
     description: 'Updated brand description.' };
@@ -452,8 +453,7 @@ test('THM-004 protected branding, metadata, cards and restored assets', async ()
     VALUES ('listing', 'example-tool', 'public', ?)`).run(mediaId);
   mediaDb.close();
   const published = await (await fetch(`${origin}/listings/example-tool`)).text();
-  assert.ok(published.includes(`content="${origin}/media/${mediaId}"`),
-    'published content image must take priority over the search default');
+  assert.ok(published.includes(`content="${origin}/social-card?path=%2Flistings%2Fexample-tool"`));
   const overrideDb = new Database(join(directory, 'directory.db'));
   overrideDb.prepare(`INSERT INTO seo_overrides (kind, slug, public_json, updated_at)
     VALUES ('listing', 'example-tool', ?, ?)`).run(JSON.stringify({
@@ -462,8 +462,7 @@ test('THM-004 protected branding, metadata, cards and restored assets', async ()
     }), now);
   overrideDb.close();
   const explicit = await (await fetch(`${origin}/listings/example-tool`)).text();
-  assert.ok(explicit.includes('content="https://cdn.example.com/explicit.png"'),
-    'a published social override must take priority over other images');
+  assert.ok(explicit.includes(`content="${origin}/social-card?path=%2Flistings%2Fexample-tool"`));
 
   await restartApp();
   const restoredHome = await (await fetch(origin)).text();

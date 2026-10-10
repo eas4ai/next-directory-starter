@@ -38,7 +38,8 @@ test('findings detect missing and duplicate public titles and previews use publi
     publishDraftSeo('listing', 'first');
     const after = seoPreview('listing', 'first');
     assert.equal(after.search.title, 'Private alternate | Search');
-    assert.equal(after.social.image, 'https://directory.example/private.png');
+    assert.equal(after.social.image,
+      'https://directory.example/social-card?path=%2Flistings%2Ffirst');
     database.prepare("UPDATE listings SET name = '' WHERE slug = 'second'").run();
     report = seoFindings();
     assert.ok(report.findings.some((row) => row.code === 'missing-title' && row.path === '/listings/second'));
