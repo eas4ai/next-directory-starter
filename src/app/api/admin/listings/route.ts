@@ -2,6 +2,7 @@ import { canAdmin, sessionUser } from "@/lib/admin";
 import { adminReadResponse } from "@/lib/admin-api";
 import { parseListing } from "@/lib/catalog-input";
 import { allListings, createListing, listingBySlug } from "@/lib/listings";
+import { HttpError, httpErrorResponse } from "@/lib/http-error";
 
 export async function GET(request: Request) {
   return adminReadResponse(request, () => ({ listings: allListings() }));
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
   try {
     createListing(listing, user.id);
   } catch (error) {
+    if (error instanceof HttpError) return httpErrorResponse(error);
     if (error instanceof Error && error.message.includes("UNIQUE constraint")) {
       return Response.json({ error: "Slug already exists" }, { status: 409 });
     }

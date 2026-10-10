@@ -2,6 +2,8 @@ import { database } from "@/lib/database";
 import { migrateCatalog } from "@/lib/catalog-migrations";
 import { recordAudit } from "@/lib/audit";
 import { checkoutMode } from "@/lib/plans";
+import { redirectForPath } from "@/lib/seo-redirects";
+import { HttpError } from "@/lib/http-error";
 
 export type Listing = {
   slug: string;
@@ -103,6 +105,9 @@ export function activeFeaturedSlugs(slugs: string[]): Set<string> {
 
 export function createListing(listing: Listing, actorUserId: string): void {
   database.transaction(() => {
+    if (redirectForPath(`/listings/${listing.slug}`)) {
+      throw new HttpError(409, "Listing slug is reserved by a redirect");
+    }
     database.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)").run(listing.category);
     database.prepare(`INSERT INTO listings
       (slug, name, summary, description, category, url, status)

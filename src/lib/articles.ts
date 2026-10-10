@@ -213,6 +213,9 @@ export function createArticle(input: unknown, actorId: string): Article {
   const now = new Date().toISOString();
   try {
     database.transaction(() => {
+      if (redirectForPath(`/articles/${article.slug}`)) {
+        throw new ArticleError(409, "Article slug is reserved by a redirect");
+      }
       database.prepare(`INSERT INTO articles
         (slug, title, summary, body, status, author_user_id, created_at, updated_at, published_at, category)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
