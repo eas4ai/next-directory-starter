@@ -3,6 +3,7 @@ import { sameOrigin, sessionUser } from "@/lib/admin";
 import { checkoutErrorResponse, createPublishingCheckout } from "@/lib/checkout";
 import { requestJson, requestJsonErrorResponse } from "@/lib/request-json";
 import { ownerListing } from "@/lib/moderation";
+import { billingProfileErrorResponse, stripeCheckoutConfiguration } from "@/lib/billing-profiles";
 
 export async function POST(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const user = await sessionUser(request.headers);
@@ -16,8 +17,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   } catch {
     return Response.json({ error: "Approved owned listing not found" }, { status: 404 });
   }
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) return Response.json({ error: "Stripe is not configured" }, { status: 503 });
+  let configuration;
+  try { configuration = stripeCheckoutConfiguration(); }
+  catch (error) { return billingProfileErrorResponse(error); }
+  if (!configuration) return Response.json({ error: "Stripe is not configured for this mode" }, { status: 503 });
   let input: unknown;
   try { input = await requestJson(request, 1024); }
   catch (error) { return requestJsonErrorResponse(error); }
@@ -30,7 +33,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   if (typeof planKey !== "string") return Response.json({ error: "Choose a plan" }, { status: 400 });
   if (typeof requestId !== "string") return Response.json({ error: "Invalid checkout request" }, { status: 400 });
   if (typeof offerToken !== "string") return Response.json({ error: "Invalid plan terms" }, { status: 400 });
-  const stripe = new Stripe(key);
+  const stripe = new Stripe(configuration.apiKey);
   try {
     const checkout = await createPublishingCheckout(user.id, slug, planKey, offerToken, requestId,
       (settings, options) => stripe.checkout.sessions.create(settings, options));
