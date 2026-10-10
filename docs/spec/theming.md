@@ -21,3 +21,8 @@ Status: Agreed 2026-10-10
 Falsifier: A guest changes branding, an invalid or oversized upload is served, a saved logo or favicon is missing after restart or restore, old branding remains in the header or default social metadata, a generated listing card keeps the old identity or palette, or a published custom social image is replaced by the brand fallback.
 Mechanism: theme-sdk
 Status: Agreed 2026-10-10
+
+[THM-005] The selected preset body and heading fonts load without a render-blocking external font stylesheet on initial public and admin pages. Every listed preset font remains available after preview, save, navigation, and restart. Text remains visible while a font loads, and a registered custom theme keeps its declared typography.
+Falsifier: Initial rendering waits for a Google Fonts stylesheet, any listed preset font fails to load when selected for body or heading text, text disappears while a font loads, a saved choice changes after restart, or selecting a custom theme changes its declared typography.
+Mechanism: font-loading
+Status: Agreed 2026-10-10

@@ -421,3 +421,17 @@ permission and migration behavior intact.
 Done-when: the command covers every `tests/*.test.mjs` file and completes with
 no failures; the isolated legacy-plan fixture migrates with valid foreign keys;
 and the content HTTP checks enforce the current editor and taxonomy boundaries.
+
+## preset-font-render-blocking
+
+Requirements: THM-005
+
+Delivery: replace the external font stylesheet import in the runtime theme CSS
+with font loading that leaves the initial render unblocked. Keep every preset
+body and heading font choice, saved selections, previews, and registered custom
+theme typography working across public and admin pages.
+
+Done-when: production page checks on the home, listing, and admin surfaces show
+no render-blocking external font stylesheet; each preset font resolves for body
+and heading selections with visible fallback text during loading; saved choices
+survive navigation and restart; and a custom theme retains its declared fonts.
