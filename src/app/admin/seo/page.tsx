@@ -5,6 +5,8 @@ import { notFound } from "next/navigation";
 import { canAdmin, sessionUser } from "@/lib/admin";
 import { getSeoSettings } from "@/lib/seo-settings";
 import { SeoSettingsEditor } from "./settings-editor";
+import { listNotFound, listRedirects } from "@/lib/seo-redirects";
+import { RedirectEditor } from "./redirect-editor";
 
 export const metadata: Metadata = {
   title: "Search settings", robots: { index: false, follow: false },
@@ -19,6 +21,7 @@ export default async function SeoAdminPage() {
       <h1 className="text-3xl font-semibold tracking-tight">Search settings</h1>
       <p className="mt-3 max-w-3xl text-muted-foreground">Set public search defaults and verify site ownership.</p>
       <SeoSettingsEditor initial={getSeoSettings()} />
+      <RedirectEditor initial={listRedirects()} paths={listNotFound()} />
     </main>
   );
 }

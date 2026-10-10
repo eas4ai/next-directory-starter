@@ -19,6 +19,8 @@ Set `SITE_NAME` and `SITE_DESCRIPTION` to identify your directory. Set `SITE_LOG
 
 Administrators can set a search title format, default description and social image, and Google/Bing verification values at `/admin/seo`. Listing owners can save optional search and social overrides in their private listing editor; the submitted values appear publicly only after moderator approval. Article editors can save the same overrides with an article revision; publishing that revision applies them. Choosing noindex on a public item keeps its page available to visitors while requesting that crawlers not index it.
 
+The same administrator page manages up to 500 permanent same-site redirects and shows the latest 50 missing paths. Redirects cannot replace live pages or form loops. The missing-page report stores paths only, without query strings or visitor details. An editor who changes a published article slug in `/admin/articles` automatically preserves the former address as a permanent redirect.
+
 Initialize the database, seed sample listings, and create the first administrator:
 
 ```sh
