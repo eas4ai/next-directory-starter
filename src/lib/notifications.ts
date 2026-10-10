@@ -39,7 +39,7 @@ export function recordPurchaseNotification(purchaseId: string, kind: string,
 export function listOwnerNotifications(ownerUserId: string): OwnerNotification[] {
   const rows = database.prepare(`SELECT id, kind, subject, body, created_at, email_state
     FROM owner_notifications WHERE owner_user_id = ?
-    ORDER BY created_at DESC, id DESC LIMIT 19`).all(ownerUserId) as {
+    ORDER BY created_at DESC, id DESC LIMIT 20`).all(ownerUserId) as {
     id: string; kind: string; subject: string; body: string;
     created_at: string; email_state: OwnerNotification["emailState"];
   }[];

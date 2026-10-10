@@ -9,7 +9,7 @@ import { HttpError, httpErrorResponse } from "@/lib/http-error";
 
 migrateCatalog();
 
-export const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 export type MediaKind = "listing" | "article";
 export type MediaAsset = { id: string; kind: MediaKind; slug: string; alt: string; width: number; height: number };
 export class MediaError extends HttpError {}
@@ -203,5 +203,5 @@ export function publicMediaAsset(id: string): MediaAsset | undefined {
       .get(row.target_slug)
     : database.prepare("SELECT 1 FROM articles WHERE slug = ? AND status = 'published'")
       .get(row.target_slug);
-  return fromMediaRow(row);
+  return eligible ? fromMediaRow(row) : undefined;
 }
