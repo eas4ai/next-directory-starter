@@ -273,3 +273,11 @@ export function stripeWebhookCandidates(): { mode: BillingMode; secret: string; 
   }
   return candidates;
 }
+
+export function providerWebhookSecret(billingProvider: Exclude<BillingProvider, "stripe">,
+  billingMode: BillingMode): string | null {
+  const profile = stored(billingProvider, billingMode);
+  if (!profile?.webhook_secret_cipher) return null;
+  return open(profile.webhook_secret_cipher, billingProvider, billingMode,
+    "webhookSecret", encryptionKey());
+}
