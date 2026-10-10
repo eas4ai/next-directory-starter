@@ -1,16 +1,11 @@
 import themeData from "@/lib/theme-options.json";
-import { database } from "@/lib/database";
+import { readSiteSetting, writeSiteSetting } from "@/lib/site-settings";
 
 export const themeOptions = themeData.options;
 export type ThemePreset = Record<keyof typeof themeOptions, string>;
 export const defaultThemePreset = themeData.defaults as ThemePreset;
 
 const fields = Object.keys(themeOptions) as (keyof ThemePreset)[];
-
-database.exec(`CREATE TABLE IF NOT EXISTS site_settings (
-  key TEXT PRIMARY KEY,
-  value TEXT NOT NULL
-)`);
 
 export function parseThemePreset(value: unknown): ThemePreset | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -23,17 +18,15 @@ export function parseThemePreset(value: unknown): ThemePreset | null {
 }
 
 export function getThemePreset(): ThemePreset {
-  const row = database.prepare("SELECT value FROM site_settings WHERE key = ?")
-    .get("theme") as { value: string } | undefined;
-  if (!row) return defaultThemePreset;
-  const preset = parseThemePreset(JSON.parse(row.value));
+  const value = readSiteSetting("theme");
+  if (value === null) return defaultThemePreset;
+  const preset = parseThemePreset(JSON.parse(value));
   if (!preset) throw new Error("Stored theme preset is invalid.");
   return preset;
 }
 
 export function saveThemePreset(preset: ThemePreset): void {
-  database.prepare("INSERT INTO site_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
-    .run("theme", JSON.stringify(preset));
+  writeSiteSetting("theme", JSON.stringify(preset));
 }
 
 const baseColors: Record<string, [number, number]> = {
@@ -135,7 +128,7 @@ function variables(preset: ThemePreset, dark: boolean): Record<string, string> {
   };
 }
 
-function declarationBlock(selector: string, values: Record<string, string>): string {
+export function declarationBlock(selector: string, values: Record<string, string>): string {
   return `${selector} { ${Object.entries(values).map(([name, value]) => `--${name}: ${value};`).join(" ")} }`;
 }
 
