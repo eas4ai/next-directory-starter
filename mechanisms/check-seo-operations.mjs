@@ -102,6 +102,20 @@ try {
     if (!updatedHtml.includes('og:image') || !updatedHtml.includes('social.png')) {
       throw new Error('Public social metadata omitted the configured image');
     }
+    const noindex = await request('/api/admin/articles', json({
+      slug: 'noindex-seo-article', title: 'Noindex SEO article', summary: 'Visible, but not indexed',
+      body: 'A published article excluded from search indexing.', status: 'published',
+      category: '', tags: [], seo: { title: null, description: null,
+        socialImage: null, indexable: false },
+    }, adminCookie));
+    if (noindex.status !== 201) throw new Error(`Noindex fixture unavailable: HTTP ${noindex.status}`);
+    const noindexHtml = await (await request('/articles/noindex-seo-article')).text();
+    const sitemap = await (await request('/sitemap.xml')).text();
+    if (!noindexHtml.includes('content="noindex') ||
+        sitemap.includes(`${origin}/articles/noindex-seo-article`) ||
+        !sitemap.includes(`${origin}/listings/example-tool`)) {
+      throw new Error('Published noindex page metadata and sitemap eligibility disagree');
+    }
   });
 
   await check('SEO-008', async () => {
