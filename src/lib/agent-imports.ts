@@ -51,7 +51,7 @@ function inputFrom(value: unknown): { data?: StagedInput; error?: string } {
   item.url = url;
   item.sourceUrl = sourceUrl;
   if (!item.idempotencyKey || item.idempotencyKey.length > 120 ||
-      item.sourceExcerpt.length > 1500 ||
+      !item.sourceExcerpt || item.sourceExcerpt.length > 1500 ||
       !item.name || item.name.length > 120 ||
       !item.summary || item.summary.length > 280 ||
       !item.description || item.description.length > 5000 ||
