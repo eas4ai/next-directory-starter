@@ -37,8 +37,11 @@ export default async function ArticlePage({ params }: Params) {
         {article.publishedAt && <time className="mt-5 block text-sm text-muted-foreground" dateTime={article.publishedAt}>
           Published {new Date(article.publishedAt).toLocaleDateString("en-US", { timeZone: "UTC" })}
         </time>}
+        {article.category && <p className="mt-4 text-sm">Category: <Link className="underline" href={`/articles?category=${encodeURIComponent(article.category)}`}>{article.category}</Link></p>}
         <div className="mt-10"><MarkdownContent source={article.body} /></div>
-        {article.tags.length > 0 && <p className="mt-10 border-t pt-5 text-sm text-muted-foreground">Tags: {article.tags.join(" · ")}</p>}
+        {article.tags.length > 0 && <p className="mt-10 flex flex-wrap gap-2 border-t pt-5 text-sm text-muted-foreground">Tags:
+          {article.tags.map((tag) => <Link key={tag} href={`/articles?tag=${encodeURIComponent(tag)}`} className="underline">{tag}</Link>)}
+        </p>}
       </article>
     </main>
   );

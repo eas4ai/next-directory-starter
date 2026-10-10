@@ -4,12 +4,12 @@ import { HttpError, httpErrorResponse } from "@/lib/http-error";
 
 migrateCatalog();
 
-export type TaxonKind = "category" | "tag";
+export type TaxonKind = "category" | "article-category" | "tag";
 export type Taxon = { name: string; usageCount: number };
 export class TaxonomyError extends HttpError {}
 export const taxonomyErrorResponse = httpErrorResponse;
 
-const table = { category: "categories", tag: "tags" } as const;
+const table = { category: "categories", "article-category": "article_categories", tag: "tags" } as const;
 
 function nameFrom(input: unknown): string {
   if (typeof input !== "string") throw new TaxonomyError(400, "Name is required");
@@ -33,6 +33,15 @@ export function listTaxa(kind: TaxonKind): Taxon[] {
         UNION SELECT slug, json_extract(payload, '$.category') FROM submissions WHERE status = 'pending'
       )
       SELECT c.name, COUNT(used.slug) AS usageCount FROM categories c
+      LEFT JOIN used ON used.category = c.name GROUP BY c.name ORDER BY c.name COLLATE NOCASE`)
+      .all() as Taxon[];
+  }
+  if (kind === "article-category") {
+    return database.prepare(`WITH used AS (
+        SELECT slug, category FROM articles WHERE category IS NOT NULL
+        UNION SELECT slug, category FROM article_revisions WHERE category IS NOT NULL
+      )
+      SELECT c.name, COUNT(used.slug) AS usageCount FROM article_categories c
       LEFT JOIN used ON used.category = c.name GROUP BY c.name ORDER BY c.name COLLATE NOCASE`)
       .all() as Taxon[];
   }
@@ -64,6 +73,9 @@ export function renameTaxon(kind: TaxonKind, original: string, input: unknown): 
         WHERE json_extract(payload, '$.category') = ?`).run(next, prior);
       database.prepare(`UPDATE submissions SET payload = json_set(payload, '$.category', ?)
         WHERE status = 'pending' AND json_extract(payload, '$.category') = ?`).run(next, prior);
+    } else if (kind === "article-category") {
+      database.prepare("UPDATE articles SET category = ? WHERE category = ?").run(next, prior);
+      database.prepare("UPDATE article_revisions SET category = ? WHERE category = ?").run(next, prior);
     } else {
       database.prepare("UPDATE article_tags SET tag_name = ? WHERE tag_name = ?").run(next, prior);
     }
@@ -83,7 +95,11 @@ export function deleteTaxon(kind: TaxonKind, original: string): void {
           EXISTS(SELECT 1 FROM submissions WHERE status = 'pending'
             AND json_extract(payload, '$.category') = ?) AS used`)
           .get(name, name, name) as { used: number }).used
-      : Boolean(database.prepare("SELECT 1 FROM article_tags WHERE tag_name = ? LIMIT 1").get(name));
+      : kind === "article-category"
+        ? (database.prepare(`SELECT EXISTS(SELECT 1 FROM articles WHERE category = ?) OR
+          EXISTS(SELECT 1 FROM article_revisions WHERE category = ?) AS used`)
+          .get(name, name) as { used: number }).used
+        : Boolean(database.prepare("SELECT 1 FROM article_tags WHERE tag_name = ? LIMIT 1").get(name));
     if (used) {
       throw new TaxonomyError(409, "Remove this name from content before deleting it");
     }

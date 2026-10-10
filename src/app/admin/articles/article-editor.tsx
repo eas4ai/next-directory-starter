@@ -8,8 +8,8 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import type { Article } from "@/lib/articles";
 
-function ArticleFields({ article, includeSlug, includeStatus = true }: {
-  article?: Article; includeSlug?: boolean; includeStatus?: boolean;
+function ArticleFields({ article, categories, includeSlug, includeStatus = true }: {
+  article?: Article; categories: string[]; includeSlug?: boolean; includeStatus?: boolean;
 }) {
   const prefix = article ? `edit-${article.slug}` : "new-article";
   return (
@@ -27,6 +27,12 @@ function ArticleFields({ article, includeSlug, includeStatus = true }: {
         <textarea id={`${prefix}-body`} name="body" defaultValue={article?.body} required maxLength={50000} className="min-h-64 rounded-md border border-input bg-background px-3 py-2 text-sm" />
       </Field>
       <div className="grid gap-5 sm:grid-cols-2">
+        <Field><FieldLabel htmlFor={`${prefix}-category`}>Article category</FieldLabel>
+          <select id={`${prefix}-category`} name="category" defaultValue={article?.category ?? ""} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+            <option value="">Uncategorized</option>
+            {categories.map((category) => <option key={category} value={category}>{category}</option>)}
+          </select>
+        </Field>
         <Field><FieldLabel htmlFor={`${prefix}-tags`}>Tags, comma separated</FieldLabel>
           <Input id={`${prefix}-tags`} name="tags" defaultValue={article?.tags.join(", ")} placeholder="Use tags created in taxonomy" />
         </Field>
@@ -71,7 +77,7 @@ function SavedArticles({ articles, pending, onEdit }: {
   );
 }
 
-export function ArticleEditor({ initialArticles }: { initialArticles: Article[] }) {
+export function ArticleEditor({ initialArticles, categories }: { initialArticles: Article[]; categories: string[] }) {
   const router = useRouter();
   const [editing, setEditing] = useState<Article | null>(null);
   const [pending, setPending] = useState(false);
@@ -149,7 +155,7 @@ export function ArticleEditor({ initialArticles }: { initialArticles: Article[] 
     <div className="mt-8 space-y-10">
       <form onSubmit={(event) => save(event)} className="space-y-4 rounded-lg border p-6">
         <h2 className="text-xl font-semibold">New article</h2>
-        <ArticleFields includeSlug />
+        <ArticleFields categories={categories} includeSlug />
         <Button type="submit" disabled={pending}>Create article</Button>
       </form>
       {message && <p role="status" className="text-sm text-muted-foreground">{message}</p>}
@@ -160,7 +166,7 @@ export function ArticleEditor({ initialArticles }: { initialArticles: Article[] 
             <h2 className="text-xl font-semibold">Edit {editing.slug}</h2>
             <Button type="button" variant="ghost" onClick={() => setEditing(null)}>Close</Button>
           </div>
-          <ArticleFields article={editing} includeStatus={false} />
+          <ArticleFields article={editing} categories={categories} includeStatus={false} />
           <div className="flex flex-wrap items-center gap-3">
             <Button type="submit" disabled={pending}>Save revision</Button>
             <Button type="button" variant="outline" asChild><Link href={`/admin/articles/${editing.slug}/preview`} target="_blank">Private preview</Link></Button>
