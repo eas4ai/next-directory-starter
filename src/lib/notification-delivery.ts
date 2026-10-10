@@ -142,13 +142,14 @@ export type NotificationDeliveryRow = {
   emailLastError: string | null; emailSentAt: string | null;
 };
 
-export function notificationDeliveryRows(limit = 100): NotificationDeliveryRow[] {
+export function notificationDeliveryRows(limit = 100, offset = 0): NotificationDeliveryRow[] {
   const bounded = Math.min(Math.max(Math.floor(limit) || 1, 1), 100);
+  const start = Number.isSafeInteger(offset) && offset >= 0 ? offset : 0;
   const rows = database.prepare(`SELECT id, subject, created_at, email_state,
     email_attempts, email_next_attempt_at, email_last_error, email_sent_at
     FROM owner_notifications ORDER BY CASE WHEN email_state = 'failed' THEN 0 ELSE 1 END,
-      created_at DESC, id DESC LIMIT ?`)
-    .all(bounded) as {
+      created_at DESC, id DESC LIMIT ? OFFSET ?`)
+    .all(bounded, start) as {
     id: string; subject: string; created_at: string; email_state: string;
     email_attempts: number; email_next_attempt_at: string | null;
     email_last_error: string | null; email_sent_at: string | null;
@@ -157,4 +158,15 @@ export function notificationDeliveryRows(limit = 100): NotificationDeliveryRow[]
     emailState: row.email_state, emailAttempts: row.email_attempts,
     emailNextAttemptAt: row.email_next_attempt_at,
     emailLastError: row.email_last_error, emailSentAt: row.email_sent_at }));
+}
+
+export function notificationDeliveryPage(requestedPage: number): {
+  rows: NotificationDeliveryRow[]; page: number; pages: number; total: number;
+} {
+  const total = (database.prepare("SELECT COUNT(*) AS count FROM owner_notifications")
+    .get() as { count: number }).count;
+  const pages = Math.max(1, Math.ceil(total / 100));
+  const page = Number.isSafeInteger(requestedPage)
+    ? Math.min(Math.max(requestedPage, 1), pages) : 1;
+  return { rows: notificationDeliveryRows(100, (page - 1) * 100), page, pages, total };
 }
