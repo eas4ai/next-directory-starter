@@ -31,6 +31,12 @@ function rowCount(file, table) {
   finally { db.close(); }
 }
 
+function hasTable(file, table) {
+  const db = new Database(file, { readonly: true, fileMustExist: true });
+  try { return Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table)); }
+  finally { db.close(); }
+}
+
 let passed = false;
 try {
   for (const name of ['src', 'scripts', 'fixtures', 'node_modules']) {
@@ -75,8 +81,17 @@ try {
 
   run('db:migrate', [], { DATABASE_URL: `file:${overrideDb}` });
   run('db:seed', [], { DATABASE_URL: `file:${overrideDb}` });
+  expect(hasTable(overrideDb, 'user'), 'Explicit DATABASE_URL missed authentication migration');
   expect(rowCount(overrideDb, 'listings') >= 2, 'Explicit DATABASE_URL did not override .env.local');
   expect(!existsSync(defaultDb), 'Override run created the default database');
+
+  const layeredDb = join(sandbox, 'production.db');
+  writeFileSync(join(sandbox, '.env.production.local'), `DATABASE_URL=file:${layeredDb}\n`);
+  run('db:migrate', [], { NODE_ENV: 'production' });
+  run('db:seed', [], { NODE_ENV: 'production' });
+  expect(hasTable(layeredDb, 'user'), 'Authentication migration missed the mode-specific database');
+  expect(rowCount(layeredDb, 'listings') >= 2, 'Catalog migration or seed missed the mode-specific database');
+  expect(!existsSync(defaultDb), 'Mode-specific run created the default database');
 
   const manual = readFileSync(join(project, 'docs/operator-manual.md'), 'utf8');
   expect(manual.includes('.env.local') && manual.includes('DATABASE_URL') &&
