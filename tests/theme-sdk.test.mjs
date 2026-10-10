@@ -119,6 +119,22 @@ test('THM-001 typed tokens validate and render a custom theme', async () => {
   const broken = structuredClone(installedThemes.studio);
   delete broken.light.primary;
   assert.throws(() => defineTheme(broken), /primary|token/i);
+  for (const [group, token, value] of [
+    ['light', 'primary', 'banana'], ['dark', 'background', 'banana'],
+    ['typography', 'body', 'banana'], ['spacing', 'card', 'banana'],
+    ['width', 'page', 'banana'],
+  ]) {
+    const invalid = structuredClone(installedThemes.studio);
+    invalid[group][token] = value;
+    assert.throws(() => defineTheme(invalid), /invalid|token/i,
+      `${group}.${token} must reject a malformed present value`);
+  }
+  for (const token of ['radius', 'shadow', 'controlHeight']) {
+    const invalid = structuredClone(installedThemes.studio);
+    invalid[token] = 'banana';
+    assert.throws(() => defineTheme(invalid), /invalid|token/i,
+      `${token} must reject a malformed present value`);
+  }
   const { origin, adminCookie } = await app();
   const presetResponse = await fetch(`${origin}/theme.css`);
   assert.equal(presetResponse.status, 200);
