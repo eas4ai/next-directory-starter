@@ -60,20 +60,26 @@ export async function proxy(request: NextRequest) {
     return next();
   }
 
-  if (path.startsWith("/admin/articles") || path.startsWith("/admin/taxonomy")) {
-    const { canEditArticles, sessionUser } = await import("@/lib/admin");
-    if (!canEditArticles((await sessionUser(request.headers))?.role)) {
+  if (path.startsWith("/admin/articles") || path.startsWith("/admin/taxonomy") ||
+      path.startsWith("/admin/catalog") || path.startsWith("/admin/plans") ||
+      path.startsWith("/admin/billing") || path.startsWith("/admin/review")) {
+    const { canEditArticles, canManageBilling, canManageCatalog,
+      canManageTaxonomy, canModerate, sessionUser } = await import("@/lib/admin");
+    const role = (await sessionUser(request.headers))?.role;
+    const allowed = path.startsWith("/admin/articles") ? canEditArticles(role) :
+      path.startsWith("/admin/taxonomy") ? canManageTaxonomy(role) :
+        path.startsWith("/admin/catalog") ? canManageCatalog(role) :
+          path.startsWith("/admin/plans") || path.startsWith("/admin/billing")
+            ? canManageBilling(role) : canModerate(role);
+    if (!allowed) {
       return new NextResponse("Forbidden", { status: 403 });
     }
     return next();
   }
 
   if (path.startsWith("/admin/") && !path.startsWith("/admin/sign-in")) {
-    const { isAdmin, canModerate, sessionUser } = await import("@/lib/admin");
-    const allowed = path.startsWith("/admin/review")
-      ? canModerate((await sessionUser(request.headers))?.role)
-      : await isAdmin(request.headers);
-    if (!allowed) return new NextResponse("Forbidden", { status: 403 });
+    const { isAdmin } = await import("@/lib/admin");
+    if (!(await isAdmin(request.headers))) return new NextResponse("Forbidden", { status: 403 });
   }
   return next();
 }

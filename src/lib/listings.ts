@@ -27,13 +27,15 @@ export function publishedListingBySlug(slug: string): Listing | undefined {
     .get(slug) as Listing | undefined;
 }
 
-export function allListings(): Listing[] {
-  return database.prepare("SELECT * FROM listings ORDER BY name COLLATE NOCASE, slug")
+export function allListings(operatorOnly = false): Listing[] {
+  return database.prepare(`SELECT * FROM listings ${operatorOnly ? "WHERE owner_user_id IS NULL" : ""}
+    ORDER BY name COLLATE NOCASE, slug`)
     .all() as Listing[];
 }
 
-export function listingBySlug(slug: string): Listing | undefined {
-  return database.prepare("SELECT * FROM listings WHERE slug = ?").get(slug) as Listing | undefined;
+export function listingBySlug(slug: string, operatorOnly = false): Listing | undefined {
+  return database.prepare(`SELECT * FROM listings WHERE slug = ?
+    ${operatorOnly ? "AND owner_user_id IS NULL" : ""}`).get(slug) as Listing | undefined;
 }
 
 export function directoryCategories(): string[] {

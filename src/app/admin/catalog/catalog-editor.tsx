@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Listing } from "@/lib/listings";
 
-export function CatalogEditor({ initialListings }: { initialListings: Listing[] }) {
+export function CatalogEditor({ initialListings, canSuspend }: { initialListings: Listing[]; canSuspend: boolean }) {
   const [listings, setListings] = useState(initialListings);
   const [message, setMessage] = useState("");
 
@@ -76,9 +76,9 @@ export function CatalogEditor({ initialListings }: { initialListings: Listing[] 
           <div key={listing.slug} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
             <div><p className="font-medium">{listing.name}</p><p className="text-sm text-muted-foreground">{listing.category} · {listing.status}</p></div>
             <div className="flex gap-2">
-              {listing.status !== "published" && <Button type="button" size="sm" onClick={() => changeStatus(listing, "published")}>Publish</Button>}
+              {listing.status === "draft" && <Button type="button" size="sm" onClick={() => changeStatus(listing, "published")}>Publish</Button>}
               {listing.status === "published" && <Button type="button" size="sm" variant="outline" onClick={() => changeStatus(listing, "draft")}>Unpublish</Button>}
-              {listing.status !== "suspended" && <Button type="button" size="sm" variant="destructive" onClick={() => changeStatus(listing, "suspended")}>Suspend</Button>}
+              {canSuspend && listing.status !== "suspended" && <Button type="button" size="sm" variant="destructive" onClick={() => changeStatus(listing, "suspended")}>Suspend</Button>}
             </div>
           </div>
         ))}

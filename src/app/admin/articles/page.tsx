@@ -3,7 +3,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
-import { canEditArticles, sessionUser } from "@/lib/admin";
+import { canEditArticles, canManageTaxonomy, sessionUser } from "@/lib/admin";
 import { listArticles } from "@/lib/articles";
 import { getSiteConfig } from "@/lib/site-config";
 import { listTaxa } from "@/lib/taxonomy";
@@ -27,7 +27,7 @@ export default async function AdminArticlesPage({ searchParams }: { searchParams
   return (
     <main className="mx-auto w-full max-w-[1400px] px-6 py-10">
       <Link href="/articles" className="text-sm text-muted-foreground hover:text-foreground">← Public articles</Link>
-      <Link href="/admin/taxonomy" className="ml-4 text-sm underline">Article categories</Link>
+      {canManageTaxonomy(user?.role) && <Link href="/admin/taxonomy" className="ml-4 text-sm underline">Categories and tags</Link>}
       <h1 className="mt-7 text-3xl font-semibold tracking-tight">Articles</h1>
       <p className="mt-3 text-muted-foreground">Save drafts and control which articles appear publicly.</p>
       <Link href="/admin/overview" className="mt-3 inline-block text-sm underline">Administration overview</Link>

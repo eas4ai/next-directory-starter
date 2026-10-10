@@ -1,14 +1,15 @@
-import { adminReadResponse } from "@/lib/admin-api";
-import { canAdmin, sameOrigin, sessionUser } from "@/lib/admin";
+import { canManageBilling, sameOrigin, sessionUser } from "@/lib/admin";
 import { createPlan, listPlans, planErrorResponse } from "@/lib/plans";
 
 export async function GET(request: Request) {
-  return adminReadResponse(request, () => ({ plans: listPlans() }));
+  const user = await sessionUser(request.headers);
+  if (!canManageBilling(user?.role)) return Response.json({ error: "Forbidden" }, { status: 403 });
+  return Response.json({ plans: listPlans() });
 }
 
 export async function POST(request: Request) {
   const user = await sessionUser(request.headers);
-  if (!user || !canAdmin(user.role)) return Response.json({ error: "Forbidden" }, { status: 403 });
+  if (!user || !canManageBilling(user.role)) return Response.json({ error: "Forbidden" }, { status: 403 });
   if (!sameOrigin(request)) return Response.json({ error: "Invalid origin" }, { status: 403 });
   let input: unknown;
   try {

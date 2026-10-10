@@ -26,7 +26,7 @@ export function SignInForm() {
         setError("Unable to sign in. Check your email and password.");
         return;
       }
-      router.replace("/admin/theme");
+      router.replace("/admin/overview");
       router.refresh();
     } catch {
       setError("Unable to sign in right now. Please try again.");

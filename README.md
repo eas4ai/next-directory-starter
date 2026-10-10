@@ -34,7 +34,7 @@ npm run account:provision -- --email you@example.com --name "Site administrator"
 npm run dev
 ```
 
-The provisioning command prompts for a password. Open [the administrator sign-in page](http://localhost:3000/admin/sign-in), sign in with that account, then open `/admin/theme` to preview and save a preset or `/admin/catalog` to create and publish listings. Public sign-ups receive the regular user role and cannot access the editors. Do not use `--force` for routine provisioning.
+The provisioning command prompts for a password. Open [the administrator sign-in page](http://localhost:3000/admin/sign-in), sign in with that account, then use `/admin/overview` to reach the workspaces. Open `/admin/theme` to preview and save a preset or `/admin/catalog` to create and publish listings. Public sign-ups receive the regular user role and cannot access the editors. Do not use `--force` for routine provisioning.
 
 The sample seed is repeatable and leaves existing listings unchanged. The public directory supports `q`, `category`, and `page` URL parameters and shows at most 12 listings per page. Draft and suspended listings are absent from public pages.
 
@@ -53,6 +53,8 @@ npm run account:provision -- --email moderator@example.com --name "Moderator" --
 ```
 
 The command prompts for a password and asks for confirmation if accounts already exist. Moderators sign in through `/owner/sign-in` and then open `/admin/review`. Every approval or rejection requires a reason; prior decisions remain in review history. The review view also lets a moderator suspend any published listing. A suspended listing immediately leaves public search and its detail route; its pending revision is rejected, and the owner cannot edit or resubmit it.
+
+The administration overview shows current published listing and article counts, pending owner submissions, and links the signed-in staff member can use. Only administrators see recent audit activity. At `/admin/accounts`, an administrator can combine the predefined moderation, article editing, catalog, taxonomy, and billing capabilities on a verified account. Catalog staff manage operator listings; moderation staff review owner submissions and suspend listings. Taxonomy staff manage listing categories, article categories, and tags. Billing staff manage plans and provider profiles. Account access, theme, search settings, and audit history stay administrator-only. An unverified or suspended account cannot use staff access, and the final active administrator cannot be demoted.
 
 Moderation decisions and confirmed payment changes add a private notice to the affected owner's workspace. The latest 20 notices appear at `/owner/listings`. Each notice is written in the same database transaction as its moderation or payment change, so retries do not repeat it and a failed notice insert rolls back the change.
 

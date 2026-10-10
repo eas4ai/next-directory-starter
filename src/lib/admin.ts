@@ -1,16 +1,17 @@
 import { auth } from "@/lib/auth";
+import { hasRole, STAFF_CAPABILITIES } from "@/lib/staff-roles";
 
 export async function isAdmin(headers: Headers): Promise<boolean> {
-  const session = await auth.api.getSession({ headers });
-  return canAdmin(session?.user.role);
+  return canAdmin((await sessionUser(headers))?.role);
 }
 
 export async function sessionUser(headers: Headers) {
-  return (await auth.api.getSession({ headers }))?.user ?? null;
+  const user = (await auth.api.getSession({ headers }))?.user;
+  return user?.emailVerified && !user.banned ? user : null;
 }
 
 function hasAnyRole(role: string | null | undefined, allowed: readonly string[]): boolean {
-  return role?.split(",").some((value) => allowed.includes(value)) ?? false;
+  return allowed.some((value) => hasRole(role, value));
 }
 
 export function canAdmin(role: string | null | undefined): boolean {
@@ -25,8 +26,20 @@ export function canEditArticles(role: string | null | undefined): boolean {
   return hasAnyRole(role, ["admin", "editor"]);
 }
 
+export function canManageCatalog(role: string | null | undefined): boolean {
+  return hasAnyRole(role, ["admin", "catalog"]);
+}
+
+export function canManageTaxonomy(role: string | null | undefined): boolean {
+  return hasAnyRole(role, ["admin", "taxonomy"]);
+}
+
+export function canManageBilling(role: string | null | undefined): boolean {
+  return hasAnyRole(role, ["admin", "billing"]);
+}
+
 export function canOpenOverview(role: string | null | undefined): boolean {
-  return hasAnyRole(role, ["admin", "moderator", "editor"]);
+  return canAdmin(role) || STAFF_CAPABILITIES.some((capability) => hasRole(role, capability));
 }
 
 export function sameOrigin(request: Request): boolean {
