@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: preset-font-render-blocking
+Current: readme-social-card
 
 ## public-starter-and-theme
 
@@ -435,3 +435,14 @@ Done-when: production page checks on the home, listing, and admin surfaces show
 no render-blocking external font stylesheet; each preset font resolves for body
 and heading selections with visible fallback text during loading; saved choices
 survive navigation and restart; and a custom theme retains its declared fonts.
+
+## readme-social-card
+
+Requirements: DOC-001
+
+Delivery: place the developer-provided `assets/social-card.jpg` immediately below
+the README title with descriptive alternative text. Keep the source-verified
+overview and first-run instructions intact.
+
+Done-when: the README renders the committed JPEG at the top through a relative
+path, and the DOC-001 overview check still passes.
