@@ -357,6 +357,31 @@ function migrateMedia(): void {
   }).immediate();
 }
 
+function migrateNotifications(): void {
+  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 14").get()) return;
+  database.transaction(() => {
+    database.exec(`CREATE TABLE owner_notifications (
+        id TEXT PRIMARY KEY NOT NULL,
+        owner_user_id TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        source_key TEXT NOT NULL UNIQUE,
+        subject TEXT NOT NULL,
+        body TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        email_state TEXT NOT NULL DEFAULT 'pending'
+          CHECK (email_state IN ('pending', 'sending', 'sent', 'failed')),
+        email_attempts INTEGER NOT NULL DEFAULT 0,
+        email_next_attempt_at TEXT,
+        email_claimed_until TEXT,
+        email_sent_at TEXT,
+        email_last_error TEXT
+      );
+      CREATE INDEX owner_notifications_recent ON owner_notifications(owner_user_id, created_at DESC, id DESC);
+      CREATE INDEX owner_notifications_delivery ON owner_notifications(email_state, email_next_attempt_at, created_at);`);
+    database.prepare("INSERT INTO catalog_migrations (version) VALUES (14)").run();
+  }).immediate();
+}
+
 export function migrateCatalog(): void {
   migrate.immediate();
   migratePlanModes();
@@ -366,6 +391,7 @@ export function migrateCatalog(): void {
   migrateArticleRevisions();
   migrateArticleCategories();
   migrateMedia();
+  migrateNotifications();
 }
 
 export function seedCatalog(): void {

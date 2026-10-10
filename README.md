@@ -46,6 +46,8 @@ npm run account:provision -- --email moderator@example.com --name "Moderator" --
 
 The command prompts for a password and asks for confirmation if accounts already exist. Moderators sign in through `/owner/sign-in` and then open `/admin/review`. Every approval or rejection requires a reason; prior decisions remain in review history. The review view also lets a moderator suspend any published listing. A suspended listing immediately leaves public search and its detail route; its pending revision is rejected, and the owner cannot edit or resubmit it.
 
+Moderation decisions and confirmed payment changes add a private notice to the affected owner's workspace. The latest 20 notices appear at `/owner/listings`. Each notice is written in the same database transaction as its moderation or payment change, so retries do not repeat it and a failed notice insert rolls back the change.
+
 ## Articles
 
 An administrator can edit articles at `/admin/articles`. To give a separate account article editing access without administrator controls, provision it against the same database:

@@ -3,6 +3,7 @@ import { database } from "@/lib/database";
 import { migrateCatalog } from "@/lib/catalog-migrations";
 import { HttpError, httpErrorResponse } from "@/lib/http-error";
 import type { BillingMode, BillingProvider } from "@/lib/billing-profiles";
+import { recordPurchaseNotification } from "@/lib/notifications";
 
 migrateCatalog();
 
@@ -185,6 +186,9 @@ function paidPeriod(evidence: VerifiedEvidence, effect: PaidEffect): void {
       purchase.id, effect.subscriptionId ?? null, endsAt, now.toISOString(),
     );
   }
+  recordPurchaseNotification(purchase.id, "payment.paid",
+    `payment:${evidence.provider}:${evidence.mode}:${effect.paymentId}:paid`,
+    "Payment confirmed", "Your publishing payment was confirmed.");
 }
 
 function refreshEntitlement(purchaseId: string): void {
@@ -223,22 +227,32 @@ function refundPeriod(evidence: VerifiedEvidence,
     throw new PaymentLifecycleError(409, "Refund terms do not match the paid period");
   }
   if (!effect.full) return;
-  database.prepare("UPDATE payment_periods SET refunded_at = COALESCE(refunded_at, ?) WHERE id = ?")
+  const changed = database.prepare("UPDATE payment_periods SET refunded_at = ? WHERE id = ? AND refunded_at IS NULL")
     .run(new Date().toISOString(), period.id);
+  if (!changed.changes) return;
   if (period.billing_mode === "one-time") {
     database.prepare("UPDATE purchases SET status = 'refunded' WHERE id = ?")
       .run(period.purchase_id);
   }
   refreshEntitlement(period.purchase_id);
+  recordPurchaseNotification(period.purchase_id, "payment.refunded",
+    `payment:${evidence.provider}:${evidence.mode}:${effect.paymentId}:refunded`,
+    "Payment refunded", "A publishing payment was fully refunded.");
 }
 
 function disputePeriod(evidence: VerifiedEvidence,
   effect: Extract<PaymentEffect, { kind: "dispute" }>): void {
   const period = matchingPeriod(evidence, effect.paymentId);
-  database.prepare(`UPDATE payment_periods SET disputed_at = ? WHERE id = ?`).run(
-    effect.open ? new Date().toISOString() : null, period.id,
-  );
+  const changed = database.prepare(`UPDATE payment_periods SET disputed_at = ? WHERE id = ?
+    AND ${effect.open ? "disputed_at IS NULL" : "disputed_at IS NOT NULL"}`).run(
+    effect.open ? new Date().toISOString() : null, period.id);
+  if (!changed.changes) return;
   refreshEntitlement(period.purchase_id);
+  recordPurchaseNotification(period.purchase_id,
+    effect.open ? "payment.dispute-open" : "payment.dispute-closed",
+    `payment:${evidence.provider}:${evidence.mode}:${evidence.eventId}:dispute`,
+    effect.open ? "Payment dispute opened" : "Payment dispute closed",
+    effect.open ? "A publishing payment is under dispute." : "The publishing payment dispute closed.");
 }
 
 function subscriptionState(evidence: VerifiedEvidence,
@@ -253,8 +267,10 @@ function subscriptionState(evidence: VerifiedEvidence,
     effect.purchaseId, evidence.provider, evidence.mode, effect.subscriptionId,
   ) as { id: string } | undefined;
   if (!purchase) throw new PaymentLifecycleError(409, "Subscription does not match the purchase");
+  const prior = database.prepare("SELECT state FROM subscription_states WHERE purchase_id = ?")
+    .get(purchase.id) as { state: string } | undefined;
   const now = new Date().toISOString();
-  database.prepare(`INSERT INTO subscription_states
+  const changed = database.prepare(`INSERT INTO subscription_states
     (purchase_id, provider_subscription_id, state, current_period_end, updated_at, provider_event_at)
     VALUES (?, ?, ?, NULL, ?, ?)
     ON CONFLICT(purchase_id) DO UPDATE SET
@@ -265,6 +281,11 @@ function subscriptionState(evidence: VerifiedEvidence,
     purchase.id, effect.subscriptionId, effect.state, now,
     new Date(occurred).toISOString(),
   );
+  if (changed.changes && prior?.state !== effect.state) {
+    recordPurchaseNotification(purchase.id, `payment.${effect.state}`,
+      `payment:${evidence.provider}:${evidence.mode}:${evidence.eventId}:subscription`,
+      "Subscription status changed", `Your publishing subscription is now ${effect.state}.`);
+  }
 }
 
 function applyEffect(evidence: VerifiedEvidence): void {

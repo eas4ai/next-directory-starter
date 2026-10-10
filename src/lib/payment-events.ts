@@ -2,6 +2,7 @@ import type Stripe from "stripe";
 import { database } from "@/lib/database";
 import { migrateCatalog } from "@/lib/catalog-migrations";
 import { HttpError, httpErrorResponse } from "@/lib/http-error";
+import { recordPurchaseNotification } from "@/lib/notifications";
 
 migrateCatalog();
 
@@ -55,6 +56,8 @@ function settle(event: Stripe.Event): void {
     VALUES (?, ?, ?, ?, ?, NULL)`).run(
     id, purchase.listing_slug, startsAt.toISOString(), endsAt.toISOString(), purchase.featured,
   );
+  recordPurchaseNotification(id, "payment.paid", `payment:stripe:${purchase.plan_mode}:${id}:paid`,
+    "Payment confirmed", "Your publishing payment was confirmed.");
 }
 
 function refund(event: Stripe.Event): void {
@@ -72,9 +75,14 @@ function refund(event: Stripe.Event): void {
   }
   if (purchase.status === "refunded") return;
   const now = new Date().toISOString();
-  database.prepare("UPDATE purchases SET status = 'refunded' WHERE id = ? AND status = 'paid'").run(purchase.id);
+  const changed = database.prepare("UPDATE purchases SET status = 'refunded' WHERE id = ? AND status = 'paid'")
+    .run(purchase.id);
+  if (!changed.changes) return;
   database.prepare("UPDATE entitlements SET revoked_at = ? WHERE purchase_id = ? AND revoked_at IS NULL")
     .run(now, purchase.id);
+  recordPurchaseNotification(purchase.id, "payment.refunded",
+    `payment:stripe:${purchase.plan_mode}:${purchase.id}:refunded`,
+    "Payment refunded", "A publishing payment was fully refunded.");
 }
 
 export function processStripeEvent(event: Stripe.Event): void {
