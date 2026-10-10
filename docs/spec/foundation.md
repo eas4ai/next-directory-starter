@@ -26,3 +26,8 @@ Status: Agreed 2026-10-09
 Falsifier: The distribution lacks the MIT grant or copyright notice, omits a required notice for copied material, or includes proprietary reference source, assets, branding, or production records.
 Mechanism: operator-adoption
 Status: Agreed 2026-10-10
+
+[FOUND-006] A custom SQLite `DATABASE_URL` in `.env.local` selects the same database for the application, authentication migration, catalog migration, sample seed, and repository maintenance commands without a separate shell export. An explicit process environment value takes precedence. Existing data stays at its selected path, and the operator manual describes the resulting setup accurately.
+Falsifier: On a fresh isolated installation with only `.env.local` naming a custom SQLite file, migration or seed creates or reads a different default database; a maintenance command targets that default; an exported `DATABASE_URL` is ignored; or the manual still says a shell export is required to avoid split databases.
+Mechanism: cli-env-consistency
+Status: Agreed 2026-10-10

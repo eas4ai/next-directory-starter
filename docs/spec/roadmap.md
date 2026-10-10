@@ -377,3 +377,18 @@ script, names its actor and success check, and makes external-provider and
 persistent-storage dependencies explicit. A mechanism checks chapter coverage,
 source links, commands and high-risk boundaries; the builder and adversary
 review the remaining semantic claims against source.
+
+## cli-env-local-mismatch
+
+Requirements: FOUND-006
+
+Delivery: make the repository's migration, seed, and maintenance entry points
+read the same `DATABASE_URL` selection that the app and Better Auth read. Keep
+an explicit process environment override. Update the operator manual's custom
+SQLite guidance to reflect the fix.
+
+Done-when: an isolated install with a custom database path only in `.env.local`
+migrates authentication and catalog tables, seeds listings, and runs its
+maintenance commands against that one file without creating the default file;
+an explicit process environment path overrides the local file; the manual
+matches the verified behavior.
