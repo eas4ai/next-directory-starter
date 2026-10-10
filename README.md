@@ -21,6 +21,8 @@ Administrators can set a search title format, default description and social ima
 
 The same administrator page manages up to 500 permanent same-site redirects and shows the latest 50 missing paths. Redirects cannot replace live pages or form loops. The missing-page report stores paths only, without query strings or visitor details. An editor who changes a published article slug in `/admin/articles` automatically preserves the former address as a permanent redirect.
 
+The search settings page also shows paged findings for current public listings and articles, including missing or repeated titles and short descriptions. Select a published slug to preview the search result and social card built from the metadata actually emitted by its page. Findings are editing suggestions, not a search ranking score.
+
 Initialize the database, seed sample listings, and create the first administrator:
 
 ```sh
