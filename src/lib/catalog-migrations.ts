@@ -241,10 +241,62 @@ function migrateBillingProfiles(): void {
   }).immediate();
 }
 
+function migratePaymentLifecycle(): void {
+  const installed = database.prepare("SELECT version FROM catalog_migrations WHERE version = 9").get();
+  if (installed) return;
+  database.transaction(() => {
+    database.exec(`ALTER TABLE purchases ADD COLUMN provider TEXT NOT NULL DEFAULT 'stripe';
+      ALTER TABLE purchases ADD COLUMN provider_resource_id TEXT;
+      ALTER TABLE purchases ADD COLUMN provider_subscription_id TEXT;
+      ALTER TABLE purchases ADD COLUMN provider_price_id TEXT;
+      ALTER TABLE purchases ADD COLUMN checkout_url TEXT;
+      CREATE UNIQUE INDEX purchases_provider_resource
+        ON purchases(provider, plan_mode, provider_resource_id)
+        WHERE provider_resource_id IS NOT NULL;
+      CREATE TABLE payment_periods (
+        id TEXT PRIMARY KEY NOT NULL,
+        purchase_id TEXT NOT NULL REFERENCES purchases(id),
+        provider TEXT NOT NULL,
+        provider_payment_id TEXT NOT NULL,
+        amount_minor INTEGER NOT NULL,
+        currency TEXT NOT NULL,
+        starts_at TEXT NOT NULL,
+        ends_at TEXT NOT NULL,
+        refunded_at TEXT,
+        disputed_at TEXT,
+        UNIQUE(provider, provider_payment_id)
+      );
+      CREATE INDEX payment_periods_purchase ON payment_periods(purchase_id, ends_at);
+      CREATE TABLE payment_evidence (
+        provider TEXT NOT NULL,
+        mode TEXT NOT NULL CHECK (mode IN ('test', 'live')),
+        event_id TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        state TEXT NOT NULL CHECK (state IN ('pending', 'processed', 'unresolved')),
+        attempts INTEGER NOT NULL DEFAULT 0,
+        received_at TEXT NOT NULL,
+        processed_at TEXT,
+        error TEXT,
+        PRIMARY KEY (provider, mode, event_id)
+      );
+      CREATE INDEX payment_evidence_unresolved ON payment_evidence(state, received_at);
+      CREATE TABLE subscription_states (
+        purchase_id TEXT PRIMARY KEY NOT NULL REFERENCES purchases(id),
+        provider_subscription_id TEXT,
+        state TEXT NOT NULL CHECK (state IN ('active', 'cancel-scheduled', 'canceled', 'disputed')),
+        current_period_end TEXT,
+        updated_at TEXT NOT NULL
+      );`);
+    database.prepare("INSERT INTO catalog_migrations (version) VALUES (9)").run();
+  }).immediate();
+}
+
 export function migrateCatalog(): void {
   migrate.immediate();
   migratePlanModes();
   migrateBillingProfiles();
+  migratePaymentLifecycle();
 }
 
 export function seedCatalog(): void {

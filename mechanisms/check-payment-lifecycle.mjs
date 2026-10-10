@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -17,6 +17,15 @@ function command(args, env) {
   const result = spawnSync('npm', args, { env, encoding: 'utf8', timeout: 120_000 });
   if (result.status !== 0) {
     throw new Error(`npm ${args[1] ?? args[0]} exited ${result.status}: ${(result.stderr ?? '').slice(-800)}`);
+  }
+}
+
+function nodeTests(paths) {
+  const result = spawnSync(process.execPath, ['--import', 'tsx', '--test', ...paths], {
+    encoding: 'utf8', timeout: 60_000,
+  });
+  if (result.status !== 0) {
+    throw new Error(`Payment tests failed: ${(result.stdout ?? '').slice(-500)} ${(result.stderr ?? '').slice(-500)}`);
   }
 }
 
@@ -66,6 +75,7 @@ try {
     if (!dependencies['@nowpaymentsio/nowpayments-sdk-nodejs']) {
       throw new Error('The official NOWPayments Node SDK is not installed for hosted checkout.');
     }
+    nodeTests(['tests/hosted-checkout.test.mjs', 'tests/nowpayments-sdk.test.mjs']);
   });
 
   await check('COM-007', async () => {
@@ -88,6 +98,10 @@ try {
         throw new Error('There is no durable paid-period state for renewal and expiry.');
       }
     } finally { database.close(); }
+    if (!existsSync('tests/payment-lifecycle-state.test.mjs')) {
+      throw new Error('Renewal, cancellation, refund, dispute, and expiry state checks are absent.');
+    }
+    nodeTests(['tests/payment-lifecycle-state.test.mjs']);
   });
 
   await check('COM-009', async () => {
