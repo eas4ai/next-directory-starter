@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: payment-foundation
+Current: payment-lifecycle
 
 ## public-starter-and-theme
 
@@ -164,3 +164,27 @@ unauthorized request cannot read or change provider settings; database rows and
 responses do not expose saved secrets; test and live credentials and mappings
 remain separate after restart; and a disabled or incomplete profile is not
 offered as a new provider checkout option.
+
+## payment-lifecycle
+
+Requirements: COM-006, COM-007, COM-008, COM-009
+
+Delivery: connect eligible one-time and recurring plans to hosted Stripe and
+Paddle checkout, and one-time plans to the official NOWPayments Node SDK.
+Reserve immutable purchase terms and provider/mode identity before calling an
+external service; an ambiguous response remains one recoverable pending
+purchase. Verify and retain signed provider events before changing access.
+Process paid periods, scheduled cancellation, full and partial refunds,
+disputes, and expiry without bypassing listing moderation or making test-mode
+payments publicly eligible. Show owners the status of their purchases and
+supported cancellation action. Add bounded operator reconciliation that can
+retry retained evidence or read an existing provider resource without creating
+a charge. Preserve free publication and existing Stripe one-time purchases.
+
+Done-when: each enabled provider offers only supported plans in its selected
+mode; approved owners can start hosted checkout from the server's price and
+cannot create a second payable attempt on retry; unsigned, unmatched, partial,
+or unsettled events grant nothing while a matching settled event grants once;
+verified renewal, cancellation, full refund, partial refund, dispute, and
+expiry produce the specified access state; and owners and operators can inspect
+and recover pending purchases without creating another payment.

@@ -32,22 +32,22 @@ Status: Agreed 2026-10-09
 [COM-006] An approved listing's owner can start a server-priced hosted checkout with an enabled provider: Stripe and Paddle for eligible one-time or recurring plans, and the official NOWPayments Node SDK for one-time invoices only. An ambiguous retry must retain the same purchase instead of creating another payable attempt.
 Falsifier: A draft or another owner's listing starts checkout, browser-supplied price or mode controls the provider request, a missing price mapping is borrowed from another mode, NOWPayments is offered for recurring billing, or a retry creates a second chargeable attempt.
 Mechanism: payment-lifecycle
-Status: Draft
+Status: Agreed 2026-10-09
 
 [COM-007] The application authenticates Stripe, Paddle, and NOWPayments event payloads, correlates settled payment evidence to the exact provider, mode, purchase and immutable terms, and applies fulfillment once even after replay or interruption.
 Falsifier: An unsigned, unsettled, partial, wrong-price, wrong-currency, wrong-mode, or unrelated event grants access; a browser return grants access; or duplicate delivery creates or extends an entitlement twice.
 Mechanism: payment-lifecycle
-Status: Draft
+Status: Agreed 2026-10-09
 
 [COM-008] A paid entitlement follows verified renewal, cancellation, refund, dispute, and expiry outcomes without overriding moderation. A failed renewal adds no time; scheduled cancellation keeps paid time; full refund and open dispute suspend the affected access, while partial refund does not.
 Falsifier: An unpaid renewal extends access, a scheduled cancellation removes already paid time, a full refund or open dispute leaves the affected paid benefit active, a partial refund revokes it, or a test-mode payment changes live public eligibility.
 Mechanism: payment-lifecycle
-Status: Draft
+Status: Agreed 2026-10-09
 
 [COM-009] Owners can see their purchase and subscription status and request supported cancellation; an operator can reconcile bounded retained payment evidence and unresolved purchases without creating a new charge, including after a provider is disabled for new checkout.
 Falsifier: An owner cannot tell pending from paid or canceled state, another owner can read or cancel the purchase, a missed event cannot be repaired from retained or authoritative evidence, a retry creates a new charge, or disabling checkout discards recovery material.
 Mechanism: payment-lifecycle
-Status: Draft
+Status: Agreed 2026-10-09
 
 ### Payment foundation operating rules
 
