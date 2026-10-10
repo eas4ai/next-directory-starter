@@ -60,6 +60,8 @@ Administrators manage listing categories, article categories, and article tags s
 
 The article RSS feed is available at `/feed.xml`. It includes published articles and updates when an editor publishes or unpublishes one.
 
+Listing owners and article editors can upload a JPEG, PNG, or WebP image in their private editor. Uploads are limited to 5 MiB and 4096 pixels per side, re-encoded as WebP, and stored in a private local directory. Set `MEDIA_DIR` to a persistent writable directory if it should differ from the default directory beside the SQLite file. Back up that directory with the database.
+
 ## Publishing plans and checkout
 
 Administrators configure test or live free, one-time, monthly, and annual plans at `/admin/plans`, including price, currency, placement, and availability. Set `BILLING_CHECKOUT_MODE=test` or `live` for the plans owners should see; existing paid plans migrate to the mode of the configured Stripe key. Moderator approval still publishes an ordinary listing for free. An owner can select a free plan without a payment provider. Paid one-time and recurring offers use provider-hosted checkout; NOWPayments is available for one-time offers only.

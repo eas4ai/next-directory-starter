@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import type { Listing } from "@/lib/listings";
+import { ImageUploader } from "@/components/image-uploader";
 
 type OwnerItem = Listing & { hasDraft: boolean; pending: boolean };
 
@@ -148,6 +149,7 @@ export function OwnerEditor({ initialListings }: { initialListings: OwnerItem[] 
             <Button type="button" variant="ghost" onClick={() => setEditing(null)}>Close</Button>
           </div>
           <ListingFields value={editing} />
+          <ImageUploader kind="listing" slug={editing.slug} onUploaded={() => router.refresh()} />
           <Button type="submit" disabled={pending}>Save changes</Button>
         </form>
       )}
