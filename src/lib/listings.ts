@@ -1,6 +1,7 @@
 import { database } from "@/lib/database";
 import { migrateCatalog } from "@/lib/catalog-migrations";
 import { recordAudit } from "@/lib/audit";
+import { checkoutMode } from "@/lib/plans";
 
 export type Listing = {
   slug: string;
@@ -80,9 +81,11 @@ export function activeFeaturedListings(search: Pick<ListingSearch, "q" | "catego
   const { where, args } = publicFilter(search.q ?? "", search.category ?? "");
   const now = new Date().toISOString();
   return database.prepare(`SELECT l.* FROM listings l WHERE ${where}
-    AND EXISTS (SELECT 1 FROM entitlements e WHERE e.listing_slug = l.slug
+    AND EXISTS (SELECT 1 FROM entitlements e
+      JOIN purchases p ON p.id = e.purchase_id AND p.plan_mode = ?
+      WHERE e.listing_slug = l.slug
       AND e.featured = 1 AND e.revoked_at IS NULL AND e.starts_at <= ? AND e.ends_at > ?)
-    ORDER BY l.name COLLATE NOCASE, l.slug LIMIT 6`).all(...args, now, now) as Listing[];
+    ORDER BY l.name COLLATE NOCASE, l.slug LIMIT 6`).all(...args, checkoutMode(), now, now) as Listing[];
 }
 
 export function activeFeaturedSlugs(slugs: string[]): Set<string> {
@@ -90,10 +93,11 @@ export function activeFeaturedSlugs(slugs: string[]): Set<string> {
   const placeholders = slugs.map(() => "?").join(", ");
   const now = new Date().toISOString();
   const rows = database.prepare(`SELECT DISTINCT e.listing_slug FROM entitlements e
+    JOIN purchases p ON p.id = e.purchase_id AND p.plan_mode = ?
     JOIN listings l ON l.slug = e.listing_slug AND ${PUBLIC_LISTING_PREDICATE}
     WHERE e.listing_slug IN (${placeholders}) AND e.featured = 1
       AND e.revoked_at IS NULL AND e.starts_at <= ? AND e.ends_at > ?`)
-    .all(...slugs, now, now) as { listing_slug: string }[];
+    .all(checkoutMode(), ...slugs, now, now) as { listing_slug: string }[];
   return new Set(rows.map((row) => row.listing_slug));
 }
 

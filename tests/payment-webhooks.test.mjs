@@ -76,6 +76,28 @@ test('Paddle and NOWPayments signatures authenticate the exact mode and purchase
     assert.equal((await nowPost(request('nowpayments', nowBody, nowSignature), context('test'))).status, 200);
     assert.equal(database.prepare('SELECT COUNT(*) AS n FROM payment_periods').get().n, 2);
     assert.equal(database.prepare('SELECT COUNT(*) AS n FROM entitlements').get().n, 2);
+
+    const adjustment = (id, type, amount) => ({ event_id: id, event_type: 'adjustment.updated',
+      data: { id, action: 'refund', status: 'approved', type,
+        transaction_id: 'txn_paddle', currency_code: 'USD', totals: { total: amount } } });
+    const signedPaddle = async (payload) => {
+      const body = JSON.stringify(payload);
+      const ts = Math.floor(Date.now() / 1000);
+      const signature = `ts=${ts};h1=${createHmac('sha256', 'paddle_secret')
+        .update(`${ts}:${body}`).digest('hex')}`;
+      return paddlePost(request('paddle', body, signature), context('test'));
+    };
+    assert.equal((await signedPaddle(adjustment('adj_partial', 'partial', '300'))).status, 200);
+    assert.equal(database.prepare("SELECT refunded_at FROM payment_periods WHERE provider = 'paddle'")
+      .get().refunded_at, null);
+    assert.equal((await signedPaddle(adjustment('adj_full', 'full', '1200'))).status, 200);
+    assert.notEqual(database.prepare("SELECT refunded_at FROM payment_periods WHERE provider = 'paddle'")
+      .get().refunded_at, null);
+    const refundedNow = { ...nowPayload, payment_status: 'refunded' };
+    assert.equal((await nowPost(request('nowpayments', JSON.stringify(refundedNow),
+      createWebhookSignature(refundedNow, 'now_secret')), context('test'))).status, 200);
+    assert.notEqual(database.prepare("SELECT refunded_at FROM payment_periods WHERE provider = 'nowpayments'")
+      .get().refunded_at, null);
   } finally {
     database?.close();
     for (const [name, value] of Object.entries(previous)) {
