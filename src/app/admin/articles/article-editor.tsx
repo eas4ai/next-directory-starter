@@ -2,12 +2,15 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import type { Article } from "@/lib/articles";
 
-function ArticleFields({ article, includeSlug }: { article?: Article; includeSlug?: boolean }) {
+function ArticleFields({ article, includeSlug, includeStatus = true }: {
+  article?: Article; includeSlug?: boolean; includeStatus?: boolean;
+}) {
   const prefix = article ? `edit-${article.slug}` : "new-article";
   return (
     <FieldGroup>
@@ -27,12 +30,12 @@ function ArticleFields({ article, includeSlug }: { article?: Article; includeSlu
         <Field><FieldLabel htmlFor={`${prefix}-tags`}>Tags, comma separated</FieldLabel>
           <Input id={`${prefix}-tags`} name="tags" defaultValue={article?.tags.join(", ")} placeholder="Use tags created in taxonomy" />
         </Field>
-        <Field><FieldLabel htmlFor={`${prefix}-status`}>Publication state</FieldLabel>
+        {includeStatus && <Field><FieldLabel htmlFor={`${prefix}-status`}>Publication state</FieldLabel>
           <select id={`${prefix}-status`} name="status" defaultValue={article?.status ?? "draft"} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
             <option value="draft">Draft</option>
             <option value="published">Published</option>
           </select>
-        </Field>
+        </Field>}
       </div>
     </FieldGroup>
   );
@@ -83,7 +86,9 @@ export function ArticleEditor({ initialArticles }: { initialArticles: Article[] 
       const response = await fetch(slug ? `/api/admin/articles/${encodeURIComponent(slug)}` : "/api/admin/articles", {
         method: slug ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formArticle(form)),
+        body: JSON.stringify(slug
+          ? { ...formArticle(form), action: "save", version: editing?.version }
+          : formArticle(form)),
       });
       if (!response.ok) {
         setMessage((await response.json()).error ?? "Could not save the article.");
@@ -92,7 +97,46 @@ export function ArticleEditor({ initialArticles }: { initialArticles: Article[] 
       const data = await response.json() as { article: Article };
       if (slug) setEditing(data.article);
       else form.reset();
-      setMessage(slug ? "Article updated." : "Article created.");
+      setMessage(slug ? data.article.staged
+        ? "Revision saved privately. Publish it when ready."
+        : "Draft saved." : "Article created.");
+      router.refresh();
+    } catch {
+      setMessage("Could not connect to the server. Try again.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function edit(article: Article) {
+    setPending(true);
+    setMessage("");
+    try {
+      const response = await fetch(`/api/admin/articles/${encodeURIComponent(article.slug)}`);
+      if (!response.ok) throw new Error();
+      setEditing((await response.json() as { article: Article }).article);
+    } catch {
+      setMessage("Could not load the latest article. Try again.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function publish() {
+    if (!editing) return;
+    setPending(true);
+    setMessage("");
+    try {
+      const response = await fetch(`/api/admin/articles/${encodeURIComponent(editing.slug)}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "publish", version: editing.version }),
+      });
+      if (!response.ok) {
+        setMessage((await response.json()).error ?? "Could not publish the article.");
+        return;
+      }
+      setEditing((await response.json() as { article: Article }).article);
+      setMessage("Saved revision published.");
       router.refresh();
     } catch {
       setMessage("Could not connect to the server. Try again.");
@@ -109,15 +153,20 @@ export function ArticleEditor({ initialArticles }: { initialArticles: Article[] 
         <Button type="submit" disabled={pending}>Create article</Button>
       </form>
       {message && <p role="status" className="text-sm text-muted-foreground">{message}</p>}
-      <SavedArticles articles={initialArticles} pending={pending} onEdit={(article) => { setEditing(article); setMessage(""); }} />
+      <SavedArticles articles={initialArticles} pending={pending} onEdit={edit} />
       {editing && (
         <form key={editing.slug} onSubmit={(event) => save(event, editing.slug)} className="space-y-4 rounded-lg border p-6">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-xl font-semibold">Edit {editing.slug}</h2>
             <Button type="button" variant="ghost" onClick={() => setEditing(null)}>Close</Button>
           </div>
-          <ArticleFields article={editing} />
-          <Button type="submit" disabled={pending}>Save changes</Button>
+          <ArticleFields article={editing} includeStatus={false} />
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="submit" disabled={pending}>Save revision</Button>
+            <Button type="button" variant="outline" asChild><Link href={`/admin/articles/${editing.slug}/preview`} target="_blank">Private preview</Link></Button>
+            {(editing.status === "draft" || editing.staged) &&
+              <Button type="button" variant="secondary" disabled={pending} onClick={publish}>Publish saved revision</Button>}
+          </div>
         </form>
       )}
     </div>

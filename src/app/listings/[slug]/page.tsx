@@ -8,6 +8,7 @@ import { connection } from "next/server";
 import { pageMetadata, publicUrl } from "@/lib/page-metadata";
 import { getSiteConfig } from "@/lib/site-config";
 import { JsonLd } from "@/components/json-ld";
+import { MarkdownContent } from "@/components/markdown-content";
 
 export const instant = false;
 
@@ -38,7 +39,7 @@ export default async function ListingPage({ params }: PageProps<"/listings/[slug
       {featured && <p className="mt-3 w-fit rounded-full bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground">Featured</p>}
       <h1 className="mt-3 text-4xl font-semibold tracking-tight">{listing.name}</h1>
       <p className="mt-5 text-lg text-muted-foreground">{listing.summary}</p>
-      <p className="mt-8 leading-relaxed">{listing.description}</p>
+      <div className="mt-8"><MarkdownContent source={listing.description} /></div>
       <div className="mt-8"><Button asChild className="h-auto min-h-8 max-w-full whitespace-normal wrap-anywhere text-center"><a href={listing.url} target="_blank" rel="noopener noreferrer">Visit {listing.name} <PresetExternalLinkIcon library={preset.iconLibrary} /></a></Button></div>
     </main>
   );
