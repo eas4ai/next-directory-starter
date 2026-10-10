@@ -12,6 +12,7 @@ import { MarkdownContent } from "@/components/markdown-content";
 import { ContentImage } from "@/components/content-image";
 import { assignedMedia } from "@/lib/media";
 import { publicSeoOverrides } from "@/lib/seo-settings";
+import { database } from "@/lib/database";
 
 export const instant = false;
 
@@ -20,8 +21,11 @@ export async function generateMetadata({ params }: PageProps<"/listings/[slug]">
   const { slug } = await params;
   const listing = publishedListingBySlug(slug);
   if (!listing) notFound();
+  const overrides = publicSeoOverrides("listing", listing.slug);
+  const imported = database.prepare("SELECT 1 FROM agent_imports WHERE slug = ?").get(listing.slug);
   const metadata = pageMetadata(`/listings/${listing.slug}`, `${listing.name} | ${getSiteConfig().name}`,
-    listing.summary, publicSeoOverrides("listing", listing.slug));
+    listing.summary, { ...overrides, socialImage: overrides.socialImage ||
+      (imported ? `/og/listings/${listing.slug}.png` : null) });
   return { ...metadata, alternates: { ...metadata.alternates,
     types: { "text/markdown": publicUrl(`/markdown/listings/${listing.slug}`) } } };
 }
