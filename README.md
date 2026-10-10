@@ -99,3 +99,7 @@ Owners can inspect pending, paid, disputed, refunded, expired, and canceled purc
 Set `BETTER_AUTH_URL` and `SITE_URL` to the site's public HTTPS origin. Set `BETTER_AUTH_SECRET` to a unique secret and `DATABASE_URL` to a writable, persistent SQLite file, then run `npm run db:migrate` and provision an administrator using the same environment as the running application. Back up the SQLite file. The ignored `.runtime/directory.db` default is intended for local development; production storage must survive builds and deployments.
 
 Run `npm run build` and `npm run start` to serve the production build. Change the sample records in `fixtures/sample-listings.json` before seeding a fresh database, or use `/admin/catalog` to add your own listings. Records marked `draft` stay off public pages. Existing databases keep their content when the seed file changes.
+
+## License
+
+This starter is distributed under the [MIT License](LICENSE), copyright 2026 Shawn McAllister. [Third-party notices](NOTICE.md) retain the separate shadcn/ui license for generated component source and theme styling. The sample listings are fictional and replaceable; no DevList production data, branding, or image assets are bundled.
