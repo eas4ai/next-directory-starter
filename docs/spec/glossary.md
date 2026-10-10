@@ -26,6 +26,12 @@
   directory's public and administrative pages.
 - **Theme editor:** the authenticated administrator's control for previewing
   and saving a theme preset.
+- **Theme SDK:** the typed token and registration interface used to add a
+  site's custom theme without editing application page components.
+- **Public template:** a registered layout choice for public pages, separate
+  from theme colors, typography, and the visitor's appearance mode.
+- **Brand kit:** the site's identity text and public logo, favicon, and
+  default social card, supplied by code defaults or administrator settings.
 - **Agent import:** an operator-managed listing drafted from a URL inspected
   by an external agent and kept private until an authorized catalog user publishes it.
 - **WebMCP:** browser-page tools registered for an agent through

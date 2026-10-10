@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: agent-ingestion
+Current: theme-sdk
 
 ## public-starter-and-theme
 
@@ -278,3 +278,26 @@ individual results; a retry creates no extra record; staging leaves public
 pages unchanged until explicit publication; a published import is visible with
 the reviewed text and an audited actor; and its valid social card appears in
 public metadata while draft or suspended cards do not.
+
+## theme-sdk
+
+Requirements: THM-001, THM-002, THM-003, THM-004
+
+Delivery: provide a typed token SDK for custom themes, a stylesheet-based
+rendering path, and registered public layout templates. Preserve every pinned
+shadcn/ui preset choice and the visitor's independent appearance mode. Add
+protected preview and selection for installed themes and templates, plus
+protected brand settings for site identity, logo, favicon, and default social
+card with validated image uploads. Connect generated listing cards to the
+selected brand and theme while preserving explicit social-image overrides.
+Ship a repository skill that guides an agent through creating a custom theme,
+template, and brand kit, with working examples and documented checks.
+
+Done-when: a new theme and template can be created through the documented SDK
+without editing application page components or adding authored inline CSS; an
+administrator can preview and save them, reload after restart, and see the
+chosen design on public and admin surfaces in light and dark mode; the
+branding controls change the header, favicon, fallback social metadata, and
+generated listing cards, preserve explicit social images, reject unsafe
+uploads, and survive backup and restore; public content, metadata, access,
+and 320-pixel readability remain correct.

@@ -34,6 +34,7 @@ adapted to a subject other than developer resources.
 | --- | --- | --- |
 | Starter configuration, setup, and deployment | foundation.md | FOUND |
 | Visitor light and dark appearance | appearance.md | UI |
+| Custom themes, templates, branding, and the creation skill | theming.md | THM |
 | Backup, restore, and upgrade operations | operations.md | OPS |
 | Account verification, recovery, magic links, and suspension | accounts.md | ACC |
 | Public discovery, search, categories, and listing pages | directory.md | DIR |
