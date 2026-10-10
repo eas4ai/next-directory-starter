@@ -44,6 +44,13 @@ test('signed Stripe hosted checkout, recurring invoice, and refund match the pur
         new Date().toISOString(), session, price);
     purchase('once-purchase', 'once', 'one-time', 30, 'cs_once', null);
     purchase('month-purchase', 'monthly', 'monthly', null, 'cs_month', 'price_month');
+    database.prepare(`INSERT INTO purchases
+      (id, listing_slug, owner_user_id, plan_key, plan_mode, billing_mode, plan_name,
+        plan_description, amount_minor, currency, duration_days, accepted_duration_days,
+        featured, stripe_session_id, checkout_request_id, status, created_at, provider)
+      VALUES ('early-purchase', 'mine', 'owner', 'once', 'test', 'one-time', 'Once', '',
+        1200, 'usd', 30, 30, 1, 'pending:early-purchase', 'early-request',
+        'pending', ?, 'stripe')`).run(new Date().toISOString());
     saveBillingProfile({ provider: 'stripe', mode: 'test', version: 0, enabled: false,
       apiKey: 'sk_test_fixture', webhookSecret: 'whsec_hosted_fixture' }, 'admin');
     const stripe = new Stripe('sk_test_fixture');
@@ -67,6 +74,15 @@ test('signed Stripe hosted checkout, recurring invoice, and refund match the pur
     assert.equal((await send({ ...oneTime, livemode: true })).status, 400);
     assert.equal((await send(oneTime)).status, 200);
     assert.equal((await send(oneTime)).status, 200);
+    const early = event('evt_early', 'checkout.session.completed', {
+      ...oneTime.data.object, id: 'cs_early', client_reference_id: 'early-purchase',
+      payment_intent: 'pi_early',
+    });
+    assert.equal((await send(early)).status, 200);
+    assert.equal(database.prepare("SELECT provider_resource_id FROM purchases WHERE id = 'early-purchase'")
+      .get().provider_resource_id, 'cs_early');
+    assert.equal(database.prepare("SELECT COUNT(*) AS n FROM payment_periods WHERE purchase_id = 'early-purchase'")
+      .get().n, 1);
     assert.equal(database.prepare("SELECT COUNT(*) AS n FROM payment_periods WHERE purchase_id = 'once-purchase'")
       .get().n, 1);
     const differentPayment = event('evt_once_second_payment', 'checkout.session.completed', {

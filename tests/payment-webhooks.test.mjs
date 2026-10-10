@@ -38,6 +38,19 @@ test('Paddle and NOWPayments signatures authenticate the exact mode and purchase
       .run(id, `pending:${id}`, new Date().toISOString(), provider, resource, price);
     purchase('paddle-purchase', 'paddle', 'txn_paddle', 'pri_once');
     purchase('now-purchase', 'nowpayments', 'invoice_now', null);
+    for (const [id, provider, price] of [
+      ['paddle-early', 'paddle', 'pri_once'], ['now-early', 'nowpayments', null],
+    ]) {
+      database.prepare(`INSERT INTO purchases
+        (id, listing_slug, owner_user_id, plan_key, plan_mode, billing_mode, plan_name,
+          plan_description, amount_minor, currency, duration_days, accepted_duration_days,
+          featured, stripe_session_id, checkout_request_id, status, created_at,
+          provider, provider_price_id)
+        VALUES (?, 'mine', 'owner', 'once', 'test', 'one-time', 'Once', '',
+          1200, 'usd', 30, 30, 1, ?, ?, 'pending', ?, ?, ?)`).run(
+        id, `pending:${id}`, `${id}-request`, new Date().toISOString(), provider, price,
+      );
+    }
     saveBillingProfile({ provider: 'paddle', mode: 'test', version: 0, enabled: false,
       apiKey: 'test_paddle_key', webhookSecret: 'paddle_secret', priceMappings: [] }, 'admin');
     saveBillingProfile({ provider: 'nowpayments', mode: 'test', version: 0, enabled: false,
@@ -63,6 +76,16 @@ test('Paddle and NOWPayments signatures authenticate the exact mode and purchase
     assert.equal((await paddlePost(request('paddle', paddleBody, paddleSignature), context('live'))).status, 503);
     assert.equal((await paddlePost(request('paddle', paddleBody, 'ts=1;h1=bad'), context('test'))).status, 400);
     assert.equal((await paddlePost(request('paddle', paddleBody, paddleSignature), context('test'))).status, 200);
+    const earlyPaddle = { ...paddlePayload, event_id: 'evt_paddle_early', data: {
+      ...paddlePayload.data, id: 'txn_paddle_early', custom_data: { purchaseId: 'paddle-early' },
+    } };
+    const earlyPaddleBody = JSON.stringify(earlyPaddle);
+    const earlyPaddleSignature = `ts=${timestamp};h1=${createHmac('sha256', 'paddle_secret')
+      .update(`${timestamp}:${earlyPaddleBody}`).digest('hex')}`;
+    assert.equal((await paddlePost(request('paddle', earlyPaddleBody, earlyPaddleSignature),
+      context('test'))).status, 200);
+    assert.equal(database.prepare("SELECT provider_resource_id FROM purchases WHERE id = 'paddle-early'")
+      .get().provider_resource_id, 'txn_paddle_early');
     assert.equal((await paddlePost(request('paddle', paddleBody, paddleSignature), context('test'))).status, 200);
 
     const nowPayload = { payment_id: 12345, invoice_id: 'invoice_now',
@@ -73,9 +96,15 @@ test('Paddle and NOWPayments signatures authenticate the exact mode and purchase
     assert.equal((await nowPost(request('nowpayments', nowBody), context('test'))).status, 400);
     assert.equal((await nowPost(request('nowpayments', nowBody, 'bad'), context('test'))).status, 400);
     assert.equal((await nowPost(request('nowpayments', nowBody, nowSignature), context('test'))).status, 200);
+    const earlyNow = { ...nowPayload, payment_id: 12346, invoice_id: 'invoice_early',
+      order_id: 'now-early' };
+    assert.equal((await nowPost(request('nowpayments', JSON.stringify(earlyNow),
+      createWebhookSignature(earlyNow, 'now_secret')), context('test'))).status, 200);
+    assert.equal(database.prepare("SELECT provider_resource_id FROM purchases WHERE id = 'now-early'")
+      .get().provider_resource_id, 'invoice_early');
     assert.equal((await nowPost(request('nowpayments', nowBody, nowSignature), context('test'))).status, 200);
-    assert.equal(database.prepare('SELECT COUNT(*) AS n FROM payment_periods').get().n, 2);
-    assert.equal(database.prepare('SELECT COUNT(*) AS n FROM entitlements').get().n, 2);
+    assert.equal(database.prepare('SELECT COUNT(*) AS n FROM payment_periods').get().n, 4);
+    assert.equal(database.prepare('SELECT COUNT(*) AS n FROM entitlements').get().n, 4);
 
     const adjustment = (id, type, amount) => ({ event_id: id, event_type: 'adjustment.updated',
       data: { id, action: 'refund', status: 'approved', type,

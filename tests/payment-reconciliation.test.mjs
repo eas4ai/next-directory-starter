@@ -62,6 +62,24 @@ test('bounded reconciliation replays retained evidence and reads one existing pu
     assert.equal(inspected, 1);
     assert.equal(database.prepare('SELECT COUNT(*) AS n FROM purchases').get().n, 1);
     assert.equal(database.prepare('SELECT COUNT(*) AS n FROM payment_periods').get().n, 2);
+    database.prepare(`INSERT INTO purchases
+      (id, listing_slug, owner_user_id, plan_key, plan_mode, billing_mode, plan_name,
+        plan_description, amount_minor, currency, duration_days, accepted_duration_days,
+        featured, stripe_session_id, checkout_request_id, status, created_at,
+        provider, provider_price_id)
+      VALUES ('early', 'mine', 'owner', 'monthly', 'test', 'monthly', 'Monthly', '',
+        1200, 'usd', 0, NULL, 1, 'pending:early', 'early-request', 'pending', ?,
+        'paddle', 'pri_monthly')`).run(new Date().toISOString());
+    const earlyInspector = async (purchase) => {
+      assert.equal(purchase.provider_resource_id, 'txn_early');
+      return [{ ...evidence('authoritative-early', { ...paid('txn_early'),
+        purchaseId: 'early', subscriptionId: 'sub_early' }),
+        eventId: 'authoritative-early' }];
+    };
+    assert.deepEqual(await reconcilePurchase('early', 5, earlyInspector, 'txn_early'),
+      { purchaseId: 'early', found: 1, processed: 1, unresolved: 0 });
+    assert.equal(database.prepare("SELECT provider_resource_id FROM purchases WHERE id = 'early'")
+      .get().provider_resource_id, 'txn_early');
     assert.throws(() => retryRetainedEvidence(51), /limit/);
     await assert.rejects(reconcilePurchase('purchase', 0, fakeReadOnlyInspector), /limit/);
   } finally {
