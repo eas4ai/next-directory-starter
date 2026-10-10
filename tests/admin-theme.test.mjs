@@ -202,18 +202,23 @@ test('ADM-006 the saved theme reaches public and admin pages after restart', asy
   const publicPage = await (await request('/listings')).text();
   const adminAgain = adminCookie;
   const adminPage = await (await request('/admin/theme', { headers: { Cookie: adminAgain } })).text();
+  const stylesheet = await request('/theme.css');
+  assert.equal(stylesheet.status, 200);
+  assert.match(stylesheet.headers.get('content-type') ?? '', /text\/css/);
+  const css = await stylesheet.text();
   for (const html of [publicPage, adminPage]) {
     assert.equal(html.match(/data-site-preset="([^"]+)"/)?.[1], Object.values(chosen).join('.'));
     assert.match(html, /data-mode="dark"/);
     assert.match(html, /data-icon-library="remixicon"/);
-    assert.match(html, /--primary: oklch\([^)]*264\)/);
-    assert.match(html, /--radius: 0\.875rem/);
-    assert.match(html, /--preset-body-font: "Lora"/);
-    assert.match(html, /--preset-heading-font: "Playfair Display"/);
-    const sidebarColor = html.match(/--sidebar: ([^;]+)/)?.[1] ?? '';
-    assert.match(sidebarColor, /^oklch\([^)]* \/ 0\.85\)$/);
-    assert.match(html.match(/<header\b[^>]*>/)?.[0] ?? '', /background:var\(--sidebar\)/);
+    assert.match(html, /href="\/theme\.css"/);
+    assert.match(html.match(/<header\b[^>]*>/)?.[0] ?? '', /bg-sidebar/);
   }
+  assert.match(css, /--primary: oklch\([^)]*264\)/);
+  assert.match(css, /--radius: 0\.875rem/);
+  assert.match(css, /--preset-body-font: "Lora"/);
+  assert.match(css, /--preset-heading-font: "Playfair Display"/);
+  const sidebarColor = css.match(/--sidebar: ([^;]+)/)?.[1] ?? '';
+  assert.match(sidebarColor, /^oklch\([^)]* \/ 0\.85\)$/);
   const persisted = await (await request('/api/admin/theme', { headers: { Cookie: adminAgain } })).json();
   assert.deepEqual(persisted.preset, chosen);
 });

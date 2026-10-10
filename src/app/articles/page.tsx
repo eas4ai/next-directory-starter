@@ -36,7 +36,7 @@ export default async function ArticlesPage({ searchParams }: {
     return `/articles${values.size ? `?${values}` : ""}`;
   };
   return (
-    <main className="mx-auto w-full max-w-[1400px] px-6 py-12">
+    <main className="site-container">
       <JsonLd data={{
         "@context": "https://schema.org", "@type": "CollectionPage",
         name: "Articles", description: "Stories and updates from this directory.",
@@ -70,7 +70,7 @@ export default async function ArticlesPage({ searchParams }: {
         </nav>
       )}
       <p className="mt-6 text-sm text-muted-foreground">{total} published {total === 1 ? "article" : "articles"}</p>
-      <div className="mt-10 grid gap-5 sm:grid-cols-2">
+      <div className="template-article-grid mt-10">
         {articles.map((article) => (
           <article key={article.slug} className="rounded-lg border p-6">
             <h2 className="text-xl font-semibold"><Link href={`/articles/${article.slug}`} className="hover:underline">{article.title}</Link></h2>

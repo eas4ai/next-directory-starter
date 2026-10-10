@@ -44,7 +44,7 @@ export default async function ListingsPage({ searchParams }: PageProps<"/listing
   };
 
   return (
-    <main className="mx-auto w-full max-w-[1400px] wrap-anywhere px-6 py-12">
+    <main className="site-container wrap-anywhere">
       <JsonLd data={{
         "@context": "https://schema.org", "@type": "CollectionPage",
         name: "Listings", description: "Explore the published links in this directory.",
@@ -79,7 +79,7 @@ export default async function ListingsPage({ searchParams }: PageProps<"/listing
         <section aria-label="Featured listings" className="mt-8">
           <h2 className="text-xl font-semibold">Featured listings</h2>
           <p className="mt-1 text-sm text-muted-foreground">Paid placements matching these filters.</p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div className="template-listing-grid mt-4">
             {featured.map((listing) => (
               <Card key={listing.slug} className="border-primary/50">
                 <CardHeader>
@@ -92,7 +92,7 @@ export default async function ListingsPage({ searchParams }: PageProps<"/listing
           </div>
         </section>
       )}
-      <section aria-label="Directory results" data-testid="ordinary-results" className="mt-8 grid gap-4 sm:grid-cols-2">
+      <section aria-label="Directory results" data-testid="ordinary-results" className="template-listing-grid mt-8">
         {result.listings.map((listing) => (
           <Card key={listing.slug}>
             <CardHeader>

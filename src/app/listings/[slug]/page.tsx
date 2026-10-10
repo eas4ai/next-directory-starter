@@ -40,7 +40,7 @@ export default async function ListingPage({ params }: PageProps<"/listings/[slug
   const image = assignedMedia("listing", listing.slug, "public");
 
   return (
-    <main className="mx-auto w-full max-w-[1400px] wrap-anywhere px-6 py-12">
+    <main className="site-container wrap-anywhere">
       <JsonLd data={{
         "@context": "https://schema.org", "@type": "Thing",
         name: listing.name, description: listing.description, url: listing.url,
