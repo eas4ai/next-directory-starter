@@ -79,7 +79,7 @@ Use `npm run build` and `npm run start` for a production build. Configure a pers
 
 ## Manual
 
-The separate operator manual will cover deployment, staff workflows, themes, SEO, agent imports, billing-provider setup, scheduled jobs, backup and restore, and upgrades step by step. The [source-linked manual brief](docs/manual-brief.md) preserves those chapters and their verification points for the next documentation task.
+The [operator manual](docs/operator-manual.md) gives step-by-step instructions for installation, staff workflows, themes, SEO, agent imports, billing providers, scheduled jobs, backup, restore, and upgrades. The [source-linked manual brief](docs/manual-brief.md) records the topics and verification work used to prepare it.
 
 ## License
 
