@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createDecipheriv, randomBytes } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
@@ -23,6 +23,17 @@ let ownerCookie;
 function command(args) {
   const result = spawnSync('npm', args, { env: appEnv, encoding: 'utf8', timeout: 120_000 });
   if (result.status !== 0) throw new Error(`npm ${args[1] ?? args[0]} exited ${result.status}: ${(result.stderr ?? '').slice(-800)}`);
+}
+
+function reveal(ciphertext, provider, mode, field) {
+  if (!ciphertext?.startsWith('v1:')) throw new Error('A billing secret has no encrypted envelope.');
+  const payload = Buffer.from(ciphertext.slice(3), 'base64url');
+  if (payload.length < 29) throw new Error('A billing secret has an invalid encrypted envelope.');
+  const decipher = createDecipheriv('aes-256-gcm', Buffer.from(appEnv.BILLING_ENCRYPTION_KEY, 'base64url'),
+    payload.subarray(0, 12));
+  decipher.setAAD(Buffer.from(`${provider}:${mode}:${field}`));
+  decipher.setAuthTag(payload.subarray(12, 28));
+  return Buffer.concat([decipher.update(payload.subarray(28)), decipher.final()]).toString('utf8');
 }
 
 async function freePort() {
@@ -267,6 +278,19 @@ try {
           JSON.stringify(rows).includes(secretMarker)) {
         throw new Error('A saved billing secret was returned or stored as plaintext.');
       }
+      const testRow = rows.find((row) => row.provider === 'stripe' && row.mode === 'test');
+      const liveRow = rows.find((row) => row.provider === 'stripe' && row.mode === 'live');
+      if (!testRow || !liveRow ||
+          reveal(testRow.api_key_cipher, 'stripe', 'test', 'apiKey') !== `sk_test_${secretMarker}` ||
+          reveal(testRow.webhook_secret_cipher, 'stripe', 'test', 'webhookSecret') !== `whsec_${secretMarker}` ||
+          reveal(liveRow.api_key_cipher, 'stripe', 'live', 'apiKey') !== `sk_live_${secretMarker}` ||
+          reveal(liveRow.webhook_secret_cipher, 'stripe', 'live', 'webhookSecret') !== `whsec_live_${secretMarker}`) {
+        throw new Error('Saved secrets are not authenticated encryption scoped to their provider and mode.');
+      }
+      let wrongModeRejected = false;
+      try { reveal(testRow.api_key_cipher, 'stripe', 'live', 'apiKey'); }
+      catch { wrongModeRejected = true; }
+      if (!wrongModeRejected) throw new Error('A test secret can be opened in live mode.');
     } finally { rawDatabase.close(); }
     const deniedWrite = await request('/api/admin/billing/profiles', json({
       provider: 'stripe', mode: 'live', enabled: true, version: 0,
@@ -281,6 +305,39 @@ try {
       apiKey: 'pdl_sdbx_apikey_fixture',
     }, adminCookie, 'PUT'));
     if (incomplete.status !== 400) throw new Error('An incomplete provider profile was enabled.');
+    for (const mode of ['test', 'live']) {
+      const now = await request('/api/admin/billing/profiles', json({
+        provider: 'nowpayments', mode, enabled: false, version: 0,
+        apiKey: `now_${mode}_${secretMarker}`, webhookSecret: `now_webhook_${mode}_${secretMarker}`,
+        priceMappings: [],
+      }, adminCookie, 'PUT'));
+      if (!now.ok) throw new Error(`NOWPayments ${mode} profile could not be saved.`);
+    }
+    const oneTime = await request('/api/admin/plans', json({
+      key: 'billing-profile-once', name: 'Billing Profile Once', description: 'Profile availability check.',
+      mode: 'test', billingMode: 'one-time', amountMinor: 500, currency: 'usd',
+      durationDays: 14, featured: false, enabled: true,
+    }, adminCookie));
+    if (oneTime.status !== 201) throw new Error('One-time billing profile fixture could not be created.');
+    const owner = await approvedListing('billing-profile-entry');
+    const active = await request('/api/admin/billing/profiles', json({
+      provider: 'stripe', mode: 'test', enabled: true, version: 1,
+    }, adminCookie, 'PUT'));
+    if (!active.ok) throw new Error('Complete Stripe profile could not be enabled.');
+    const offered = await request('/owner/listings/billing-profile-entry/plans', { headers: { Cookie: owner } });
+    if (!offered.ok || !(await offered.text()).includes('Continue to Stripe Checkout')) {
+      throw new Error('Enabled test profile did not offer one-time checkout.');
+    }
+    const inactive = await request('/api/admin/billing/profiles', json({
+      provider: 'stripe', mode: 'test', enabled: false, version: 2,
+    }, adminCookie, 'PUT'));
+    if (!inactive.ok) throw new Error('Stripe profile could not be disabled.');
+    const withheld = await request('/owner/listings/billing-profile-entry/plans', { headers: { Cookie: owner } });
+    const withheldHtml = await withheld.text();
+    if (!withheld.ok || withheldHtml.includes('Continue to Stripe Checkout') ||
+        !withheldHtml.includes('Checkout is unavailable for the selected mode.')) {
+      throw new Error('A disabled test profile was still offered for one-time checkout.');
+    }
     const page = await request('/admin/billing', { headers: { Cookie: adminCookie } });
     if (!page.ok || !(await page.text()).includes('Stripe')) {
       throw new Error('No protected provider settings page exists.');
