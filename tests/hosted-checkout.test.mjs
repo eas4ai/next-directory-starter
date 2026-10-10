@@ -97,6 +97,9 @@ test('hosted checkout reserves one immutable purchase and never retries an ambig
     const ambiguous = async () => { ambiguousCalls += 1; throw new Error('socket closed after remote create'); };
     await assert.rejects(createHostedCheckout('owner', 'mine', oneTime, ambiguous), /status is unknown/);
     await assert.rejects(createHostedCheckout('owner', 'mine', oneTime, ambiguous), /Checkout is pending/);
+    await assert.rejects(createHostedCheckout('owner', 'mine', {
+      ...oneTime, requestId: randomUUID(),
+    }, ambiguous), /Checkout is pending/);
     assert.equal(ambiguousCalls, 1);
     assert.equal(database.prepare('SELECT COUNT(*) AS count FROM purchases WHERE checkout_request_id = ?')
       .get(oneTime.requestId).count, 1);
