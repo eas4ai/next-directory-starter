@@ -446,3 +446,16 @@ overview and first-run instructions intact.
 
 Done-when: the README renders the committed JPEG at the top through a relative
 path, and the DOC-001 overview check still passes.
+
+## intermittent-turbopack-build-crash
+
+Requirements: FOUND-001
+
+Delivery: reproduce the intermittent production-build crash from a clean
+workspace, then make the documented default build reliable. Compare the
+supported Next.js build paths, including the proposed Rspack integration,
+without losing the current Tailwind CSS output or public routes.
+
+Done-when: repeated clean default builds succeed, the produced CSS and route
+set match the expected application, and the documented build command uses the
+verified stable path.
