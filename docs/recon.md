@@ -21,10 +21,7 @@
   max-age=0, must-revalidate`. The developer approved requiring noncached HTML
   and `Vary` on Markdown in answer
   `ef12ed1c8cd5884005de182c4ca22c536be38ef6`.
-- **Documented:** `README.md` now states the successor cache policy: both
-  detail representations are noncached, and Markdown varies on `Accept` and
-  `User-Agent`.
-- **Exists:** the successor mechanism failed on a deliberate missing Markdown
-  `Vary` header in receipt `af40867ea1047ea45bcfc369a83e6b310402139a`
-  and passed with the header restored in receipt
-  `2681fdd607c8abddcd1acef97a5ceb4867e3d884`.
+- **Documented:** `README.md` currently says both detail representations vary;
+  it must be updated to match the successor contract.
+- **Unverified:** the successor's bound mechanism must still be shown to fail
+  on a deliberate violation and then pass on the restored product.
