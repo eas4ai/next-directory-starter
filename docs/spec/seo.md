@@ -51,3 +51,8 @@ Status: Agreed 2026-10-10
 Falsifier: A draft or suspended record has a Markdown response, a pending revision leaks into the Markdown body, an HTML page advertises a missing Markdown version, or a Markdown response lacks its content type, noindex or no-store headers.
 Mechanism: seo-operations
 Status: Agreed 2026-10-10
+
+[SEO-011] Eligible public listing and article detail pages serve their existing Markdown version when a GET request explicitly accepts `text/markdown`, uses a documented LLM user agent, or adds a `.md` suffix. Ordinary HTML requests remain HTML; an explicit `text/markdown;q=0` suppresses user-agent negotiation except for a `.md` URL. The negotiated version follows the same current-public eligibility and revision rules as the linked Markdown route, carries the same nonindexable and noncached headers, and both representations send `Vary: Accept, User-Agent`. Private, administrative, API, index, and unrelated routes are never converted. The explicit `/markdown/` routes remain available.
+Falsifier: A Markdown request for an eligible detail page returns HTML, a normal browser or non-suffixed `text/markdown;q=0` request receives Markdown, a private or ineligible page is converted or exposed, a pending revision appears, an explicit Markdown route changes, or a negotiated response lacks `text/markdown`, `noindex`, `no-store`, or `Vary: Accept, User-Agent`.
+Mechanism: geo-negotiation
+Status: Agreed 2026-10-10

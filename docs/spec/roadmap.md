@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: theme-sdk
+Current: next-geo
 
 ## public-starter-and-theme
 
@@ -301,3 +301,19 @@ branding controls change the header, favicon, fallback social metadata, and
 generated listing cards, preserve explicit social images, reject unsafe
 uploads, and survive backup and restore; public content, metadata, access,
 and 320-pixel readability remain correct.
+
+## next-geo
+
+Requirements: SEO-011
+
+Delivery: recognize Markdown requests for eligible public listing and article
+detail pages through the existing Next.js proxy. Serve the current public
+revision from the existing Markdown routes for explicit `Accept` headers,
+documented agent user agents, and `.md` URLs. Keep ordinary HTML responses and
+private routes on their current path. Apply nonindexable, noncached Markdown
+headers and representation-aware `Vary` headers without broad HTML conversion.
+
+Done-when: each supported request signal returns the same current Markdown as
+the linked route; HTML requests remain HTML; private and ineligible content
+cannot be converted or exposed; staged revisions stay private; and responses
+carry the specified content type, crawl, cache, and variation headers.
