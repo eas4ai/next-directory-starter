@@ -380,15 +380,51 @@ try {
         .get(staged.first);
       assert(audit?.actor_user_id && audit?.occurred_at, 'Publication audit lacks actor or time.');
     } finally { db.close(); }
+    const hostile = { ...first, idempotencyKey: 'hostile-source-text',
+      url: 'https://example.org/hostile', name: 'Hostile source text',
+      sourceExcerpt: '<img src=x onerror="window.__agentMarkupExecuted=true">',
+      description: '<script>window.__agentMarkupExecuted=true</script>',
+      summary: 'A tested source with literal markup in its description.' };
+    const hostileResult = await tool('stage_links', { items: [hostile] });
+    const hostileSlug = hostileResult.items?.[0]?.slug;
+    assert(hostileResult.items?.[0]?.status === 'created' && hostileSlug,
+      'Hostile source text could not be staged as data.');
+    assert((await request(`/listings/${hostileSlug}`)).status === 404,
+      'Untrusted source text caused publication without review.');
+    const hostileContext = await browser.newContext();
+    try {
+      await hostileContext.addCookies(adminCookie.split('; ').map((pair) => {
+        const separator = pair.indexOf('=');
+        return { name: pair.slice(0, separator), value: pair.slice(separator + 1), url: origin };
+      }));
+      const hostilePage = await hostileContext.newPage();
+      await hostilePage.goto(`${origin}/admin/import`, { waitUntil: 'networkidle' });
+      assert(!await hostilePage.evaluate(() => window.__agentMarkupExecuted),
+        'Source excerpt executed in the private workspace.');
+      await tool('publish_import', { slug: hostileSlug });
+      await hostilePage.goto(`${origin}/listings/${hostileSlug}`, { waitUntil: 'networkidle' });
+      assert(!await hostilePage.evaluate(() => window.__agentMarkupExecuted),
+        'Imported description executed on the public listing.');
+      const rawScript = await hostilePage.locator('script').allTextContents();
+      assert(!rawScript.some((script) => script.trim() === 'window.__agentMarkupExecuted=true'),
+        'Untrusted markup became an executable script element.');
+    } finally { await hostileContext.close(); }
   });
 
   await check('ING-004', async () => {
     assert(staged?.second, 'Staging prerequisite did not pass.');
     const screenshot = await sharp({ create: { width: 640, height: 400,
-      channels: 3, background: '#ee00ee' } }).jpeg().toBuffer();
+      channels: 3, background: '#ee00ee' } }).withExif({ IFD0: { Artist: 'agent-exif-probe' } }).jpeg().toBuffer();
     const attached = await tool('attach_screenshot', { slug: staged.second,
       mimeType: 'image/jpeg', base64: screenshot.toString('base64') });
     assert(attached.slug === staged.second, 'Agent-browser screenshot was not attached.');
+    const cleanRaw = await request(`/api/agent/imports/${staged.second}/screenshot`,
+      { headers: { Cookie: adminCookie } });
+    assert(cleanRaw.ok, 'Catalog actor cannot inspect their uploaded screenshot.');
+    const cleanBytes = Buffer.from(await cleanRaw.arrayBuffer());
+    const cleanMetadata = await sharp(cleanBytes).metadata();
+    assert(!cleanMetadata.exif && !cleanBytes.includes(Buffer.from('agent-exif-probe')),
+      'Screenshot metadata survived the private normalization step.');
     const forged = await mcp('tools/call', { name: 'attach_screenshot', arguments: {
       slug: staged.second, mimeType: 'image/png', base64: screenshot.toString('base64') } });
     assert(forged.isError, 'Forged screenshot MIME was accepted.');
@@ -397,6 +433,20 @@ try {
     const oversized = await mcp('tools/call', { name: 'attach_screenshot', arguments: {
       slug: staged.second, mimeType: 'image/png', base64: oversizedDimensions.toString('base64') } });
     assert(oversized.isError, 'Oversized screenshot dimensions were accepted.');
+    const noise = randomBytes(1920 * 920 * 3);
+    const oversizedBytes = await sharp(noise, { raw: { width: 1920, height: 920, channels: 3 } })
+      .png({ compressionLevel: 0 }).toBuffer();
+    assert(oversizedBytes.length > 5 * 1024 * 1024 &&
+      oversizedBytes.toString('base64').length <= 7_100_000,
+    'Byte-limit fixture does not reach the decoded-size boundary.');
+    const byteLimit = await mcp('tools/call', { name: 'attach_screenshot', arguments: {
+      slug: staged.second, mimeType: 'image/png', base64: oversizedBytes.toString('base64') } });
+    assert(byteLimit.isError, 'Screenshot above 5 MiB was accepted.');
+    const afterRejectedBytes = await request(`/api/agent/imports/${staged.second}/screenshot`,
+      { headers: { Cookie: adminCookie } });
+    assert(afterRejectedBytes.ok &&
+      Buffer.from(await afterRejectedBytes.arrayBuffer()).equals(cleanBytes),
+    'Rejected screenshot replaced the sanitized screenshot.');
     const rawGuest = await request(`/api/agent/imports/${staged.second}/screenshot`);
     assert([401, 403, 404].includes(rawGuest.status), 'Guest can read a raw screenshot.');
     const draftPublic = await request(`/og/listings/${staged.second}.png`);
