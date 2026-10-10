@@ -54,7 +54,7 @@ Operators can define free, one-time, monthly, and annual publication plans in te
 
 ### Operations
 
-Content, settings, accounts, and billing state live in SQLite; uploaded media lives in a writable directory. The repository includes migration and seed scripts, a provisioner for the first administrator, delivery of queued owner notices through Resend, billing reconciliation, and verified backup and isolated restore scripts. Production storage must persist across builds and restarts. See the [database connection](src/lib/database.ts), [catalog migration](src/lib/catalog-migrations.ts), [notification delivery](src/lib/notification-delivery.ts), and [backup script](scripts/backup.mjs).
+Content, settings, accounts, and billing state live in SQLite; uploaded media lives in a writable directory. The repository includes migration and seed scripts, a provisioner for the first administrator, delivery of queued owner notices through Resend, billing reconciliation, and verified backup and isolated restore scripts. A Docker image and Compose file run one persistent installation on a host. See the [container procedure](docs/operator-manual.md#container-deployment), [database connection](src/lib/database.ts), [catalog migration](src/lib/catalog-migrations.ts), [notification delivery](src/lib/notification-delivery.ts), and [backup script](scripts/backup.mjs).
 
 ## Technology
 
@@ -76,6 +76,8 @@ npm run dev
 Set a unique `BETTER_AUTH_SECRET` in `.env.local` before creating accounts. Set `BETTER_AUTH_URL` and `SITE_URL` to the origin where you open the app; the example file uses `http://localhost:3000`. The provisioner prompts for a password. Open `/admin/sign-in` for the administrator workspace and `/listings` for the seeded directory. The seed command is repeatable and keeps existing listings. See [database initialization](src/lib/catalog-migrations.ts) and [public URL validation](src/lib/page-metadata.ts).
 
 Use `npm run build` and `npm run start` for a production build. Configure a persistent SQLite file and media directory before deployment. Public account email, billing providers, and owner-notification email depend on their respective external services; they are optional to the basic browsable directory.
+
+For a single-host container installation, copy `.env.docker.example` to `.env.docker`, set the public origins and a fresh authentication secret, then follow the [Compose migration, start, job, and recovery commands](docs/operator-manual.md#container-deployment). Compose binds only to loopback for a reverse proxy and keeps SQLite and media in a named volume.
 
 ## Manual
 

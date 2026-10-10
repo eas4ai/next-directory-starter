@@ -127,6 +127,59 @@ The limit must be 1–50. The command reports attempted, sent, and failed counts
 
 ## 10. Deploy, back up, restore, and upgrade
 
+### Container deployment
+
+This Compose setup runs one application instance on one host. Install Docker Engine with Compose, then copy `.env.docker.example` to `.env.docker`. Set `SITE_URL` and `BETTER_AUTH_URL` to the public HTTPS origin and replace `BETTER_AUTH_SECRET` with a unique long random value. Keep `.env.docker` private. Set optional mail and payment variables there as described above. If provider profiles are saved, keep `BILLING_ENCRYPTION_KEY` stable and store its matching key file outside the repository. Compose fixes `DATABASE_URL` to `file:/app/data/directory.db` and `MEDIA_DIR` to `/app/data/media`; both live in its named volume. It maps port 3000 to `127.0.0.1` only, so configure a reverse proxy with HTTPS at the public origin. Change `DIRECTORY_PORT` if another local service uses 3000.
+
+From the repository root, build the image, migrate the empty database, optionally add sample listings, and start the service. Migration and seeding are explicit, not startup actions. Use the same `--env-file` and Compose project for every command so the one-off containers share the service's volume. Check `docker compose --env-file .env.docker ps` for `healthy`, then open `/listings` through the proxy.
+
+```sh
+docker compose --env-file .env.docker build
+docker compose --env-file .env.docker run --rm --no-deps web npm run db:migrate
+docker compose --env-file .env.docker run --rm --no-deps web npm run db:seed
+docker compose --env-file .env.docker up -d --no-build
+docker compose --env-file .env.docker ps
+```
+
+To create the first administrator, run the interactive provisioner. Scheduled notification and billing jobs use the same data volume and runtime settings. Arrange their schedules on the host and prevent overlapping runs of the same job.
+
+```sh
+docker compose --env-file .env.docker run --rm --no-deps web npm run account:provision -- --email you@example.com --name "Site administrator"
+docker compose --env-file .env.docker run --rm --no-deps web npm run notifications:deliver -- --limit 100
+docker compose --env-file .env.docker run --rm --no-deps web npm run billing:reconcile -- --limit 100
+```
+
+For a verified backup, mount a private host backup directory and the same billing key file used by the running app. Set `BACKUP_DIR` and `KEY_FILE` to real absolute host paths that container user ID 1000 can access; the backup directory must be writable by that user. The destination must be new. An isolated restore verifies the archive into another new directory on that host mount; it does not overwrite the live volume.
+
+```sh
+export BACKUP_DIR=/private/backups
+export KEY_FILE=/private/keys/directory-billing.key
+docker compose --env-file .env.docker run --rm --no-deps \
+  -v "$BACKUP_DIR:/backup" -v "$KEY_FILE:/run/secrets/billing.key:ro" \
+  web npm run ops:backup -- --output /backup/directory-YYYYMMDD --key-file /run/secrets/billing.key
+docker compose --env-file .env.docker run --rm --no-deps \
+  -v "$BACKUP_DIR:/backup" web npm run ops:restore -- \
+  --backup /backup/directory-YYYYMMDD --target /backup/directory-restore-check
+```
+
+Before an upgrade, verify a backup and isolated restore, build the new revision, stop the service, run its migration, and start it. Keep the prior image and backup until you inspect public and authorized paths. Do not run two application containers against the same SQLite volume.
+
+To recover from a failed upgrade, stop the service, check out the old code and image, and use a **new** Compose project. The following one-off command copies the verified restore into that project's empty volume. The host restore directory must be readable by container user ID 1000. Keep `BILLING_ENCRYPTION_KEY` in `.env.docker` equal to the restored `billing.key` value. Run all later Compose commands with `-p directory-recovery` to keep using this new volume. Start only after the original service has stopped, since both projects bind the same local port.
+
+```sh
+docker compose --env-file .env.docker down
+docker compose --env-file .env.docker -p directory-recovery run --rm --no-deps \
+  -v "$BACKUP_DIR:/backup:ro" web sh -eu -c '
+    test ! -e /app/data/directory.db
+    cp /backup/directory-restore-check/database.db /app/data/directory.db
+    mkdir -p /app/data/media
+    cp -a /backup/directory-restore-check/media/. /app/data/media/
+  '
+docker compose --env-file .env.docker -p directory-recovery up -d --no-build
+```
+
+Inspect public and authorized paths before routing traffic to the recovered service. The restore command intentionally never modifies the original volume; preserve it until recovery is verified. See the [backup](../scripts/backup.mjs) and [restore](../scripts/restore.mjs) scripts for their exact checks.
+
 ### Production checklist
 
 - Install the locked packages with `npm ci`; run `npm run build`, `npm run db:migrate`, and `npm run start` with the same database environment. The [package scripts](../package.json) define these commands.
