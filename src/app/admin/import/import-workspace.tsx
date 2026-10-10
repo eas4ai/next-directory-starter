@@ -168,7 +168,8 @@ export function ImportWorkspace({ initialKeys, initialImports, categories }: {
       </div>
       <div className="mt-4 space-y-4">
         {imports.length === 0 && <p className="text-muted-foreground">No imports staged yet.</p>}
-        {imports.map((item) => <article key={item.slug} className="rounded-xl border p-5">
+        {imports.map((item) => <article key={item.slug} className="min-w-0 rounded-xl border p-5"
+          style={{ overflowWrap: "anywhere" }}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <h3 className="text-lg font-semibold">{item.name}</h3>
             <span className="text-sm text-muted-foreground">{item.status}</span>

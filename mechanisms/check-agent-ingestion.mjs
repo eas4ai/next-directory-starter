@@ -391,7 +391,7 @@ try {
       'Hostile source text could not be staged as data.');
     assert((await request(`/listings/${hostileSlug}`)).status === 404,
       'Untrusted source text caused publication without review.');
-    const hostileContext = await browser.newContext();
+    const hostileContext = await browser.newContext({ viewport: { width: 375, height: 812 } });
     try {
       await hostileContext.addCookies(adminCookie.split('; ').map((pair) => {
         const separator = pair.indexOf('=');
@@ -399,9 +399,25 @@ try {
       }));
       const hostilePage = await hostileContext.newPage();
       await hostilePage.goto(`${origin}/admin/import`, { waitUntil: 'networkidle' });
+      await hostilePage.screenshot({ path: '/tmp/agent-import-workspace-mobile.png', fullPage: true });
+      const width = await hostilePage.evaluate(() => ({ document: document.documentElement.scrollWidth,
+        viewport: window.innerWidth }));
+      assert(width.document <= width.viewport, 'Import workspace overflows a 375px viewport.');
+      await hostilePage.getByRole('textbox', { name: 'Credential name' }).focus();
+      await hostilePage.keyboard.press('Tab');
+      assert(await hostilePage.evaluate(() => document.activeElement?.textContent?.trim() === 'Create key'),
+        'Keyboard focus skips the credential action.');
+      await hostilePage.getByRole('textbox', { name: 'Observed links JSON array' }).focus();
+      await hostilePage.keyboard.press('Tab');
+      assert(await hostilePage.evaluate(() => document.activeElement?.textContent?.trim() === 'Stage private drafts'),
+        'Keyboard focus skips the stage action.');
       assert(!await hostilePage.evaluate(() => window.__agentMarkupExecuted),
         'Source excerpt executed in the private workspace.');
-      await tool('publish_import', { slug: hostileSlug });
+      const publishButton = hostilePage.locator('article').filter({ hasText: 'Hostile source text' })
+        .getByRole('button', { name: 'Publish reviewed import' });
+      await publishButton.focus();
+      await hostilePage.keyboard.press('Enter');
+      await hostilePage.getByText(`${hostileSlug} published.`).waitFor();
       await hostilePage.goto(`${origin}/listings/${hostileSlug}`, { waitUntil: 'networkidle' });
       assert(!await hostilePage.evaluate(() => window.__agentMarkupExecuted),
         'Imported description executed on the public listing.');
