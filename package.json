@@ -12,7 +12,9 @@
     "db:seed": "tsx scripts/seed-catalog.ts",
     "billing:reconcile": "tsx scripts/reconcile-billing.ts",
     "notifications:deliver": "tsx scripts/deliver-notifications.ts",
-    "account:provision": "auth create-admin --config ./src/lib/auth.ts"
+    "account:provision": "auth create-admin --config ./src/lib/auth.ts",
+    "ops:backup": "node scripts/backup.mjs",
+    "ops:restore": "node scripts/restore.mjs"
   },
   "dependencies": {
     "@hugeicons/core-free-icons": "^4.3.5",
