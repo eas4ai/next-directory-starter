@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { createServer } from 'node:net';
 
@@ -15,10 +16,10 @@ if (!(group in groups)) {
 }
 
 const result = Object.fromEntries(groups[group].map((id) => [id, false]));
-const run = (command, args) => spawnSync(command, args, {
+const run = (command, args, extraEnv = {}) => spawnSync(command, args, {
   encoding: 'utf8',
   timeout: 120_000,
-  env: { ...process.env, CI: '1' },
+  env: { ...process.env, CI: '1', ...extraEnv },
 });
 const text = (value) => typeof value === 'string' ? value : '';
 const contains = (html, value) => html.toLowerCase().includes(value.toLowerCase());
@@ -85,9 +86,14 @@ async function checkFoundation() {
     atLeast(deps.shadcn, [4, 21, 4]);
   const uiPath = ['src/components/ui', 'components/ui'].find(existsSync);
   const hasUi = uiPath && readdirSync(uiPath).some((name) => name.endsWith('.tsx'));
+  const buildEnv = {
+    SITE_URL: process.env.SITE_URL || 'http://localhost:3000',
+    BETTER_AUTH_URL: process.env.BETTER_AUTH_URL || 'http://localhost:3000',
+    BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET || randomBytes(32).toString('hex'),
+  };
   result['FOUND-001'] = Boolean(currentAtStart && deps.typescript &&
     config.tailwind?.cssVariables === true && hasUi &&
-    run('npm', ['run', 'build']).status === 0);
+    run('npm', ['run', 'build'], buildEnv).status === 0);
 }
 
 async function checkPublic(origin) {

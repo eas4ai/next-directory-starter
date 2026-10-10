@@ -10,7 +10,7 @@ COPY . .
 # Build-time values are nonsecret placeholders. Deployment settings enter at runtime.
 RUN SITE_URL=http://localhost:3000 BETTER_AUTH_URL=http://localhost:3000 \
     BETTER_AUTH_SECRET=build-only-placeholder DATABASE_URL=file:/tmp/directory-build.db \
-    npm run build -- --webpack
+    npm run build
 
 FROM build AS production-files
 RUN npm prune --omit=dev && npm cache clean --force && rm -rf .next/cache

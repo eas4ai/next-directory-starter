@@ -10,7 +10,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "test": "node --import tsx --test --test-concurrency=1 --test-reporter=tap tests/*.test.mjs",
