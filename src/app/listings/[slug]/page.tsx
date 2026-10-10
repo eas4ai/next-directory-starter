@@ -27,6 +27,7 @@ export async function generateMetadata({ params }: PageProps<"/listings/[slug]">
 }
 
 export default async function ListingPage({ params }: PageProps<"/listings/[slug]">) {
+  await connection();
   const { slug } = await params;
   const listing = publishedListingBySlug(slug);
   if (!listing) notFound();
