@@ -61,15 +61,7 @@ async function dispatch(request: Request): Promise<Response> {
   if (rejected) return rejected;
   const actor = agentPrincipal(request.headers.get("authorization"));
   if (!actor) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  let forwarded = request;
-  if (request.method === "POST") {
-    const body = await request.text();
-    if (Buffer.byteLength(body) > 8 * 1024 * 1024) {
-      return Response.json({ error: "Request is too large" }, { status: 413 });
-    }
-    forwarded = new Request(request.url, { method: request.method, headers: request.headers, body });
-  }
-  const response = await handler.fetch(forwarded, {
+  const response = await handler.fetch(request, {
     authInfo: { token: actor.keyId, clientId: actor.userId,
       scopes: ["catalog"], expiresAt: Math.floor(new Date(actor.expiresAt).getTime() / 1000) },
   });

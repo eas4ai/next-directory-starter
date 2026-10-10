@@ -166,6 +166,11 @@ try {
       'publish_import', 'attach_screenshot', 'preview_card']) {
       assert(listed.tools?.some((entry) => entry.name === name), `MCP omitted ${name}.`);
     }
+    const oversizedRequest = await request('/api/mcp', { method: 'POST', headers: {
+      Authorization: `Bearer ${token}`, 'Content-Type': 'application/json',
+      Accept: 'application/json, text/event-stream',
+    }, body: 'x'.repeat(8 * 1024 * 1024 + 1) });
+    assert(oversizedRequest.status === 413, 'MCP did not bound an oversized request body.');
     const client = new Client({ name: 'directory-acceptance', version: '1.0.0' });
     const transport = new StreamableHTTPClientTransport(new URL('/api/mcp', origin), {
       requestInit: { headers: { Authorization: `Bearer ${token}` } },
