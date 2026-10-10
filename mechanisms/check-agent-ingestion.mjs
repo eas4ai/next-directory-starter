@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
+import { createServer as createHttpServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -251,9 +252,33 @@ try {
     const retry = await tool('stage_links', { items: [first] });
     assert(retry.items?.[0]?.slug === staged.first && retry.items[0].status !== 'created',
       'Retry created a second listing.');
+    const duplicate = await tool('stage_links', { items: [{ ...first,
+      idempotencyKey: 'different-key-same-url' }] });
+    assert(duplicate.items?.[0]?.status === 'duplicate',
+      'A different key created a duplicate destination.');
     const missingSource = await tool('stage_links', { items: [{ ...first,
       idempotencyKey: 'missing-source', url: 'https://example.org/missing', sourceExcerpt: '' }] });
     assert(missingSource.items?.[0]?.status === 'invalid', 'Missing source evidence was accepted.');
+    const overLimit = await mcp('tools/call', { name: 'stage_links', arguments: {
+      items: Array.from({ length: 21 }, (_, index) => ({ ...first,
+        idempotencyKey: `too-many-${index}`, url: `https://example.org/too-many-${index}` })) } });
+    assert(overLimit.isError, 'A batch above 20 items was accepted.');
+    let privateFetches = 0;
+    const privateServer = createHttpServer((_incoming, outgoing) => {
+      privateFetches += 1;
+      outgoing.writeHead(200).end('private service');
+    });
+    await new Promise((resolve) => privateServer.listen(0, '127.0.0.1', resolve));
+    try {
+      const privateUrl = `http://127.0.0.1:${privateServer.address().port}/private`;
+      const privateResult = await tool('stage_links', { items: [{ ...first,
+        idempotencyKey: 'private-address', url: privateUrl }] });
+      assert(privateResult.items?.[0]?.status === 'invalid',
+        'A private network destination was accepted.');
+      assert(privateFetches === 0, 'The directory fetched a submitted private address.');
+    } finally {
+      await new Promise((resolve) => privateServer.close(resolve));
+    }
     const publicDraft = await request(`/listings/${staged.first}`);
     assert(publicDraft.status === 404, 'Staged import is already public.');
     const imports = await tool('list_imports');
@@ -291,6 +316,13 @@ try {
     const forged = await mcp('tools/call', { name: 'attach_screenshot', arguments: {
       slug: staged.second, mimeType: 'image/png', base64: screenshot.toString('base64') } });
     assert(forged.isError, 'Forged screenshot MIME was accepted.');
+    const oversizedDimensions = await sharp({ create: { width: 4097, height: 1,
+      channels: 3, background: '#ee00ee' } }).png().toBuffer();
+    const oversized = await mcp('tools/call', { name: 'attach_screenshot', arguments: {
+      slug: staged.second, mimeType: 'image/png', base64: oversizedDimensions.toString('base64') } });
+    assert(oversized.isError, 'Oversized screenshot dimensions were accepted.');
+    const rawGuest = await request(`/api/agent/imports/${staged.second}/screenshot`);
+    assert([401, 403, 404].includes(rawGuest.status), 'Guest can read a raw screenshot.');
     const draftPublic = await request(`/og/listings/${staged.second}.png`);
     assert(draftPublic.status === 404, 'Draft social card is public.');
     const draftGuest = await request(`/api/agent/imports/${staged.second}/card`);
@@ -319,6 +351,18 @@ try {
     assert(html.includes(`/og/listings/${staged.second}.png`) &&
       html.includes('og:image') && html.includes('twitter:image'),
     'Public social metadata does not reference the generated card.');
+    const db = new Database(databasePath);
+    try {
+      db.prepare(`INSERT INTO seo_overrides (kind, slug, public_json, updated_at)
+        VALUES ('listing', ?, ?, ?) ON CONFLICT(kind, slug) DO UPDATE SET
+        public_json = excluded.public_json, updated_at = excluded.updated_at`)
+        .run(staged.second, JSON.stringify({ title: null, description: null,
+          socialImage: 'https://cdn.example.org/custom.png', indexable: null }),
+        new Date().toISOString());
+    } finally { db.close(); }
+    const customHtml = await (await request(`/listings/${staged.second}`)).text();
+    assert(customHtml.includes('https://cdn.example.org/custom.png'),
+      'Published custom social image was replaced by the generated card.');
     const suspend = await request(`/api/admin/listings/${staged.second}`,
       json({ ...second, slug: staged.second, status: 'suspended' }, adminCookie, 'PATCH'));
     assert(suspend.ok, `Suspending the listing returned ${suspend.status}`);
