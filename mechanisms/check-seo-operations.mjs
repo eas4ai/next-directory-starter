@@ -161,6 +161,9 @@ try {
   });
 
   await check('SEO-009', async () => {
+    const local = spawnSync('node', ['--import', 'tsx', '--test', 'tests/seo-findings.test.mjs'],
+      { env, encoding: 'utf8', timeout: 30_000 });
+    if (local.status !== 0) throw new Error(`SEO findings state check failed: ${local.stderr || local.stdout}`);
     const guest = await request('/api/admin/seo/findings');
     if (![401, 403, 404].includes(guest.status)) throw new Error('Guest read SEO findings');
     const findings = await request('/api/admin/seo/findings',
@@ -170,6 +173,37 @@ try {
     if (!Array.isArray(value.findings) || !value.preview) {
       throw new Error('SEO findings lacked actionable rows or a public preview');
     }
+    const second = await request('/api/admin/listings', json({ slug: 'second-example',
+      name: 'Example Tool', summary: 'Another public sample listing with the same title',
+      description: 'A separate public listing for search findings.', category: 'Tools',
+      url: 'https://example.org/second', status: 'published' }, adminCookie));
+    if (second.status !== 201) throw new Error(`Duplicate fixture unavailable: HTTP ${second.status}`);
+    const updated = await request('/api/admin/seo/findings', { headers: { Cookie: adminCookie } });
+    const duplicateRows = (await updated.json()).findings.filter((item) => item.code === 'duplicate-title');
+    if (!duplicateRows.some((item) => item.path === '/listings/example-tool') ||
+        !duplicateRows.some((item) => item.path === '/listings/second-example')) {
+      throw new Error('Duplicate public titles were not actionable findings');
+    }
+    const previewResponse = await request('/api/admin/seo/findings?kind=listing&slug=example-tool',
+      { headers: { Cookie: adminCookie } });
+    if (!previewResponse.ok) throw new Error('Published listing preview unavailable');
+    const selected = (await previewResponse.json()).preview;
+    const html = await (await request('/listings/example-tool')).text();
+    const metas = [...html.matchAll(/<meta\b[^>]*>/g)].map(([tag]) =>
+      Object.fromEntries([...tag.matchAll(/([\w:-]+)="([^"]*)"/g)].map(([, key, content]) => [key, content])));
+    const ogTitle = metas.find((attrs) => attrs.property === 'og:title')?.content;
+    const ogImage = metas.find((attrs) => attrs.property === 'og:image')?.content;
+    if (selected.search.canonical !== `${origin}/listings/example-tool` ||
+        selected.social.title !== ogTitle || selected.social.image !== ogImage) {
+      throw new Error('Search/social preview differed from initial public HTML');
+    }
+    const draft = await request('/api/admin/articles', json({ slug: 'private-seo-draft',
+      title: 'Private SEO draft', summary: 'Hidden summary', body: 'Hidden body',
+      status: 'draft', category: '', tags: [] }, adminCookie));
+    if (draft.status !== 201) throw new Error('Private preview fixture unavailable');
+    const privatePreview = await request('/api/admin/seo/findings?kind=article&slug=private-seo-draft',
+      { headers: { Cookie: adminCookie } });
+    if (privatePreview.status !== 404) throw new Error('Private draft received a public SEO preview');
   });
 
   await check('SEO-010', async () => {
