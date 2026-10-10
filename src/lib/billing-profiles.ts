@@ -183,18 +183,21 @@ export function saveBillingProfile(input: unknown, actorUserId: string): Billing
   }).immediate();
 }
 
-function legacyStripe(): { apiKey: string; webhookSecret: string } | null {
+function legacyStripe(): { mode: BillingMode; apiKey: string; webhookSecret: string } | null {
   const apiKey = process.env.STRIPE_SECRET_KEY;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!apiKey || !webhookSecret) return null;
   const inferredMode = apiKey.startsWith("sk_live_") ? "live" : apiKey.startsWith("sk_test_") ? "test" : null;
-  return inferredMode === checkoutMode() ? { apiKey, webhookSecret } : null;
+  return inferredMode ? { mode: inferredMode, apiKey, webhookSecret } : null;
 }
 
 export function stripeCheckoutConfiguration(): { apiKey: string; webhookSecret: string } | null {
   const billingMode = checkoutMode();
   const profile = stored("stripe", billingMode);
-  if (!profile) return legacyStripe();
+  if (!profile) {
+    const legacy = legacyStripe();
+    return legacy?.mode === billingMode ? legacy : null;
+  }
   if (!profile.enabled || !profile.api_key_cipher || !profile.webhook_secret_cipher) return null;
   const key = encryptionKey();
   return {
@@ -213,13 +216,14 @@ export function stripeWebhookCandidates(): { mode: BillingMode; secret: string; 
     .all() as StoredProfile[];
   const candidates: { mode: BillingMode; secret: string; profile: boolean }[] = [];
   for (const row of rows) {
-    if (!row.enabled || !row.webhook_secret_cipher) continue;
+    if (!row.webhook_secret_cipher) continue;
     candidates.push({ mode: row.mode, profile: true,
       secret: open(row.webhook_secret_cipher, "stripe", row.mode, "webhookSecret", encryptionKey()) });
   }
   const fallback = legacyStripe();
-  if (fallback && !rows.some((row) => row.mode === checkoutMode())) {
-    candidates.push({ mode: checkoutMode(), secret: fallback.webhookSecret, profile: false });
+  if (fallback && !candidates.some((candidate) => candidate.mode === fallback.mode &&
+      candidate.secret === fallback.webhookSecret)) {
+    candidates.push({ mode: fallback.mode, secret: fallback.webhookSecret, profile: false });
   }
   return candidates;
 }

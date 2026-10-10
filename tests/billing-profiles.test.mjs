@@ -35,13 +35,17 @@ test('billing profiles encrypt secrets, isolate modes, and honor disabled and st
     assert.equal(stripeCheckoutConfiguration().apiKey, 'sk_test_saved');
     process.env.BILLING_CHECKOUT_MODE = 'live';
     assert.equal(stripeCheckoutConfiguration().apiKey, 'sk_live_saved');
-    assert.deepEqual(stripeWebhookCandidates().map(({ mode }) => mode).sort(), ['live', 'test']);
+    assert.deepEqual(stripeWebhookCandidates().map(({ mode, secret }) => [mode, secret]).sort(),
+      [['live', 'whsec_live_saved'], ['test', 'whsec_legacy_fixture'],
+        ['test', 'whsec_test_saved']].sort());
     assert.throws(() => saveBillingProfile(input('live', 0, false, 'stale'), 'admin'),
       /Billing profile changed/);
     assert.throws(() => saveBillingProfile({ ...input('live', 1, true, 'wrong'),
       apiKey: 'sk_test_wrong_mode' }, 'admin'), /must match the selected checkout mode/);
     saveBillingProfile({ provider: 'stripe', mode: 'live', version: 1, enabled: false }, 'admin');
     assert.equal(stripeCheckoutConfiguration(), null);
+    assert.ok(stripeWebhookCandidates().some(({ mode, secret }) =>
+      mode === 'live' && secret === 'whsec_live_saved'));
     process.env.BILLING_CHECKOUT_MODE = 'test';
     assert.equal(stripeCheckoutConfiguration().apiKey, 'sk_test_saved');
     process.env.BILLING_ENCRYPTION_KEY = randomBytes(32).toString('base64url');
