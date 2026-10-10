@@ -1,6 +1,6 @@
 import { createDecipheriv, createHash } from 'node:crypto';
-import { createReadStream, lstatSync, readdirSync, readFileSync } from 'node:fs';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { createReadStream, lstatSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import Database from 'better-sqlite3';
 
 export function databasePath() {
@@ -32,6 +32,22 @@ export function parsePairs(args, names) {
 export function contained(child, parent) {
   const path = relative(parent, child);
   return path === '' || (!path.startsWith(`..${sep}`) && path !== '..' && !path.startsWith(sep));
+}
+
+export function pathEntryExists(path) {
+  return lstatSync(path, { throwIfNoEntry: false }) !== undefined;
+}
+
+export function canonicalPath(path) {
+  let current = resolve(path);
+  const missing = [];
+  while (!pathEntryExists(current)) {
+    const parent = dirname(current);
+    if (parent === current) throw new Error('Cannot resolve storage path');
+    missing.unshift(basename(current));
+    current = parent;
+  }
+  return resolve(realpathSync(current), ...missing);
 }
 
 export function regularFiles(root) {

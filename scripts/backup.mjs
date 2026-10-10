@@ -2,8 +2,8 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, renameSync, rmSync,
   writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import Database from 'better-sqlite3';
-import { contained, databasePath, hashFile, inspectDatabase, mediaPath,
-  parsePairs, readKey, regularFiles } from './ops-common.mjs';
+import { canonicalPath, contained, databasePath, hashFile, inspectDatabase, mediaPath,
+  parsePairs, pathEntryExists, readKey, regularFiles } from './ops-common.mjs';
 
 async function main() {
   const { '--output': output, '--key-file': keyFile } =
@@ -11,9 +11,12 @@ async function main() {
   const source = databasePath();
   const media = mediaPath(source);
   if (!existsSync(source)) throw new Error('Source database does not exist');
-  if (existsSync(output)) throw new Error('Backup destination already exists');
-  if (contained(output, media) || contained(source, output) ||
-      contained(media, output) || contained(keyFile, output)) {
+  if (pathEntryExists(output)) throw new Error('Backup destination already exists');
+  const plannedOutput = canonicalPath(output);
+  const liveDatabase = canonicalPath(source);
+  const liveMedia = canonicalPath(media);
+  if (contained(plannedOutput, liveMedia) || contained(liveDatabase, plannedOutput) ||
+      contained(liveMedia, plannedOutput) || contained(canonicalPath(keyFile), plannedOutput)) {
     throw new Error('Backup destination overlaps live storage');
   }
   const key = readKey(keyFile);
@@ -21,6 +24,7 @@ async function main() {
     throw new Error('Key file does not match BILLING_ENCRYPTION_KEY');
   }
   mkdirSync(dirname(output), { recursive: true });
+  if (canonicalPath(output) !== plannedOutput) throw new Error('Backup path changed');
   const stage = mkdtempSync(join(dirname(output), '.directory-backup-'));
   try {
     mkdirSync(join(stage, 'media'));
@@ -36,7 +40,9 @@ async function main() {
       [file, await hashFile(join(stage, file))])));
     writeFileSync(join(stage, 'manifest.json'),
       `${JSON.stringify({ version: 1, hashes }, null, 2)}\n`, { flag: 'wx' });
-    if (existsSync(output)) throw new Error('Backup destination already exists');
+    if (pathEntryExists(output) || canonicalPath(output) !== plannedOutput) {
+      throw new Error('Backup destination changed or already exists');
+    }
     renameSync(stage, output);
     process.stdout.write('Backup created and verified. Keep the directory private.\n');
   } catch (error) {
