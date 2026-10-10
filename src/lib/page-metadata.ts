@@ -21,17 +21,16 @@ export function pageMetadata(path: string, title: string, description: string,
   const settings = getSeoSettings();
   const searchTitle = settings.titleFormat.replace("%s", overrides?.title || title);
   const searchDescription = overrides?.description || description;
-  const image = overrides?.socialImage || images?.published || settings.socialImage ||
-    images?.generated || site.socialImage;
-  const imageUrl = image?.startsWith("/") ? publicUrl(image) : image;
+  const imageUrl = publicUrl(`/social-card?path=${encodeURIComponent(path)}`);
+  const image = { url: imageUrl, width: 1200, height: 630, type: "image/png" };
   return {
     title: searchTitle,
     description: searchDescription,
     alternates: { canonical: url },
     openGraph: { type: "website", siteName: site.name, title: searchTitle,
-      description: searchDescription, url, images: imageUrl ? [imageUrl] : undefined },
-    twitter: { card: imageUrl ? "summary_large_image" : "summary", title: searchTitle,
-      description: searchDescription, images: imageUrl ? [imageUrl] : undefined },
+      description: searchDescription, url, images: [image] },
+    twitter: { card: "summary_large_image", title: searchTitle,
+      description: searchDescription, images: [image] },
     robots: overrides?.indexable === false ? { index: false, follow: true } : undefined,
   };
 }
