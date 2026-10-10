@@ -77,6 +77,11 @@ try {
   expect(manual.includes('docker compose') && manual.includes('db:migrate') &&
     manual.includes('ops:backup') && manual.includes('ops:restore'),
   'Operator manual is missing container migration or recovery commands');
+  const notificationLimit = Number(/notifications:deliver -- --limit (\d+)/.exec(manual)?.[1]);
+  const reconciliationLimit = Number(/billing:reconcile -- --limit (\d+)/.exec(manual)?.[1]);
+  expect(Number.isInteger(notificationLimit) && notificationLimit >= 1 && notificationLimit <= 50 &&
+    Number.isInteger(reconciliationLimit) && reconciliationLimit >= 1 && reconciliationLimit <= 50,
+  'Operator manual uses a job limit outside the scripts\' accepted range');
 
   const port = await freePort();
   writeFileSync(envFile, [
@@ -122,8 +127,10 @@ try {
     `process.stdout.write(require('node:fs').readFileSync('${mediaPath}','utf8'))`]).trim() === 'kept',
   'Uploaded media directory did not survive container replacement');
   expect(compose(['run', '--rm', '--no-deps', 'web', 'npm', 'run', 'notifications:deliver', '--',
-    '--limit', '1']).includes('Notifications attempted:'), 'Notification command missed container data');
-  compose(['run', '--rm', '--no-deps', 'web', 'npm', 'run', 'billing:reconcile', '--', '--limit', '1']);
+    '--limit', String(notificationLimit)]).includes('Notifications attempted:'),
+  'Notification command missed container data');
+  compose(['run', '--rm', '--no-deps', 'web', 'npm', 'run', 'billing:reconcile', '--',
+    '--limit', String(reconciliationLimit)]);
 
   const backupDir = join(scratch, 'backup-output');
   const keyFile = join(scratch, 'billing.key');
