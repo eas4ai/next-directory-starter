@@ -281,3 +281,24 @@ export function providerWebhookSecret(billingProvider: Exclude<BillingProvider, 
   return open(profile.webhook_secret_cipher, billingProvider, billingMode,
     "webhookSecret", encryptionKey());
 }
+
+export function providerRecoveryConfiguration(billingProvider: BillingProvider,
+  billingMode: BillingMode): CheckoutConfiguration | null {
+  const profile = stored(billingProvider, billingMode);
+  if (profile?.api_key_cipher) {
+    const key = encryptionKey();
+    return {
+      provider: billingProvider, mode: billingMode,
+      apiKey: open(profile.api_key_cipher, billingProvider, billingMode, "apiKey", key),
+      webhookSecret: profile.webhook_secret_cipher
+        ? open(profile.webhook_secret_cipher, billingProvider, billingMode, "webhookSecret", key) : "",
+      publicKey: profile.public_key,
+      priceMappings: JSON.parse(profile.price_mappings) as PriceMapping[], legacy: false,
+    };
+  }
+  const fallback = billingProvider === "stripe" ? legacyStripe() : null;
+  return fallback?.mode === billingMode ? {
+    provider: "stripe", mode: billingMode, apiKey: fallback.apiKey,
+    webhookSecret: fallback.webhookSecret, publicKey: "", priceMappings: [], legacy: true,
+  } : null;
+}

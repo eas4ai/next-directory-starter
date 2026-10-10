@@ -26,6 +26,7 @@ export default async function OwnerListingsPage() {
       <Link href="/listings" className="text-sm text-muted-foreground hover:text-foreground">← Directory</Link>
       <h1 className="mt-7 text-3xl font-semibold tracking-tight">My listings</h1>
       <p className="mt-3 text-muted-foreground">Save drafts, submit them for review, and propose updates to approved listings.</p>
+      <Link href="/owner/billing" className="mt-3 inline-block text-sm underline">My billing</Link>
       {canModerate(user.role) && <Link href="/admin/review" className="mt-3 inline-block text-sm underline">Review submissions</Link>}
       {canEditArticles(user.role) && <Link href="/admin/articles" className="ml-4 mt-3 inline-block text-sm underline">Edit articles</Link>}
       <OwnerEditor initialListings={ownerListings(user.id)} />
