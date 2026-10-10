@@ -54,7 +54,7 @@ An administrator can edit articles at `/admin/articles`. To give a separate acco
 npm run account:provision -- --email editor@example.com --name "Editor" --role editor
 ```
 
-Editors sign in through `/owner/sign-in` and follow **Edit articles** to save drafts or publish and unpublish articles. Published articles appear at `/articles`; drafts return a missing response on public routes. Article bodies are plain text and preserve line breaks.
+Editors sign in through `/owner/sign-in` and follow **Edit articles**. Article bodies and listing descriptions accept Markdown; raw HTML, executable links, and embedded remote images are not rendered. Editors can save an article revision, open its private preview, and publish it explicitly. Saving a revision of an already published article leaves the public version in place until publication; stale editor tabs are asked to refresh. Published articles appear at `/articles`; drafts return a missing response on public routes.
 
 Administrators manage listing categories and article tags at `/admin/taxonomy`. A newly added category appears in the directory filter even before it has listings. Rename carries existing listings and pending owner proposals to the new category. Names in use must be removed from content before deletion. Editors can assign an existing tag to an article using the comma-separated tag field.
 

@@ -6,6 +6,7 @@ import { publishedArticleBySlug } from "@/lib/articles";
 import { pageMetadata, publicUrl } from "@/lib/page-metadata";
 import { getSiteConfig } from "@/lib/site-config";
 import { JsonLd } from "@/components/json-ld";
+import { MarkdownContent } from "@/components/markdown-content";
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -36,7 +37,7 @@ export default async function ArticlePage({ params }: Params) {
         {article.publishedAt && <time className="mt-5 block text-sm text-muted-foreground" dateTime={article.publishedAt}>
           Published {new Date(article.publishedAt).toLocaleDateString("en-US", { timeZone: "UTC" })}
         </time>}
-        <div className="mt-10 whitespace-pre-wrap leading-8">{article.body}</div>
+        <div className="mt-10"><MarkdownContent source={article.body} /></div>
         {article.tags.length > 0 && <p className="mt-10 border-t pt-5 text-sm text-muted-foreground">Tags: {article.tags.join(" · ")}</p>}
       </article>
     </main>

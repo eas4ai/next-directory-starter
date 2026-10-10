@@ -305,12 +305,29 @@ function migratePaymentOutcomes(): void {
   }).immediate();
 }
 
+function migrateArticleRevisions(): void {
+  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 11").get()) return;
+  database.transaction(() => {
+    database.exec(`ALTER TABLE articles ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+      CREATE TABLE article_revisions (
+        slug TEXT PRIMARY KEY NOT NULL REFERENCES articles(slug) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        body TEXT NOT NULL,
+        tags_json TEXT NOT NULL,
+        saved_at TEXT NOT NULL
+      );`);
+    database.prepare("INSERT INTO catalog_migrations (version) VALUES (11)").run();
+  }).immediate();
+}
+
 export function migrateCatalog(): void {
   migrate.immediate();
   migratePlanModes();
   migrateBillingProfiles();
   migratePaymentLifecycle();
   migratePaymentOutcomes();
+  migrateArticleRevisions();
 }
 
 export function seedCatalog(): void {

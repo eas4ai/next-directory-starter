@@ -137,3 +137,18 @@
   border-radius: var(--radius);
   box-shadow: var(--preset-shadow);
 }
+
+.markdown-content > * + * { margin-top: 1rem; }
+.markdown-content :is(h1, h2, h3) { font-weight: 600; line-height: 1.3; }
+.markdown-content h1 { font-size: 1.75rem; }
+.markdown-content h2 { font-size: 1.4rem; }
+.markdown-content h3 { font-size: 1.15rem; }
+.markdown-content :is(ul, ol) { padding-left: 1.5rem; }
+.markdown-content ul { list-style: disc; }
+.markdown-content ol { list-style: decimal; }
+.markdown-content blockquote { border-left: 3px solid var(--border); padding-left: 1rem; }
+.markdown-content :is(pre, code) { border-radius: 0.25rem; background: var(--muted); }
+.markdown-content pre { overflow-x: auto; padding: 0.75rem; }
+.markdown-content :not(pre) > code { padding: 0.125rem 0.25rem; }
+.markdown-content table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
+.markdown-content :is(th, td) { border: 1px solid var(--border); padding: 0.25rem 0.5rem; }
