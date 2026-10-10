@@ -15,13 +15,14 @@ export function publicUrl(path: string): string {
 }
 
 export function pageMetadata(path: string, title: string, description: string,
-  overrides?: SeoOverrides): Metadata {
+  overrides?: SeoOverrides, images?: { published?: string; generated?: string }): Metadata {
   const url = publicUrl(path);
   const site = getSiteConfig();
   const settings = getSeoSettings();
   const searchTitle = settings.titleFormat.replace("%s", overrides?.title || title);
   const searchDescription = overrides?.description || description;
-  const image = overrides?.socialImage || settings.socialImage;
+  const image = overrides?.socialImage || images?.published || settings.socialImage ||
+    images?.generated || site.socialImage;
   const imageUrl = image?.startsWith("/") ? publicUrl(image) : image;
   return {
     title: searchTitle,

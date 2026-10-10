@@ -16,8 +16,9 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   await connection();
   const article = publishedArticleBySlug((await params).slug);
   if (!article) notFound();
+  const image = assignedMedia("article", article.slug, "public");
   const metadata = pageMetadata(`/articles/${article.slug}`, `${article.title} | ${getSiteConfig().name}`,
-    article.summary, article.seo);
+    article.summary, article.seo, { published: image ? `/media/${image.id}` : undefined });
   return { ...metadata, alternates: { ...metadata.alternates,
     types: { "text/markdown": publicUrl(`/markdown/articles/${article.slug}`) } } };
 }

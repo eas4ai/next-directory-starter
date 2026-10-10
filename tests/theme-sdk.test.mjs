@@ -1,12 +1,14 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createServer } from 'node:net';
 import { randomBytes } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { chromium } from 'playwright-core';
+import sharp from 'sharp';
+import Database from 'better-sqlite3';
 
 let runtime;
 
@@ -34,8 +36,8 @@ async function app() {
   runtime = { directory, origin, env, process: null, password, adminCookie: '' };
   // Each acceptance run needs its own clean generated build state.
   rmSync('.next', { recursive: true, force: true });
-  command(env, ['run', 'build']);
   command(env, ['run', 'db:migrate']);
+  command(env, ['run', 'build']);
   command(env, ['run', 'db:seed']);
   command(env, ['run', 'account:provision', '--', '--email',
     'theme-sdk-admin@example.invalid', '--password', password, '--role', 'admin', '--yes']);
@@ -265,12 +267,174 @@ test('THM-003 skill and example extensions are usable', () => {
   assert.ok(existsSync('src/templates/editorial.css'), 'example template is missing');
 });
 
-test('THM-004 branding has protected settings and asset paths', () => {
+test('THM-004 protected branding, metadata, cards and restored assets', async () => {
   assert.ok(existsSync('src/lib/branding.ts'), 'brand settings are missing');
   assert.ok(existsSync('src/app/api/admin/branding/route.ts'), 'brand API is missing');
   assert.ok(existsSync('src/app/api/admin/branding/assets/route.ts'),
     'validated brand asset upload is missing');
-  const card = readFileSync('src/lib/agent-cards.ts', 'utf8');
-  assert.match(card, /getSiteConfig|branding/);
-  assert.match(card, /theme|token|palette/i);
+  const { parseSiteConfig } = await import('../src/lib/site-config.ts');
+  assert.throws(() => parseSiteConfig({ name: 'Test', description: 'Hello',
+    iconUrl: 'javascript:alert(1)' }), /Asset/);
+  assert.throws(() => parseSiteConfig({ name: 'Test', description: 'Hello',
+    logoUrl: '//example.com/logo.png' }), /Asset/);
+  const { origin, adminCookie, directory, env } = await app();
+  assert.equal((await selectionRequest(origin, adminCookie,
+    { themeId: 'preset', templateId: 'classic' })).status, 200);
+  const changed = { name: 'Copper Atlas', description: 'Find good tools and stories.',
+    logoUrl: null, iconUrl: null, socialImage: 'https://cdn.example.com/fallback.png' };
+  const patchBrand = (cookie, branding) => fetch(`${origin}/api/admin/branding`, {
+    method: 'PATCH', headers: { Origin: origin, Cookie: cookie,
+      'Content-Type': 'application/json' }, body: JSON.stringify(branding),
+  });
+  assert.equal((await patchBrand('', changed)).status, 403);
+  assert.ok([403, 404].includes((await fetch(`${origin}/admin/branding`)).status));
+  assert.equal((await patchBrand(adminCookie, { ...changed,
+    iconUrl: '/admin/accounts' })).status, 400);
+  assert.equal((await patchBrand(adminCookie, { ...changed,
+    iconUrl: 'data:image/svg+xml,evil' })).status, 400);
+  assert.equal((await patchBrand(adminCookie, { ...changed,
+    iconUrl: '/brand-assets/00000000-0000-0000-0000-000000000000.webp' })).status, 400);
+  assert.equal((await patchBrand(adminCookie, changed)).status, 200);
+  assert.equal((await fetch(`${origin}/admin/branding`,
+    { headers: { Cookie: adminCookie } })).status, 200);
+  let home = await (await fetch(origin)).text();
+  assert.match(home, /Copper Atlas/);
+  assert.match(home, /Find good tools and stories/);
+  assert.match(home, /property="og:image" content="https:\/\/cdn\.example\.com\/fallback\.png"/);
+
+  const logo = await sharp({ create: { width: 60, height: 40, channels: 4,
+    background: '#197c6d' } }).png().toBuffer();
+  const upload = (slot, bytes, type = 'image/png', cookie = adminCookie) =>
+    fetch(`${origin}/api/admin/branding/assets`, { method: 'POST',
+      headers: { Origin: origin, Cookie: cookie, 'Content-Type': type,
+        'X-Brand-Slot': slot }, body: bytes });
+  assert.equal((await upload('logo', logo, 'image/png', '')).status, 403);
+  assert.equal((await upload('logo', Buffer.from('<svg/>'), 'image/svg+xml')).status, 400);
+  assert.equal((await upload('logo', logo, 'image/jpeg')).status, 400);
+  assert.equal((await upload('logo', Buffer.alloc(5 * 1024 * 1024 + 1))).status, 413);
+  const logoSaved = await upload('logo', logo);
+  assert.equal(logoSaved.status, 201);
+  const logoPath = (await logoSaved.json()).branding.logoUrl;
+  assert.match(logoPath, /^\/brand-assets\/[0-9a-f-]{36}\.webp$/);
+  const iconSaved = await upload('icon', logo);
+  assert.equal(iconSaved.status, 201);
+  const iconPath = (await iconSaved.json()).branding.iconUrl;
+  const socialSaved = await upload('social', logo);
+  assert.equal(socialSaved.status, 201);
+  const socialPath = (await socialSaved.json()).branding.socialImage;
+  const asset = await fetch(`${origin}${logoPath}`);
+  assert.equal(asset.status, 200);
+  assert.match(asset.headers.get('content-type') ?? '', /image\/webp/);
+  assert.match(asset.headers.get('cache-control') ?? '', /no-store/);
+  assert.equal((await sharp(Buffer.from(await asset.arrayBuffer())).metadata()).format, 'webp');
+  home = await (await fetch(origin)).text();
+  assert.ok(home.includes(`src="${logoPath}"`));
+  assert.ok(home.includes(`href="${iconPath}"`));
+  assert.ok(home.includes(`content="${origin}${socialPath}"`));
+
+  const browser = await chromium.launch({ headless: true,
+    ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: 'chrome' }),
+    args: ['--no-sandbox'] });
+  try {
+    const context = await browser.newContext({ viewport: { width: 390, height: 800 } });
+    await context.addCookies(adminCookie.split('; ').map((part) => {
+      const at = part.indexOf('=');
+      return { name: part.slice(0, at), value: part.slice(at + 1), url: origin };
+    }));
+    const page = await context.newPage();
+    await page.goto(`${origin}/admin/branding`);
+    assert.ok(await page.getByRole('heading', { name: 'Branding' }).isVisible());
+    assert.ok((await page.evaluate(() => document.documentElement.scrollWidth)) <= 390);
+    await page.getByRole('textbox', { name: 'Site name' }).fill('Copper Atlas Preview');
+    await page.getByRole('button', { name: 'Save branding' }).click();
+    await page.getByRole('status').filter({ hasText: 'Branding saved.' }).waitFor();
+    await page.goto(origin);
+    assert.ok(await page.getByRole('link', { name: 'Copper Atlas Preview' }).isVisible());
+    await page.goto(`${origin}/admin/branding`);
+    await page.getByRole('textbox', { name: 'Site name' }).fill('Copper Atlas');
+    await page.getByRole('button', { name: 'Save branding' }).click();
+    await page.getByRole('status').filter({ hasText: 'Branding saved.' }).waitFor();
+    await context.close();
+  } finally { await browser.close(); }
+
+  const db = new Database(join(directory, 'directory.db'));
+  const now = new Date().toISOString();
+  db.prepare(`INSERT INTO agent_imports (slug, actor_user_id, idempotency_key,
+    source_url, source_excerpt, created_at) VALUES (?, ?, ?, ?, ?, ?)`).run(
+    'example-tool', 'theme-sdk-test', 'brand-card', 'https://example.org/tool',
+    'Example source', now);
+  db.close();
+  const cardBefore = await (await fetch(`${origin}/og/listings/example-tool.png`)).arrayBuffer();
+  const selected = await selectionRequest(origin, adminCookie,
+    { themeId: 'studio', templateId: 'editorial' });
+  assert.equal(selected.status, 200);
+  const cardAfter = await (await fetch(`${origin}/og/listings/example-tool.png`)).arrayBuffer();
+  assert.notDeepEqual(Buffer.from(cardBefore), Buffer.from(cardAfter),
+    'generated cards must use the selected theme palette');
+  assert.equal((await sharp(Buffer.from(cardAfter)).metadata()).width, 1200);
+  const namedBrand = { ...(await (await fetch(`${origin}/api/admin/branding`,
+    { headers: { Cookie: adminCookie } })).json()).branding, name: 'Copper Atlas Revised' };
+  assert.equal((await patchBrand(adminCookie, namedBrand)).status, 200);
+  const renamedCard = await (await fetch(`${origin}/og/listings/example-tool.png`)).arrayBuffer();
+  assert.notDeepEqual(Buffer.from(cardAfter), Buffer.from(renamedCard),
+    'generated cards must use the current brand name');
+  assert.equal((await patchBrand(adminCookie, { ...namedBrand,
+    name: 'Copper Atlas' })).status, 200);
+
+  const seo = await fetch(`${origin}/api/admin/seo/settings`, {
+    method: 'PATCH', headers: { Origin: origin, Cookie: adminCookie,
+      'Content-Type': 'application/json' },
+    body: JSON.stringify({ titleFormat: '%s', description: changed.description,
+      socialImage: '/brand/seo-default.png', googleVerification: null,
+      bingVerification: null }),
+  });
+  assert.equal(seo.status, 200);
+  home = await (await fetch(origin)).text();
+  assert.ok(home.includes(`content="${origin}/brand/seo-default.png"`));
+  const listing = await (await fetch(`${origin}/listings/example-tool`)).text();
+  assert.ok(listing.includes(`content="${origin}/brand/seo-default.png"`),
+    'search setting must take priority over a generated listing card');
+
+  const mediaId = '12345678-1234-4234-8234-123456789abc';
+  writeFileSync(join(directory, 'media', `${mediaId}.webp`),
+    await sharp(logo).webp().toBuffer());
+  const mediaDb = new Database(join(directory, 'directory.db'));
+  mediaDb.prepare(`INSERT INTO media_assets (id, target_kind, target_slug, uploaded_by,
+    alt, width, height, created_at) VALUES (?, 'listing', 'example-tool', ?, ?, ?, ?, ?)`).run(
+    mediaId, 'theme-sdk-test', 'Published image', 60, 40, now);
+  mediaDb.prepare(`INSERT INTO media_assignments (target_kind, target_slug, slot, asset_id)
+    VALUES ('listing', 'example-tool', 'public', ?)`).run(mediaId);
+  mediaDb.close();
+  const published = await (await fetch(`${origin}/listings/example-tool`)).text();
+  assert.ok(published.includes(`content="${origin}/media/${mediaId}"`),
+    'published content image must take priority over the search default');
+  const overrideDb = new Database(join(directory, 'directory.db'));
+  overrideDb.prepare(`INSERT INTO seo_overrides (kind, slug, public_json, updated_at)
+    VALUES ('listing', 'example-tool', ?, ?)`).run(JSON.stringify({
+      title: null, description: null,
+      socialImage: 'https://cdn.example.com/explicit.png', indexable: null,
+    }), now);
+  overrideDb.close();
+  const explicit = await (await fetch(`${origin}/listings/example-tool`)).text();
+  assert.ok(explicit.includes('content="https://cdn.example.com/explicit.png"'),
+    'a published social override must take priority over other images');
+
+  await restartApp();
+  const restoredHome = await (await fetch(origin)).text();
+  assert.ok(restoredHome.includes('Copper Atlas'));
+  assert.ok(restoredHome.includes(`href="${iconPath}"`));
+  process.kill(-runtime.process.pid, 'SIGTERM');
+  runtime.process = null;
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  const key = randomBytes(32).toString('base64url');
+  const keyFile = join(directory, 'billing.key');
+  writeFileSync(keyFile, `${key}\n`, { mode: 0o600 });
+  const backup = join(directory, 'backup');
+  const restored = join(directory, 'restored');
+  const opsEnv = { ...env, BILLING_ENCRYPTION_KEY: key };
+  command(opsEnv, ['run', 'ops:backup', '--', '--output', backup, '--key-file', keyFile]);
+  command(opsEnv, ['run', 'ops:restore', '--', '--backup', backup, '--target', restored]);
+  for (const path of [logoPath, iconPath, socialPath]) {
+    assert.ok(existsSync(join(restored, 'media', path.split('/').at(-1))));
+  }
 });

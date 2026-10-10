@@ -15,7 +15,7 @@ Edit `.env.local`. Set `BETTER_AUTH_SECRET` to a unique value from `openssl rand
 
 Set `RESEND_API_KEY` and `RESEND_FROM` using a verified Resend sending domain. Public account creation sends a verification link through Resend and cannot sign the new account in until the link is used. Configure the sender before opening public registration. Account holders can request password recovery from `/owner/forgot-password`; a completed reset revokes their earlier sessions.
 
-Set `SITE_NAME` and `SITE_DESCRIPTION` to identify your directory. Set `SITE_LOGO_URL` and `SITE_ICON_URL` to site-relative paths or HTTP(S) asset URLs. Put site-relative assets in `public/` and refer to them with paths such as `/brand/logo.svg`. These settings change the public header and page metadata without editing application code.
+Set `SITE_NAME` and `SITE_DESCRIPTION` to identify your directory. Set `SITE_LOGO_URL` and `SITE_ICON_URL` to site-relative paths or HTTP(S) asset URLs. Put site-relative assets in `public/` and refer to them with paths such as `/brand/logo.svg`. An administrator can later change the name, description, logo, favicon, and default social image at `/admin/branding`; saved values take precedence over environment defaults.
 
 Administrators can set a search title format, default description and social image, and Google/Bing verification values at `/admin/seo`. Listing owners can save optional search and social overrides in their private listing editor; the submitted values appear publicly only after moderator approval. Article editors can save the same overrides with an article revision; publishing that revision applies them. Choosing noindex on a public item keeps its page available to visitors while requesting that crawlers not index it.
 
@@ -148,7 +148,7 @@ This starter is distributed under the [MIT License](LICENSE), copyright 2026 Sha
 
 ## Backup and restore
 
-Stop the application and background jobs before backup so no upload can race the database snapshot. Keep the production `DATABASE_URL`, `MEDIA_DIR`, and `BILLING_ENCRYPTION_KEY` in the shell environment. The commands copy the SQLite database through SQLite's online backup API, copy uploaded media, and include the matching billing key. The key and the backup directory are sensitive. Store them outside the repository with restricted access.
+Stop the application and background jobs before backup so no upload can race the database snapshot. Keep the production `DATABASE_URL`, `MEDIA_DIR`, and `BILLING_ENCRYPTION_KEY` in the shell environment. The commands copy the SQLite database through SQLite's online backup API, copy uploaded media including brand images, and include the matching billing key. The backup check verifies current brand images. The key and the backup directory are sensitive. Store them outside the repository with restricted access.
 
 ```sh
 umask 077

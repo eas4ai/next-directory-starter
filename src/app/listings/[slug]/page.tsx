@@ -23,9 +23,12 @@ export async function generateMetadata({ params }: PageProps<"/listings/[slug]">
   if (!listing) notFound();
   const overrides = publicSeoOverrides("listing", listing.slug);
   const imported = database.prepare("SELECT 1 FROM agent_imports WHERE slug = ?").get(listing.slug);
+  const image = assignedMedia("listing", listing.slug, "public");
   const metadata = pageMetadata(`/listings/${listing.slug}`, `${listing.name} | ${getSiteConfig().name}`,
-    listing.summary, { ...overrides, socialImage: overrides.socialImage ||
-      (imported ? `/og/listings/${listing.slug}.png` : null) });
+    listing.summary, overrides, {
+      published: image ? `/media/${image.id}` : undefined,
+      generated: imported ? `/og/listings/${listing.slug}.png` : undefined,
+    });
   return { ...metadata, alternates: { ...metadata.alternates,
     types: { "text/markdown": publicUrl(`/markdown/listings/${listing.slug}`) } } };
 }

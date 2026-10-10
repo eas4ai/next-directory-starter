@@ -6,6 +6,7 @@ import { getSeoSettings, publicSeoOverrides, type SeoOverrides } from "@/lib/seo
 import { getSiteConfig } from "@/lib/site-config";
 import { pageMetadata, publicUrl } from "@/lib/page-metadata";
 import { HttpError } from "@/lib/http-error";
+import { assignedMedia } from "@/lib/media";
 
 migrateCatalog();
 
@@ -30,8 +31,8 @@ type Candidate = { kind: "article" | "listing"; slug: string; title: string; des
 const PAGE_SIZE = 40;
 
 function preview(path: string, title: string, description: string,
-  overrides?: SeoOverrides): SeoPreview {
-  const metadata = pageMetadata(path, title, description, overrides);
+  overrides?: SeoOverrides, images?: { published?: string; generated?: string }): SeoPreview {
+  const metadata = pageMetadata(path, title, description, overrides, images);
   const graph = metadata.openGraph as {
     title?: string; description?: string; url?: string; images?: string[];
   } | undefined;
@@ -62,13 +63,19 @@ export function seoPreview(kind: "home" | "listing" | "article", slug?: string):
   if (kind === "listing") {
     const listing = publishedListingBySlug(slug);
     if (!listing) throw new SeoFindingError(404, "Public content not found");
+    const image = assignedMedia("listing", slug, "public");
+    const imported = database.prepare("SELECT 1 FROM agent_imports WHERE slug = ?").get(slug);
     return preview(`/listings/${slug}`, `${listing.name} | ${getSiteConfig().name}`,
-      listing.summary, publicSeoOverrides("listing", slug));
+      listing.summary, publicSeoOverrides("listing", slug), {
+        published: image ? `/media/${image.id}` : undefined,
+        generated: imported ? `/og/listings/${slug}.png` : undefined,
+      });
   }
   const article = publishedArticleBySlug(slug);
   if (!article) throw new SeoFindingError(404, "Public content not found");
+  const image = assignedMedia("article", slug, "public");
   return preview(`/articles/${slug}`, `${article.title} | ${getSiteConfig().name}`,
-    article.summary, article.seo);
+    article.summary, article.seo, { published: image ? `/media/${image.id}` : undefined });
 }
 
 function candidates(page: number): { rows: Candidate[]; page: number; pages: number } {
@@ -103,7 +110,7 @@ export function seoFindings(requestedPage = 1): {
   const { rows, page, pages } = candidates(requestedPage);
   const settings = getSeoSettings();
   const findings: SeoFinding[] = [];
-  if (page === 1 && !settings.socialImage) {
+  if (page === 1 && !settings.socialImage && !getSiteConfig().socialImage) {
     findings.push({ code: "missing-social-image", path: "/",
       message: "The site has no default social image.",
       action: "Set a default social image in Search settings.", editPath: "/admin/seo" });

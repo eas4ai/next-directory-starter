@@ -128,6 +128,12 @@ function variables(preset: ThemePreset, dark: boolean): Record<string, string> {
   };
 }
 
+export function presetSocialColors(preset: ThemePreset): Record<"background" | "foreground" | "accent" | "muted", string> {
+  const colors = variables(preset, true);
+  return { background: colors.background, foreground: colors.foreground,
+    accent: colors.primary, muted: colors["muted-foreground"] };
+}
+
 export function declarationBlock(selector: string, values: Record<string, string>): string {
   return `${selector} { ${Object.entries(values).map(([name, value]) => `--${name}: ${value};`).join(" ")} }`;
 }
