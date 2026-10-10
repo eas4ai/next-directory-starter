@@ -16,7 +16,7 @@ export async function generateMetadata() {
 export default function Home() {
   const site = getSiteConfig();
   return (
-    <main className="mx-auto flex min-h-[70vh] w-full max-w-[1400px] flex-col justify-center px-6 py-20">
+    <main className="site-container template-hero flex min-h-[70vh] flex-col justify-center">
       <JsonLd data={{
         "@context": "https://schema.org", "@type": "WebSite",
         name: site.name, description: site.description, url: publicUrl("/"),

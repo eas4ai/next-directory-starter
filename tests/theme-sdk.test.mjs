@@ -32,6 +32,8 @@ async function app() {
     SITE_URL: origin, BETTER_AUTH_URL: origin,
     BETTER_AUTH_SECRET: randomBytes(32).toString('hex') };
   runtime = { directory, origin, env, process: null, password, adminCookie: '' };
+  // Each acceptance run needs its own clean generated build state.
+  rmSync('.next', { recursive: true, force: true });
   command(env, ['run', 'build']);
   command(env, ['run', 'db:migrate']);
   command(env, ['run', 'db:seed']);
@@ -60,6 +62,30 @@ async function app() {
     .map((value) => value.split(';')[0]).join('; ');
   assert.ok(runtime.adminCookie);
   return runtime;
+}
+
+async function restartApp() {
+  const current = await app();
+  process.kill(-current.process.pid, 'SIGTERM');
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  current.process = spawn('npm', ['run', 'start', '--', '-p', new URL(current.origin).port], {
+    env: current.env, detached: true, stdio: 'ignore',
+  });
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    try {
+      if ((await fetch(current.origin, { signal: AbortSignal.timeout(1000) })).status < 500) return;
+    } catch { /* wait for restart */ }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  assert.fail('application did not restart');
+}
+
+function selectionRequest(origin, cookie, selection) {
+  return fetch(`${origin}/api/admin/theme/selection`, {
+    method: 'PATCH', headers: { Cookie: cookie, Origin: origin,
+      'Content-Type': 'application/json' },
+    body: JSON.stringify(selection),
+  });
 }
 
 after(() => {
@@ -140,7 +166,7 @@ test('THM-001 typed tokens validate and render a custom theme', async () => {
   } finally { await browser.close(); }
 });
 
-test('THM-002 authored inline CSS is absent and theme/template routes exist', () => {
+test('THM-002 stylesheets, preview, selection, restart and narrow layouts', async () => {
   for (const path of sourceFiles('src')) {
     const code = readFileSync(path, 'utf8');
     assert.doesNotMatch(code, /<style(?:\s|>)/i, `${path} authors a style element`);
@@ -153,6 +179,78 @@ test('THM-002 authored inline CSS is absent and theme/template routes exist', ()
   const layout = readFileSync('src/app/layout.tsx', 'utf8');
   assert.match(layout, /<link\b[^>]*href=["']\/theme\.css["']/);
   assert.match(layout, /data-template=/);
+  const { origin, adminCookie } = await app();
+  const forbidden = await selectionRequest(origin, '',
+    { themeId: 'studio', templateId: 'editorial' });
+  assert.equal(forbidden.status, 403);
+  const invalid = await selectionRequest(origin, adminCookie,
+    { themeId: 'missing', templateId: 'editorial' });
+  assert.equal(invalid.status, 400);
+  const reset = await selectionRequest(origin, adminCookie,
+    { themeId: 'preset', templateId: 'classic' });
+  assert.equal(reset.status, 200);
+  const previewQuery = new URLSearchParams({
+    preset: JSON.stringify((await import('../src/lib/theme.ts')).defaultThemePreset),
+    themeId: 'studio', scope: 'selection',
+  });
+  assert.equal((await fetch(`${origin}/api/admin/theme/preview.css?${previewQuery}`)).status, 403);
+  const preview = await fetch(`${origin}/api/admin/theme/preview.css?${previewQuery}`,
+    { headers: { Cookie: adminCookie } });
+  assert.equal(preview.status, 200);
+  assert.match(preview.headers.get('cache-control') ?? '', /no-store/);
+  assert.match(await preview.text(), /--background: #f7f4ed/);
+
+  const browser = await chromium.launch({ headless: true,
+    ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: 'chrome' }),
+    args: ['--no-sandbox'] });
+  try {
+    const context = await browser.newContext({ viewport: { width: 1200, height: 800 } });
+    await context.addCookies(adminCookie.split('; ').map((part) => {
+      const at = part.indexOf('=');
+      return { name: part.slice(0, at), value: part.slice(at + 1), url: origin };
+    }));
+    const page = await context.newPage();
+    await page.goto(`${origin}/listings`);
+    const beforeText = await page.locator('main').innerText();
+    const beforeCanonical = await page.locator('link[rel=canonical]').getAttribute('href');
+    await page.goto(`${origin}/admin/theme`);
+    await page.selectOption('select[name=themeId]', 'studio');
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('.selection-preview .theme-preview-body')).backgroundColor === 'rgb(247, 244, 237)');
+    await page.selectOption('select[name=templateId]', 'editorial');
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('.selection-preview .theme-preview-body')).display === 'grid');
+    await page.getByRole('button', { name: 'Apply design' }).click();
+    await page.getByRole('status').filter({ hasText: 'Theme and template saved.' }).waitFor();
+    await page.goto(`${origin}/listings`);
+    assert.equal(await page.locator('html').getAttribute('data-template'), 'editorial');
+    assert.equal(await page.locator('html').getAttribute('data-theme'), 'studio');
+    assert.equal(await page.locator('main').innerText(), beforeText);
+    assert.equal(await page.locator('link[rel=canonical]').getAttribute('href'), beforeCanonical);
+    const columns = await page.locator('[data-testid=ordinary-results]').evaluate((element) =>
+      getComputedStyle(element).gridTemplateColumns.split(' ').length);
+    assert.equal(columns, 3, 'editorial template must change the result grid');
+    await context.close();
+    for (const mode of ['light', 'dark']) {
+      const narrow = await browser.newContext({ viewport: { width: 320, height: 740 }, colorScheme: mode });
+      await narrow.addCookies([{ name: 'site_appearance', value: mode, url: origin }]);
+      const narrowPage = await narrow.newPage();
+      for (const path of ['/', '/listings', '/listings/example-tool', '/articles']) {
+        await narrowPage.goto(`${origin}${path}`);
+        const metrics = await narrowPage.evaluate(() => ({
+          width: document.documentElement.scrollWidth,
+          text: document.querySelector('main')?.textContent?.trim() ?? '',
+        }));
+        assert.ok(metrics.width <= 320, `${path} overflows in ${mode} mode`);
+        assert.ok(metrics.text.length > 0, `${path} has no visible content`);
+      }
+      await narrow.close();
+    }
+  } finally { await browser.close(); }
+  await restartApp();
+  const saved = await fetch(`${origin}/api/admin/theme/selection`,
+    { headers: { Cookie: adminCookie } });
+  assert.deepEqual((await saved.json()).selection,
+    { themeId: 'studio', templateId: 'editorial' });
+  assert.match(await (await fetch(`${origin}/listings`)).text(), /data-template="editorial"/);
 });
 
 test('THM-003 skill and example extensions are usable', () => {

@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "../templates/editorial.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -140,6 +141,66 @@
 [data-slot="card"] {
   border-radius: var(--radius);
   box-shadow: var(--preset-shadow);
+}
+
+.site-container {
+  width: 100%;
+  max-width: var(--theme-page-width, 1400px);
+  margin-inline: auto;
+  padding-inline: clamp(1rem, 4vw, 1.5rem);
+  padding-block: var(--theme-space-section, 3rem);
+}
+
+.site-nav {
+  width: 100%;
+  max-width: var(--theme-page-width, 1400px);
+  margin-inline: auto;
+  padding-inline: clamp(1rem, 4vw, 1.5rem);
+}
+
+.template-listing-grid,
+.template-article-grid {
+  display: grid;
+  gap: var(--theme-space-gap, 1rem);
+}
+
+@media (min-width: 640px) {
+  .template-listing-grid,
+  .template-article-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.theme-preview-body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--preset-body-font);
+}
+.theme-preview-heading { font-family: var(--preset-heading-font); }
+.theme-preview-muted { color: var(--muted-foreground); }
+.theme-preview-card {
+  background: var(--card);
+  border-color: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--preset-shadow);
+}
+.theme-preview-primary {
+  height: var(--preset-control-height);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-radius: var(--radius);
+}
+.theme-preview-chart-1 { background: var(--chart-1); }
+.theme-preview-chart-2 { background: var(--chart-2); }
+.theme-preview-chart-3 { background: var(--chart-3); }
+.theme-preview-chart-4 { background: var(--chart-4); }
+.theme-preview-chart-5 { background: var(--chart-5); }
+.theme-preview-menu {
+  background: var(--sidebar);
+  color: var(--sidebar-foreground);
+  border-color: var(--sidebar-border);
+}
+.theme-preview-menu-accent {
+  background: var(--sidebar-accent);
+  color: var(--sidebar-accent-foreground);
 }
 
 .markdown-content > * + * { margin-top: 1rem; }

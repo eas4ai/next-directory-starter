@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
-import { PresetExternalLinkIcon } from "@/components/preset-icon";
 import type { ThemePreset } from "@/lib/theme";
+import type { ThemeSelection } from "@/lib/theme-selection";
+import { ThemePreview } from "./theme-preview";
 
 const labels: Record<keyof ThemePreset, string> = {
   style: "Style",
@@ -28,59 +29,51 @@ function displayName(value: string): string {
 type Props = {
   options: Record<keyof ThemePreset, string[]>;
   initialPreset: ThemePreset;
-  initialCss: string;
+  initialSelection: ThemeSelection;
+  themes: readonly { id: string; name: string }[];
+  templates: readonly { id: string; name: string }[];
 };
 
-export function ThemeEditor({ options, initialPreset, initialCss }: Props) {
+export function ThemeEditor({ options, initialPreset, initialSelection, themes, templates }: Props) {
   const router = useRouter();
   const [preset, setPreset] = useState(initialPreset);
-  const [css, setCss] = useState(initialCss);
   const [status, setStatus] = useState("");
+  const [selection, setSelection] = useState(initialSelection);
+  const [selectionStatus, setSelectionStatus] = useState("");
+  const previewHref = `/api/admin/theme/preview.css?${new URLSearchParams({
+    preset: JSON.stringify(preset), themeId: "preset", scope: "preset",
+  })}`;
+  const selectionHref = `/api/admin/theme/preview.css?${new URLSearchParams({
+    preset: JSON.stringify(preset), themeId: selection.themeId, scope: "selection",
+  })}`;
 
-  useEffect(() => {
-    const controller = new AbortController();
-    async function preview() {
-      try {
-        const response = await fetch("/api/admin/theme/preview", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(preset),
-          signal: controller.signal,
-        });
-        if (!response.ok) throw new Error("Preview failed.");
-        const result = await response.json() as { css: string };
-        setCss(result.css);
-      } catch (error) {
-        if (!controller.signal.aborted) setStatus(error instanceof Error ? error.message : "Preview failed.");
-      }
-    }
-    void preview();
-    return () => controller.abort();
-  }, [preset]);
-
-  async function save(event: FormEvent<HTMLFormElement>) {
+  async function save(event: FormEvent<HTMLFormElement>, kind: "preset" | "selection") {
     event.preventDefault();
-    setStatus("Saving…");
+    const update = kind === "preset" ? setStatus : setSelectionStatus;
+    const errorMessage = kind === "preset" ? "The theme could not be saved." :
+      "The theme or template could not be saved.";
+    update("Saving…");
     try {
-      const response = await fetch("/api/admin/theme", {
-        method: "POST",
+      const response = await fetch(kind === "preset" ? "/api/admin/theme" : "/api/admin/theme/selection", {
+        method: kind === "preset" ? "POST" : "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(preset),
+        body: JSON.stringify(kind === "preset" ? preset : selection),
       });
-      if (!response.ok) throw new Error("The theme could not be saved.");
-      setStatus("Theme saved.");
+      if (!response.ok) throw new Error(errorMessage);
+      update(kind === "preset" ? "Theme saved." : "Theme and template saved.");
       router.refresh();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "The theme could not be saved.");
+      update(error instanceof Error ? error.message : errorMessage);
     }
   }
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+    <>
+    <div className="grid gap-8 lg:grid-cols-2">
       <Card>
         <CardHeader><CardTitle>Preset choices</CardTitle></CardHeader>
         <CardContent>
-          <form onSubmit={save} className="grid gap-5 sm:grid-cols-2">
+          <form onSubmit={(event) => save(event, "preset")} className="grid gap-5 sm:grid-cols-2">
             {(Object.keys(options) as (keyof ThemePreset)[]).map((field) => (
               <div key={field} className="grid gap-2">
                 <label htmlFor={`theme-${field}`} className="text-sm font-medium">{labels[field]}</label>
@@ -107,31 +100,46 @@ export function ThemeEditor({ options, initialPreset, initialCss }: Props) {
       </Card>
 
       <div>
-        <style>{css}</style>
-        <section className="theme-preview overflow-hidden rounded-xl border" data-mode={preset.mode} aria-label="Theme preview">
-          <div className="space-y-6 p-6" style={{ background: "var(--background)", color: "var(--foreground)", fontFamily: "var(--preset-body-font)" }}>
-            <div>
-              <p className="text-xs uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>Live preview · {displayName(preset.style)}</p>
-              <h2 className="mt-2 text-2xl font-semibold" style={{ fontFamily: "var(--preset-heading-font)" }}>Find something useful</h2>
-              <p className="mt-2 text-sm" style={{ color: "var(--muted-foreground)" }}>A sample directory card in your selected palette and type.</p>
-            </div>
-            <div className="rounded-lg border p-5" style={{ background: "var(--card)", borderColor: "var(--border)", borderRadius: "var(--radius)", boxShadow: "var(--preset-shadow)" }}>
-              <p className="text-sm font-semibold">Example Tool</p>
-              <p className="mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>A sample link for your directory</p>
-              <div className="mt-4 flex items-center gap-3">
-                <span className="inline-flex items-center gap-2 px-4 text-sm font-medium" style={{ height: "var(--preset-control-height)", background: "var(--primary)", color: "var(--primary-foreground)", borderRadius: "var(--radius)" }}>Visit listing <PresetExternalLinkIcon library={preset.iconLibrary} /></span>
-                <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>{displayName(preset.iconLibrary)} icons</span>
-              </div>
-            </div>
-            <div className="flex gap-1" aria-label="Chart colors">
-              {[1, 2, 3, 4, 5].map((index) => <span key={index} className="h-6 flex-1 rounded-sm" style={{ background: `var(--chart-${index})` }} />)}
-            </div>
-            <div className="rounded-lg border px-4 py-3 text-sm" style={{ background: "var(--sidebar)", color: "var(--sidebar-foreground)", borderColor: "var(--sidebar-border)" }}>
-              <span className="rounded px-2 py-1" style={{ background: "var(--sidebar-accent)", color: "var(--sidebar-accent-foreground)" }}>Menu preview</span>
-            </div>
-          </div>
-        </section>
+        <link rel="stylesheet" href={previewHref} />
+        <ThemePreview scope="preset" library={preset.iconLibrary} mode={preset.mode}
+          styleName={displayName(preset.style)} />
       </div>
     </div>
+    <div className="mt-10 grid gap-8 lg:grid-cols-2">
+      <Card>
+        <CardHeader><CardTitle>Installed designs</CardTitle></CardHeader>
+        <CardContent>
+          <p className="mb-5 text-sm text-muted-foreground">Preview an installed theme and public layout before applying them to the site.</p>
+          <form className="grid gap-5" onSubmit={(event) => save(event, "selection")}>
+            <label className="grid gap-2 text-sm font-medium">Theme
+              <select name="themeId" value={selection.themeId}
+                onChange={(event) => { setSelection((current) => ({ ...current, themeId: event.target.value })); setSelectionStatus("Unsaved changes"); }}
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                {themes.map((theme) => <option key={theme.id} value={theme.id}>{theme.name}</option>)}
+              </select>
+            </label>
+            <label className="grid gap-2 text-sm font-medium">Public template
+              <select name="templateId" value={selection.templateId}
+                onChange={(event) => { setSelection((current) => ({ ...current, templateId: event.target.value })); setSelectionStatus("Unsaved changes"); }}
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                {templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
+              </select>
+            </label>
+            <div className="flex items-center gap-3">
+              <Button type="submit">Apply design</Button>
+              <p role="status" aria-live="polite" className="text-sm text-muted-foreground">{selectionStatus}</p>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+      <div>
+        <link rel="stylesheet" href={selectionHref} />
+        <ThemePreview scope="selection" library={preset.iconLibrary} mode={preset.mode}
+          styleName={`${themes.find((theme) => theme.id === selection.themeId)?.name ?? "Theme"} · ${
+            templates.find((template) => template.id === selection.templateId)?.name ?? "Template"}`}
+          templateId={selection.templateId} />
+      </div>
+    </div>
+    </>
   );
 }

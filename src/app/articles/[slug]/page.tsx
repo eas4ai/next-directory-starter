@@ -28,7 +28,7 @@ export default async function ArticlePage({ params }: Params) {
   if (!article) notFound();
   const image = assignedMedia("article", article.slug, "public");
   return (
-    <main className="mx-auto w-full max-w-[1400px] px-6 py-12">
+    <main className="site-container">
       <JsonLd data={{
         "@context": "https://schema.org", "@type": "Article",
         headline: article.title, description: article.summary,
