@@ -13,6 +13,6 @@ export async function GET(request: Request) {
   }
   const page = Number(query.get("page") ?? "1");
   try {
-    return Response.json({ ...seoFindings(page), findings: [], preview: seoPreview(kind, query.get("slug") ?? undefined) });
+    return Response.json({ ...seoFindings(page), preview: seoPreview(kind, query.get("slug") ?? undefined) });
   } catch (error) { return httpErrorResponse(error); }
 }

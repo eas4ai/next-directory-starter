@@ -11,13 +11,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const listings = database.prepare(`SELECT l.slug FROM listings l
     LEFT JOIN seo_overrides seo ON seo.kind = 'listing' AND seo.slug = l.slug
     WHERE ${PUBLIC_LISTING_PREDICATE}
-      AND 1 = 1
+      AND COALESCE(json_extract(seo.public_json, '$.indexable'), 1) != 0
     ORDER BY l.slug`)
     .all() as { slug: string }[];
   const articles = database.prepare(`SELECT a.slug, a.published_at FROM articles a
     LEFT JOIN seo_overrides seo ON seo.kind = 'article' AND seo.slug = a.slug
     WHERE a.status = 'published'
-      AND 1 = 1
+      AND COALESCE(json_extract(seo.public_json, '$.indexable'), 1) != 0
     ORDER BY a.slug`)
     .all() as { slug: string; published_at: string | null }[];
   return [

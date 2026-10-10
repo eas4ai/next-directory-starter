@@ -65,7 +65,7 @@ export function listRedirects(): SiteRedirect[] {
 export function saveRedirect(sourceInput: unknown, destinationInput: unknown, actorId: string): SiteRedirect {
   const source = path(sourceInput, false);
   const destination = path(destinationInput, true);
-  if (source === destination) {
+  if (source === destination || unavailableSource(source)) {
     throw new RedirectError(409, "Redirect would shadow a live route or point to itself");
   }
   return database.transaction(() => {
