@@ -8,11 +8,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:migrate": "auth migrate --yes --config ./src/lib/auth.ts && tsx scripts/migrate-catalog.ts",
+    "db:migrate": "node --import ./scripts/load-env.mjs ./node_modules/auth/dist/index.mjs migrate --yes --config ./src/lib/auth.ts && tsx scripts/migrate-catalog.ts",
     "db:seed": "tsx scripts/seed-catalog.ts",
     "billing:reconcile": "tsx scripts/reconcile-billing.ts",
     "notifications:deliver": "tsx scripts/deliver-notifications.ts",
-    "account:provision": "auth create-admin --config ./src/lib/auth.ts",
+    "account:provision": "node --import ./scripts/load-env.mjs ./node_modules/auth/dist/index.mjs create-admin --config ./src/lib/auth.ts",
     "ops:backup": "node scripts/backup.mjs",
     "ops:restore": "node scripts/restore.mjs"
   },
