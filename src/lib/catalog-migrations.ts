@@ -155,6 +155,15 @@ const migrate = database.transaction(() => {
       WHERE checkout_request_id IS NOT NULL;`);
     database.prepare("INSERT INTO catalog_migrations (version) VALUES (5)").run();
   }
+
+  const verificationUseInstalled = database.prepare("SELECT version FROM catalog_migrations WHERE version = 6").get();
+  if (!verificationUseInstalled) {
+    database.exec(`CREATE TABLE email_verification_uses (
+      token_hash TEXT PRIMARY KEY NOT NULL,
+      used_at TEXT NOT NULL
+    );`);
+    database.prepare("INSERT INTO catalog_migrations (version) VALUES (6)").run();
+  }
 });
 
 export function migrateCatalog(): void {

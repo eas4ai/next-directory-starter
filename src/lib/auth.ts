@@ -4,6 +4,7 @@ import { after } from "next/server";
 import { database } from "@/lib/database";
 import { accessControl, roles } from "@/lib/permissions";
 import { sendAccountEmail } from "@/lib/mail";
+import { recordVerificationLinkUse } from "@/lib/email-verification";
 
 export const auth = betterAuth({
   database,
@@ -16,6 +17,10 @@ export const auth = betterAuth({
         try { await sendAccountEmail(user.email, "Verify your email address", `Verify your account: ${url}`, "verification"); }
         catch { console.error("Account verification email delivery failed."); }
       });
+    },
+    afterEmailVerification: async (_user, request) => {
+      const token = request?.url ? new URL(request.url).searchParams.get("token") : null;
+      if (token) recordVerificationLinkUse(token);
     },
   },
   emailAndPassword: {
