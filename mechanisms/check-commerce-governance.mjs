@@ -205,6 +205,7 @@ try {
     CI: '1', DATABASE_URL: `file:${databasePath}`,
     BETTER_AUTH_SECRET: randomBytes(32).toString('hex'),
     BETTER_AUTH_URL: origin, SITE_URL: origin,
+    BILLING_CHECKOUT_MODE: 'test',
     STRIPE_WEBHOOK_SECRET: webhookSecret,
   };
   requireCommand('npm', ['run', 'db:migrate']);
