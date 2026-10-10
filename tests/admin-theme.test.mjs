@@ -215,8 +215,8 @@ test('ADM-006 the saved theme reaches public and admin pages after restart', asy
   }
   assert.match(css, /--primary: oklch\([^)]*264\)/);
   assert.match(css, /--radius: 0\.875rem/);
-  assert.match(css, /--preset-body-font: "Lora"/);
-  assert.match(css, /--preset-heading-font: "Playfair Display"/);
+  assert.match(css, /--preset-body-font: var\(--font-preset-lora\)/);
+  assert.match(css, /--preset-heading-font: var\(--font-preset-playfair-display\)/);
   const sidebarColor = css.match(/--sidebar: ([^;]+)/)?.[1] ?? '';
   assert.match(sidebarColor, /^oklch\([^)]* \/ 0\.85\)$/);
   const persisted = await (await request('/api/admin/theme', { headers: { Cookie: adminAgain } })).json();
