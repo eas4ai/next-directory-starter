@@ -3,7 +3,7 @@ import type Stripe from "stripe";
 import { database } from "@/lib/database";
 import { migrateCatalog } from "@/lib/catalog-migrations";
 import { HttpError, httpErrorResponse } from "@/lib/http-error";
-import { planByKey, planOfferToken } from "@/lib/plans";
+import { checkoutMode, planByKey, planOfferToken } from "@/lib/plans";
 import { publicUrl } from "@/lib/page-metadata";
 
 migrateCatalog();
@@ -21,6 +21,11 @@ type ReservedPurchase = {
   listing_slug: string;
   owner_user_id: string;
   plan_key: string;
+  plan_mode: "test" | "live";
+  billing_mode: "free" | "one-time" | "monthly" | "annual";
+  plan_name: string;
+  plan_description: string;
+  accepted_duration_days: number | null;
   amount_minor: number;
   currency: string;
   duration_days: number;
@@ -46,28 +51,78 @@ function reservePurchase(ownerUserId: string, listingSlug: string, planKey: stri
         throw new CheckoutError(409, "Checkout request was already used");
       }
       const reservedToken = planOfferToken({
-        key: existing.plan_key, amountMinor: existing.amount_minor, currency: existing.currency,
-        durationDays: existing.duration_days, featured: Boolean(existing.featured),
+        key: existing.plan_key, name: existing.plan_name, description: existing.plan_description,
+        mode: existing.plan_mode, billingMode: existing.billing_mode,
+        amountMinor: existing.amount_minor, currency: existing.currency,
+        durationDays: existing.accepted_duration_days, featured: Boolean(existing.featured),
       });
-      if (reservedToken !== offerToken) throw new CheckoutError(409, "Checkout terms changed. Refresh and review the plan");
+      if (existing.plan_mode !== checkoutMode() || existing.billing_mode !== "one-time" ||
+          reservedToken !== offerToken) {
+        throw new CheckoutError(409, "Checkout terms changed. Refresh and review the plan");
+      }
       return existing;
     }
     const plan = planByKey(planKey);
-    if (!plan || !plan.enabled) throw new CheckoutError(404, "Available plan not found");
+    if (!plan || !plan.enabled || plan.mode !== checkoutMode() || plan.billingMode !== "one-time") {
+      throw new CheckoutError(404, "Available one-time plan not found");
+    }
     if (planOfferToken(plan) !== offerToken) {
       throw new CheckoutError(409, "Plan terms changed. Refresh and review the plan");
     }
     const id = randomUUID();
     const createdAt = new Date().toISOString();
     database.prepare(`INSERT INTO purchases
-      (id, listing_slug, owner_user_id, plan_key, amount_minor, currency, duration_days,
-        featured, stripe_session_id, stripe_product_name, checkout_request_id, status, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`).run(
-      id, listingSlug, ownerUserId, plan.key, plan.amountMinor, plan.currency,
-      plan.durationDays, Number(plan.featured), `pending:${id}`,
-      `${plan.name} · ${listing.name}`, requestId, createdAt,
+      (id, listing_slug, owner_user_id, plan_key, plan_mode, billing_mode, plan_name,
+        plan_description, amount_minor, currency, duration_days, accepted_duration_days, featured,
+        stripe_session_id, stripe_product_name, checkout_request_id, status, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`).run(
+      id, listingSlug, ownerUserId, plan.key, plan.mode, plan.billingMode, plan.name,
+      plan.description, plan.amountMinor, plan.currency, plan.durationDays, plan.durationDays,
+      Number(plan.featured), `pending:${id}`, `${plan.name} · ${listing.name}`,
+      requestId, createdAt,
     );
     return database.prepare("SELECT * FROM purchases WHERE id = ?").get(id) as ReservedPurchase;
+  }).immediate();
+}
+
+export function acceptFreePlan(ownerUserId: string, listingSlug: string, planKey: string): {
+  purchaseId: string; status: "free";
+} {
+  return database.transaction(() => {
+    const listing = database.prepare(`SELECT slug FROM listings
+      WHERE slug = ? AND owner_user_id = ? AND status = 'published'`)
+      .get(listingSlug, ownerUserId);
+    if (!listing) throw new CheckoutError(404, "Approved owned listing not found");
+    const plan = planByKey(planKey);
+    if (!plan || !plan.enabled || plan.mode !== checkoutMode() || plan.billingMode !== "free") {
+      throw new CheckoutError(404, "Available free plan not found");
+    }
+    const previous = database.prepare(`SELECT id FROM purchases
+      WHERE listing_slug = ? AND owner_user_id = ? AND plan_key = ?
+        AND plan_mode = ? AND billing_mode = 'free' AND status = 'paid'
+        AND plan_name = ? AND plan_description = ?
+        AND amount_minor = 0 AND currency = ? AND featured = ?
+      ORDER BY created_at DESC LIMIT 1`)
+      .get(listingSlug, ownerUserId, plan.key, plan.mode, plan.name,
+        plan.description, plan.currency, Number(plan.featured)) as { id: string } | undefined;
+    if (previous) return { purchaseId: previous.id, status: "free" as const };
+    const id = randomUUID();
+    database.prepare(`INSERT INTO purchases
+      (id, listing_slug, owner_user_id, plan_key, plan_mode, billing_mode, plan_name,
+        plan_description, amount_minor, currency, duration_days, accepted_duration_days, featured,
+        stripe_session_id, stripe_product_name, status, created_at)
+      VALUES (?, ?, ?, ?, ?, 'free', ?, ?, 0, ?, 0, NULL, ?, ?, ?, 'paid', ?)`).run(
+      id, listingSlug, ownerUserId, plan.key, plan.mode, plan.name,
+      plan.description, plan.currency, Number(plan.featured), `free:${id}`,
+      plan.name, new Date().toISOString(),
+    );
+    if (plan.featured) {
+      database.prepare(`INSERT INTO entitlements
+        (purchase_id, listing_slug, starts_at, ends_at, featured, revoked_at)
+        VALUES (?, ?, ?, '9999-12-31T23:59:59.999Z', 1, NULL)`)
+        .run(id, listingSlug, new Date().toISOString());
+    }
+    return { purchaseId: id, status: "free" as const };
   }).immediate();
 }
 

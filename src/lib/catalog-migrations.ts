@@ -168,6 +168,58 @@ const migrate = database.transaction(() => {
 
 export function migrateCatalog(): void {
   migrate.immediate();
+  const planModesInstalled = database.prepare("SELECT version FROM catalog_migrations WHERE version = 7").get();
+  if (planModesInstalled) return;
+
+  // SQLite cannot relax the existing plan CHECK constraints in place. Rebuild the
+  // parent table with foreign keys paused, then validate every reference before
+  // committing the migration.
+  database.pragma("foreign_keys = OFF");
+  try {
+    database.transaction(() => {
+      const legacyMode = process.env.BILLING_CHECKOUT_MODE === "live" ? "live" :
+        process.env.BILLING_CHECKOUT_MODE === "test" ? "test" :
+          process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_") ? "live" : "test";
+      database.exec(`CREATE TABLE publishing_plans_next (
+        key TEXT PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL,
+        mode TEXT NOT NULL CHECK (mode IN ('test', 'live')),
+        billing_mode TEXT NOT NULL CHECK (billing_mode IN ('free', 'one-time', 'monthly', 'annual')),
+        amount_minor INTEGER NOT NULL CHECK (amount_minor >= 0),
+        currency TEXT NOT NULL,
+        duration_days INTEGER CHECK (duration_days BETWEEN 1 AND 3650 OR duration_days IS NULL),
+        featured INTEGER NOT NULL CHECK (featured IN (0, 1)),
+        enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+        updated_at TEXT NOT NULL,
+        CHECK ((billing_mode = 'free' AND amount_minor = 0 AND duration_days IS NULL)
+          OR (billing_mode = 'one-time' AND amount_minor > 0 AND duration_days IS NOT NULL)
+          OR (billing_mode IN ('monthly', 'annual') AND amount_minor > 0 AND duration_days IS NULL))
+      );`);
+      database.prepare(`INSERT INTO publishing_plans_next
+        (key, name, description, mode, billing_mode, amount_minor, currency, duration_days,
+          featured, enabled, updated_at)
+        SELECT key, name, description, ?, 'one-time', amount_minor, currency, duration_days,
+          featured, enabled, updated_at FROM publishing_plans`).run(legacyMode);
+      database.exec(`DROP TABLE publishing_plans;
+        ALTER TABLE publishing_plans_next RENAME TO publishing_plans;
+        ALTER TABLE purchases ADD COLUMN plan_mode TEXT NOT NULL DEFAULT 'test';
+        ALTER TABLE purchases ADD COLUMN billing_mode TEXT NOT NULL DEFAULT 'one-time';
+        ALTER TABLE purchases ADD COLUMN plan_name TEXT;
+        ALTER TABLE purchases ADD COLUMN plan_description TEXT;
+        ALTER TABLE purchases ADD COLUMN accepted_duration_days INTEGER;`);
+      database.prepare(`UPDATE purchases SET plan_mode = ?,
+        plan_name = (SELECT name FROM publishing_plans WHERE key = purchases.plan_key),
+        plan_description = (SELECT description FROM publishing_plans WHERE key = purchases.plan_key),
+        accepted_duration_days = duration_days`)
+        .run(legacyMode);
+      const violations = database.pragma("foreign_key_check") as unknown[];
+      if (violations.length) throw new Error("Plan migration left invalid foreign keys");
+      database.prepare("INSERT INTO catalog_migrations (version) VALUES (7)").run();
+    }).immediate();
+  } finally {
+    database.pragma("foreign_keys = ON");
+  }
 }
 
 export function seedCatalog(): void {
