@@ -525,7 +525,9 @@ try {
     const rawGuest = await request(`/api/agent/imports/${staged.second}/screenshot`);
     assert([401, 403, 404].includes(rawGuest.status), 'Guest can read a raw screenshot.');
     const draftPublic = await request(`/og/listings/${staged.second}.png`);
-    assert(draftPublic.status === 404, 'Draft social card is public.');
+    assert(draftPublic.status === 404 &&
+      draftPublic.headers.get('cache-control')?.includes('no-store'),
+    'Draft social card is public or its denial can be cached.');
     const draftGuest = await request(`/api/agent/imports/${staged.second}/card`);
     assert(draftGuest.status === 401 || draftGuest.status === 403, 'Guest can preview draft card.');
     const draftPreview = await request(`/api/agent/imports/${staged.second}/card`,
@@ -547,6 +549,8 @@ try {
     const publishedCard = await request(`/og/listings/${staged.second}.png`);
     assert(publishedCard.ok && publishedCard.headers.get('content-type')?.includes('image/png'),
       'Published card is unavailable as PNG.');
+    assert(publishedCard.headers.get('cache-control')?.includes('no-store'),
+      'A published social card can outlive eligibility in a cache.');
     const publishedPage = await request(`/listings/${staged.second}`);
     const html = await publishedPage.text();
     assert(html.includes(`/og/listings/${staged.second}.png`) &&
@@ -567,8 +571,10 @@ try {
     const suspend = await request(`/api/admin/listings/${staged.second}`,
       json({ ...second, slug: staged.second, status: 'suspended' }, adminCookie, 'PATCH'));
     assert(suspend.ok, `Suspending the listing returned ${suspend.status}`);
-    assert((await request(`/og/listings/${staged.second}.png`)).status === 404,
-      'Suspended listing kept a public card.');
+    const suspendedCard = await request(`/og/listings/${staged.second}.png`);
+    assert(suspendedCard.status === 404 &&
+      suspendedCard.headers.get('cache-control')?.includes('no-store'),
+    'Suspended listing kept a public or cacheable card.');
   });
 } catch (error) {
   process.stderr.write(`agent-ingestion setup: ${error.message}\n`);
