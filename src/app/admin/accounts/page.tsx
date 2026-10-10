@@ -26,7 +26,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
     <main className="mx-auto w-full max-w-[1400px] px-6 py-10">
       <Link href="/admin/catalog" className="text-sm text-muted-foreground hover:text-foreground">← Catalog</Link>
       <h1 className="mt-7 text-3xl font-semibold tracking-tight">Accounts and roles</h1>
-      <p className="mt-3 text-muted-foreground">Grant only the access each account needs. Suspension revokes sessions and hides owned listings until reinstatement. The final active administrator cannot be demoted or suspended.</p>
+      <p className="mt-3 text-muted-foreground">Combine only the staff capabilities each verified account needs. Account, theme, search, and audit controls stay administrator-only. Suspension revokes sessions and hides owned listings until reinstatement. The final active administrator cannot be demoted or suspended.</p>
       <AccountRoles accounts={accounts} />
       {pages > 1 && (
         <nav className="mt-8 flex items-center justify-between text-sm" aria-label="Account pages">

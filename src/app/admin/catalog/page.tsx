@@ -1,7 +1,8 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { isAdmin } from "@/lib/admin";
+import { canAdmin, canManageCatalog, canModerate, sessionUser } from "@/lib/admin";
+import { overviewDestinations } from "@/lib/overview";
 import { allListings } from "@/lib/listings";
 import { CatalogEditor } from "./catalog-editor";
 import { connection } from "next/server";
@@ -18,21 +19,18 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function CatalogPage() {
-  if (!(await isAdmin(await headers()))) notFound();
+  const user = await sessionUser(await headers());
+  if (!canManageCatalog(user?.role)) notFound();
   return (
     <main className="mx-auto w-full max-w-[1400px] px-6 py-10">
       <h1 className="text-3xl font-semibold tracking-tight">Catalog</h1>
       <p className="mt-3 text-muted-foreground">Create listings and manage their publication state.</p>
-      <Link href="/admin/overview" className="mt-3 inline-block text-sm underline">Administration overview</Link>
-      <Link href="/admin/review" className="mt-3 inline-block text-sm underline">Review owner submissions</Link>
-      <Link href="/admin/articles" className="ml-4 mt-3 inline-block text-sm underline">Edit articles</Link>
-      <Link href="/admin/taxonomy" className="ml-4 mt-3 inline-block text-sm underline">Categories and tags</Link>
-      <Link href="/admin/plans" className="ml-4 mt-3 inline-block text-sm underline">Publishing plans</Link>
-      <Link href="/admin/billing" className="ml-4 mt-3 inline-block text-sm underline">Billing providers</Link>
-      <Link href="/admin/accounts" className="ml-4 mt-3 inline-block text-sm underline">Accounts and roles</Link>
-      <Link href="/admin/seo" className="ml-4 mt-3 inline-block text-sm underline">Search settings</Link>
-      <Link href="/admin/audit" className="ml-4 mt-3 inline-block text-sm underline">Audit history</Link>
-      <CatalogEditor initialListings={allListings()} />
+      <nav className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm" aria-label="Administration workspaces">
+        <Link href="/admin/overview" className="underline">Administration overview</Link>
+        {overviewDestinations(user?.role).filter(({ href }) => href !== "/admin/catalog")
+          .map(({ href, label }) => <Link key={href} href={href} className="underline">{label}</Link>)}
+      </nav>
+      <CatalogEditor initialListings={allListings(!canAdmin(user?.role))} canSuspend={canModerate(user?.role)} />
     </main>
   );
 }

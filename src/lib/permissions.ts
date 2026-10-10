@@ -9,4 +9,7 @@ export const roles = {
   user: accessControl.newRole(userAc.statements),
   moderator: accessControl.newRole({}),
   editor: accessControl.newRole({}),
+  catalog: accessControl.newRole({}),
+  taxonomy: accessControl.newRole({}),
+  billing: accessControl.newRole({}),
 };
