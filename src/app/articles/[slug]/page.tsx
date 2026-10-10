@@ -16,8 +16,10 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   await connection();
   const article = publishedArticleBySlug((await params).slug);
   if (!article) notFound();
-  return pageMetadata(`/articles/${article.slug}`, `${article.title} | ${getSiteConfig().name}`,
+  const metadata = pageMetadata(`/articles/${article.slug}`, `${article.title} | ${getSiteConfig().name}`,
     article.summary, article.seo);
+  return { ...metadata, alternates: { ...metadata.alternates,
+    types: { "text/markdown": publicUrl(`/markdown/articles/${article.slug}`) } } };
 }
 
 export default async function ArticlePage({ params }: Params) {
@@ -35,6 +37,8 @@ export default async function ArticlePage({ params }: Params) {
         ...(article.tags.length > 0 ? { keywords: article.tags } : {}),
       }} />
       <Link href="/articles" className="text-sm text-muted-foreground hover:text-foreground">← Articles</Link>
+      <a href={`/markdown/articles/${article.slug}`} type="text/markdown" rel="alternate"
+        className="ml-4 text-sm underline">Markdown version</a>
       <article className="mt-10">
         <h1 className="text-4xl font-semibold tracking-tight">{article.title}</h1>
         <p className="mt-5 text-lg text-muted-foreground">{article.summary}</p>

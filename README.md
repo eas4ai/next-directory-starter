@@ -23,6 +23,8 @@ The same administrator page manages up to 500 permanent same-site redirects and 
 
 The search settings page also shows paged findings for current public listings and articles, including missing or repeated titles and short descriptions. Select a published slug to preview the search result and social card built from the metadata actually emitted by its page. Findings are editing suggestions, not a search ranking score.
 
+Eligible listing and article pages link to a `text/markdown` version at `/markdown/listings/:slug` or `/markdown/articles/:slug`. Markdown responses use the current public revision only, carry `X-Robots-Tag: noindex` and `Cache-Control: no-store`, and return 404 as soon as the source is no longer public.
+
 Initialize the database, seed sample listings, and create the first administrator:
 
 ```sh
