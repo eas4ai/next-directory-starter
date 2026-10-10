@@ -7,6 +7,7 @@ services:
       - ${DIRECTORY_ENV_FILE:-.env.docker}
     environment:
       NODE_ENV: production
+      DIRECTORY_EXPLICIT_MIGRATIONS: "1"
       DATABASE_URL: file:/app/data/directory.db
       MEDIA_DIR: /app/data/media
       SITE_URL: ${SITE_URL:?Set SITE_URL in the Compose environment file}

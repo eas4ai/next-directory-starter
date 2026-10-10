@@ -19,7 +19,8 @@ FROM node:24-bookworm-slim AS runtime
 
 ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0 \
-    PORT=3000
+    PORT=3000 \
+    DIRECTORY_EXPLICIT_MIGRATIONS=1
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY --from=production-files --chown=node:node /app/node_modules ./node_modules
@@ -32,6 +33,6 @@ COPY --from=production-files --chown=node:node /app/tsconfig.json ./tsconfig.jso
 RUN mkdir -p /app/data /app/.next/cache && chown -R node:node /app/data /app/.next/cache
 USER node
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
-  CMD node -e 'fetch("http://127.0.0.1:3000/listings").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))'
+HEALTHCHECK --interval=30s --timeout=8s --start-period=45s --retries=3 \
+  CMD ["node", "scripts/healthcheck.mjs"]
 CMD ["npm", "run", "start", "--", "-H", "0.0.0.0"]

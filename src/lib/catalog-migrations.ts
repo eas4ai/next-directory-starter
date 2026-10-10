@@ -471,7 +471,8 @@ function migrateAgentIngestion(): void {
   }).immediate();
 }
 
-export function migrateCatalog(): void {
+export function migrateCatalog(explicit = false): void {
+  if (process.env.DIRECTORY_EXPLICIT_MIGRATIONS === "1" && !explicit) return;
   migrate.immediate();
   migratePlanModes();
   migrateBillingProfiles();
@@ -488,6 +489,6 @@ export function migrateCatalog(): void {
 }
 
 export function seedCatalog(): void {
-  migrateCatalog();
+  migrateCatalog(true);
   database.transaction(insertSampleRows)();
 }
