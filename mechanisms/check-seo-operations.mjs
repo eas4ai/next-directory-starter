@@ -239,6 +239,30 @@ try {
     const saved = await request('/api/admin/seo/redirects',
       json({ source: '/old-tool', destination: '/listings/example-tool' }, adminCookie));
     if (!saved.ok) throw new Error(`Same-site redirect was not saved: HTTP ${saved.status}`);
+    for (const source of ['/listings/future-seo-listing', '/listings/future-owner-seo',
+      '/articles/future-seo-article', '/articles/future-rename-seo']) {
+      const reserved = await request('/api/admin/seo/redirects',
+        json({ source, destination: '/articles' }, adminCookie));
+      if (!reserved.ok) throw new Error(`Future path redirect could not be reserved: ${source}`);
+    }
+    const adminListing = await request('/api/admin/listings', json({
+      slug: 'future-seo-listing', name: 'Future SEO listing', summary: 'Future listing',
+      description: 'Should not shadow the saved redirect', category: 'Tools',
+      url: 'https://example.org/future-seo-listing', status: 'published',
+    }, adminCookie));
+    const ownerListing = await request('/api/owner/listings', json({
+      slug: 'future-owner-seo', name: 'Future owner SEO', summary: 'Future owner listing',
+      description: 'Should not shadow the saved redirect', category: 'Tools',
+      url: 'https://example.org/future-owner-seo',
+    }, ownerACookie));
+    const articleCollision = await request('/api/admin/articles', json({
+      slug: 'future-seo-article', title: 'Future SEO article', summary: 'Future article',
+      body: 'Should not shadow the saved redirect', status: 'published', category: '', tags: [],
+    }, adminCookie));
+    if (adminListing.status !== 409 || ownerListing.status !== 409 ||
+        articleCollision.status !== 409) {
+      throw new Error(`Content claimed a reserved redirect source: ${adminListing.status}/${ownerListing.status}/${articleCollision.status}`);
+    }
     const shadow = await request('/api/admin/seo/redirects',
       json({ source: '/listings/example-tool', destination: '/articles' }, adminCookie));
     if (shadow.status < 400 || shadow.status >= 500) throw new Error('A live listing route was shadowed');
@@ -272,6 +296,9 @@ try {
       category: '', tags: [] }, adminCookie));
     if (created.status !== 201) throw new Error(`Article for slug redirect unavailable: HTTP ${created.status}`);
     const version = (await created.json()).article.version;
+    const reservedRename = await request('/api/admin/articles/old-seo-article',
+      json({ action: 'rename', newSlug: 'future-rename-seo', version }, adminCookie, 'PATCH'));
+    if (reservedRename.status !== 409) throw new Error('Article rename claimed a reserved redirect source');
     const renamed = await request('/api/admin/articles/old-seo-article',
       json({ action: 'rename', newSlug: 'new-seo-article', version }, adminCookie, 'PATCH'));
     if (!renamed.ok || (await request('/articles/new-seo-article')).status !== 200) {
