@@ -28,11 +28,41 @@ export type ThemeDefinition = {
   social: { background: string; foreground: string; accent: string; muted: string };
 };
 
-const safeValue = (value: unknown): value is string =>
-  typeof value === "string" && value.trim().length > 0 && value.length <= 240 &&
-  !/[{};\r\n]/.test(value) && !/url\s*\(|expression\s*\(|@import/i.test(value);
+const hexColor = /^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/;
+const cssLength = /^(?:0|(?:\d+(?:\.\d+)?|\.\d+)(?:px|rem|em))$/;
+const signedLength = /^(?:0|-?(?:\d+(?:\.\d+)?|\.\d+)(?:px|rem|em))$/;
+const fontName = /^(?:"[A-Za-z][A-Za-z0-9 -]*"|'[A-Za-z][A-Za-z0-9 -]*'|[A-Za-z][A-Za-z0-9 -]*)$/;
+const genericFont = /^(?:serif|sans-serif|monospace|system-ui|ui-sans-serif|ui-serif|ui-monospace|cursive|fantasy)$/;
 
-function requireValues(group: string, values: unknown, names: readonly string[]): void {
+function isLength(value: unknown, allowZero = false): value is string {
+  return typeof value === "string" && cssLength.test(value) &&
+    (allowZero || value !== "0") && Number.parseFloat(value) > (allowZero ? -1 : 0);
+}
+
+function isFontStack(value: unknown): value is string {
+  if (typeof value !== "string" || value.length > 240) return false;
+  const names = value.split(",").map((name) => name.trim());
+  return names.every((name) => fontName.test(name)) &&
+    genericFont.test(names[names.length - 1]);
+}
+
+function isShadow(value: unknown): value is string {
+  if (value === "none") return true;
+  if (typeof value !== "string" || value.length > 240) return false;
+  const color = /\s(#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?|rgb\([^)]*\))$/.exec(value);
+  if (!color) return false;
+  if (!hexColor.test(color[1])) {
+    const rgb = /^rgb\((\d{1,3}) (\d{1,3}) (\d{1,3})(?: \/ (\d{1,3})%)?\)$/.exec(color[1]);
+    if (!rgb || rgb.slice(1, 4).some((channel) => Number(channel) > 255) ||
+        (rgb[4] !== undefined && Number(rgb[4]) > 100)) return false;
+  }
+  const lengths = value.slice(0, color.index).split(/\s+/);
+  return lengths.length >= 2 && lengths.length <= 4 &&
+    lengths.every((length) => signedLength.test(length));
+}
+
+function requireValues(group: string, values: unknown, names: readonly string[],
+    accepts: (value: unknown) => boolean): void {
   if (!values || typeof values !== "object" || Array.isArray(values)) {
     throw new Error(`Invalid ${group} tokens`);
   }
@@ -41,7 +71,7 @@ function requireValues(group: string, values: unknown, names: readonly string[])
     throw new Error(`Missing or extra ${group} token`);
   }
   for (const name of names) {
-    if (!safeValue(record[name])) throw new Error(`Invalid ${group} token: ${name}`);
+    if (!accepts(record[name])) throw new Error(`Invalid ${group} token: ${name}`);
   }
 }
 
@@ -52,18 +82,18 @@ export function defineTheme(definition: ThemeDefinition): ThemeDefinition {
       definition.name.length > 80) {
     throw new Error("Invalid theme identity");
   }
-  requireValues("light", definition.light, colorTokenNames);
-  requireValues("dark", definition.dark, colorTokenNames);
-  requireValues("typography", definition.typography, ["body", "heading"]);
-  requireValues("spacing", definition.spacing, ["section", "card", "gap"]);
-  requireValues("width", definition.width, ["page", "reading"]);
-  requireValues("social", definition.social, ["background", "foreground", "accent", "muted"]);
-  if (Object.values(definition.social).some((value) => !/^#[0-9a-fA-F]{6}$/.test(value))) {
-    throw new Error("Social palette colors must be six-digit hex values");
-  }
-  for (const name of ["radius", "shadow", "controlHeight"] as const) {
-    if (!safeValue(definition[name])) throw new Error(`Invalid theme token: ${name}`);
-  }
+  requireValues("light", definition.light, colorTokenNames,
+    (value) => typeof value === "string" && hexColor.test(value));
+  requireValues("dark", definition.dark, colorTokenNames,
+    (value) => typeof value === "string" && hexColor.test(value));
+  requireValues("typography", definition.typography, ["body", "heading"], isFontStack);
+  requireValues("spacing", definition.spacing, ["section", "card", "gap"], isLength);
+  requireValues("width", definition.width, ["page", "reading"], isLength);
+  requireValues("social", definition.social, ["background", "foreground", "accent", "muted"],
+    (value) => typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value));
+  if (!isLength(definition.radius, true)) throw new Error("Invalid theme token: radius");
+  if (!isShadow(definition.shadow)) throw new Error("Invalid theme token: shadow");
+  if (!isLength(definition.controlHeight)) throw new Error("Invalid theme token: controlHeight");
   return definition;
 }
 

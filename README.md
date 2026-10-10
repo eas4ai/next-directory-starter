@@ -54,6 +54,12 @@ and register the definition in `src/themes/index.ts`. The type and the runtime
 typography, radius, shadow, control height, spacing, page widths, and a social
 card palette. The SDK emits those values through `/theme.css`; components use
 the resulting CSS variables, while grid and flex structure stay in classes.
+Custom colors use six or eight digit hex values; social-card colors use six digit
+hex. Spacing, widths, radius, and control height use nonnegative `px`, `rem`, or
+`em` lengths (or `0` for radius). Font stacks contain comma-separated font names
+and end with a generic family such as `sans-serif` or `serif`.
+Shadows use `none` or two to four lengths followed by a hex or space-separated `rgb()` color.
+The runtime validator rejects other forms before it emits CSS.
 
 The selection lives separately from the saved preset. Selecting a custom theme
 does not overwrite any pinned preset control, and the visitor's mode choice
