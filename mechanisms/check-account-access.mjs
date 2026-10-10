@@ -183,7 +183,9 @@ try {
     const session = await signIn(email);
     if (!session.response.ok || !session.cookie) throw new Error('Verified owner cannot sign in.');
     const replay = await request(link);
-    if (cookieFrom(replay)) throw new Error('Reused verification link created a session.');
+    if (replay.status !== 409 || cookieFrom(replay)) {
+      throw new Error(`Reused verification link was accepted (HTTP ${replay.status}).`);
+    }
     const expiredEmail = 'expired-verify@example.invalid';
     const beforeExpired = messages.length;
     const expiredSignup = await request('/api/auth/sign-up/email',
