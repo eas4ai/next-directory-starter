@@ -52,7 +52,7 @@ const handler = createMcpHandler(({ authInfo }) => {
     catch (error) { return failed(error); }
   });
   return server;
-}, { responseMode: "json" });
+}, { responseMode: "json", maxRequestBodySize: 8 * 1024 * 1024 });
 
 async function dispatch(request: Request): Promise<Response> {
   const trusted = new URL(process.env.BETTER_AUTH_URL ?? request.url).hostname;
