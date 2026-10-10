@@ -145,8 +145,8 @@ To create the first administrator, run the interactive provisioner. Scheduled no
 
 ```sh
 docker compose --env-file .env.docker run --rm --no-deps web npm run account:provision -- --email you@example.com --name "Site administrator"
-docker compose --env-file .env.docker run --rm --no-deps web npm run notifications:deliver -- --limit 100
-docker compose --env-file .env.docker run --rm --no-deps web npm run billing:reconcile -- --limit 100
+docker compose --env-file .env.docker run --rm --no-deps web npm run notifications:deliver -- --limit 10
+docker compose --env-file .env.docker run --rm --no-deps web npm run billing:reconcile -- --limit 10
 ```
 
 For a verified backup, mount a private host backup directory and the same billing key file used by the running app. Set `BACKUP_DIR` and `KEY_FILE` to real absolute host paths that container user ID 1000 can access; the backup directory must be writable by that user. The destination must be new. An isolated restore verifies the archive into another new directory on that host mount; it does not overwrite the live volume.
