@@ -440,6 +440,37 @@ function migrateSeoRoutes(): void {
   }).immediate();
 }
 
+function migrateAgentIngestion(): void {
+  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 18").get()) return;
+  database.transaction(() => {
+    database.exec(`CREATE TABLE agent_keys (
+        id TEXT PRIMARY KEY NOT NULL,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        token_hash TEXT NOT NULL UNIQUE,
+        expires_at TEXT NOT NULL,
+        revoked_at TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX agent_keys_user ON agent_keys(user_id, created_at DESC);
+      CREATE TABLE agent_imports (
+        slug TEXT PRIMARY KEY NOT NULL REFERENCES listings(slug),
+        actor_user_id TEXT NOT NULL,
+        idempotency_key TEXT NOT NULL,
+        source_url TEXT NOT NULL,
+        source_excerpt TEXT NOT NULL,
+        screenshot_bytes BLOB,
+        screenshot_mime TEXT,
+        created_at TEXT NOT NULL,
+        published_at TEXT,
+        published_by TEXT,
+        UNIQUE(actor_user_id, idempotency_key)
+      );
+      CREATE INDEX agent_imports_recent ON agent_imports(created_at DESC, slug);`);
+    database.prepare("INSERT INTO catalog_migrations (version) VALUES (18)").run();
+  }).immediate();
+}
+
 export function migrateCatalog(): void {
   migrate.immediate();
   migratePlanModes();
@@ -453,6 +484,7 @@ export function migrateCatalog(): void {
   migrateNotificationClaims();
   migrateSeoSettings();
   migrateSeoRoutes();
+  migrateAgentIngestion();
 }
 
 export function seedCatalog(): void {

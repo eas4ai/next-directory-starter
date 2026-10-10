@@ -61,14 +61,14 @@ export async function proxy(request: NextRequest) {
   }
 
   if (path.startsWith("/admin/articles") || path.startsWith("/admin/taxonomy") ||
-      path.startsWith("/admin/catalog") || path.startsWith("/admin/plans") ||
+      path.startsWith("/admin/catalog") || path.startsWith("/admin/import") || path.startsWith("/admin/plans") ||
       path.startsWith("/admin/billing") || path.startsWith("/admin/review")) {
     const { canEditArticles, canManageBilling, canManageCatalog,
       canManageTaxonomy, canModerate, sessionUser } = await import("@/lib/admin");
     const role = (await sessionUser(request.headers))?.role;
     const allowed = path.startsWith("/admin/articles") ? canEditArticles(role) :
       path.startsWith("/admin/taxonomy") ? canManageTaxonomy(role) :
-        path.startsWith("/admin/catalog") ? canManageCatalog(role) :
+        path.startsWith("/admin/catalog") || path.startsWith("/admin/import") ? canManageCatalog(role) :
           path.startsWith("/admin/plans") || path.startsWith("/admin/billing")
             ? canManageBilling(role) : canModerate(role);
     if (!allowed) {

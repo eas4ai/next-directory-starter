@@ -96,6 +96,22 @@ For saved billing profiles, configure Paddle notifications at `/api/webhooks/pad
 
 Owners can inspect pending, paid, disputed, refunded, expired, and canceled purchases at `/owner/billing`; Stripe and Paddle recurring purchases can request cancellation at the paid period's end. For missed or out-of-order events, run `npm run billing:reconcile -- --limit 10` to retry at most ten retained unresolved events. Add `--purchase PURCHASE_ID` to read an existing Stripe Checkout Session, Paddle transaction, or NOWPayments invoice payments and reconcile their settled state without starting checkout. If a provider created a checkout but its response was lost, use `--purchase PURCHASE_ID --resource PROVIDER_ID` with the resource ID from that provider's dashboard. Reconciliation reads that exact resource, verifies its purchase reference and accepted terms, and binds it only when settled evidence matches. Provider profiles remain usable for this read-only recovery when disabled for new checkout. NOWPayments invoice lookup requires the optional `NOWPAYMENTS_EMAIL` and `NOWPAYMENTS_PASSWORD` dashboard credentials in the operator environment; the command reports when they are absent. The limit is capped at 50, and provider reads are capped to one page per purchase.
 
+## Agent-assisted imports
+
+Verified administrators and staff with catalog capability can open `/admin/import` to create a 30-day remote MCP key, inspect private drafts, preview cards, publish reviewed imports, and revoke keys. The key is shown once. The directory stores only its hash and checks the account's current verification, suspension, and catalog permission on every MCP request. WebMCP tools also appear on that page when the browser supports `document.modelContext`.
+
+Connect Claude Code to the deployed HTTPS endpoint using an environment variable for the key. Claude Code supports variable expansion in MCP JSON configuration:
+
+```sh
+claude mcp add-json directory-import '{"type":"http","url":"https://your-site.example/api/mcp","headers":{"Authorization":"Bearer ${DIRECTORY_MCP_TOKEN}"}}'
+```
+
+Set `DIRECTORY_MCP_TOKEN` in Claude Code's environment, then check `/mcp` inside Claude Code. The equivalent direct syntax is `claude mcp add --transport http directory-import https://your-site.example/api/mcp --header "Authorization: Bearer <key>"`; that form saves the expanded key in the local client configuration, so prefer the environment-variable form. Do not commit the key to the repository.
+
+Use [agent-browser](https://github.com/vercel-labs/agent-browser) in Claude Code to inspect external pages; the directory does not fetch submitted URLs. For a single URL, open it, read the rendered page and take an optional screenshot. For a directory page, inspect its link list, then visit each selected destination. For a GitHub awesome list, inspect the list and then each destination before drafting a summary. The core commands are `agent-browser open <url>`, `agent-browser snapshot`, `agent-browser read`, and `agent-browser screenshot <path>`.
+
+Call `list_categories` first. For each observed destination, call `stage_links` with `idempotencyKey`, `url`, `sourceUrl`, `sourceExcerpt`, `name`, `summary`, `description`, and an existing `category`. A source excerpt must quote or accurately describe the page evidence used for the text. Stage at most 20 links per call; each result reports whether it was created, already staged, duplicated, or invalid. Review the private drafts at `/admin/import`; `publish_import` or the page's Publish button makes a reviewed item public and records the actor. Use `attach_screenshot` with the screenshot's MIME type and base64 bytes before publication to include it in a 1200 × 630 social card; `preview_card` returns its private preview URL. The site also generates a text card when no screenshot is attached.
+
 ## Deploying
 
 Set `BETTER_AUTH_URL` and `SITE_URL` to the site's public HTTPS origin. Set `BETTER_AUTH_SECRET` to a unique secret and `DATABASE_URL` to a writable, persistent SQLite file, then run `npm run db:migrate` and provision an administrator using the same environment as the running application. Back up the SQLite file. The ignored `.runtime/directory.db` default is intended for local development; production storage must survive builds and deployments.

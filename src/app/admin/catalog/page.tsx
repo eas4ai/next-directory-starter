@@ -25,6 +25,7 @@ export default async function CatalogPage() {
     <main className="mx-auto w-full max-w-[1400px] px-6 py-10">
       <h1 className="text-3xl font-semibold tracking-tight">Catalog</h1>
       <p className="mt-3 text-muted-foreground">Create listings and manage their publication state.</p>
+      <Link href="/admin/import" className="mt-3 inline-block underline">Agent-assisted imports</Link>
       <nav className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm" aria-label="Administration workspaces">
         <Link href="/admin/overview" className="underline">Administration overview</Link>
         {overviewDestinations(user?.role).filter(({ href }) => href !== "/admin/catalog")
