@@ -1,15 +1,21 @@
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync,
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync,
   renameSync, rmSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
-import { contained, hashFile, inspectDatabase, parsePairs,
-  readKey, regularFiles } from './ops-common.mjs';
+import { canonicalPath, contained, databasePath, hashFile, inspectDatabase,
+  mediaPath, parsePairs, pathEntryExists, readKey, regularFiles } from './ops-common.mjs';
 
 async function main() {
   const { '--backup': backup, '--target': target } =
     parsePairs(process.argv.slice(2), ['--backup', '--target']);
-  if (existsSync(target)) throw new Error('Restore target already exists');
-  if (contained(target, backup) || contained(backup, target)) {
-    throw new Error('Restore target overlaps backup');
+  if (pathEntryExists(target)) throw new Error('Restore target already exists');
+  const plannedTarget = canonicalPath(target);
+  const archived = canonicalPath(backup);
+  const liveDatabase = canonicalPath(databasePath());
+  const liveMedia = canonicalPath(mediaPath());
+  if (contained(plannedTarget, archived) || contained(archived, plannedTarget) ||
+      contained(plannedTarget, liveMedia) || contained(liveMedia, plannedTarget) ||
+      contained(liveDatabase, plannedTarget) || contained(plannedTarget, liveDatabase)) {
+    throw new Error('Restore target overlaps backup or live storage');
   }
   const manifest = JSON.parse(readFileSync(join(backup, 'manifest.json'), 'utf8'));
   if (manifest.version !== 1 || !manifest.hashes ||
@@ -30,6 +36,7 @@ async function main() {
   const key = readKey(join(backup, 'billing.key'));
   inspectDatabase(join(backup, 'database.db'), join(backup, 'media'), key);
   mkdirSync(dirname(target), { recursive: true });
+  if (canonicalPath(target) !== plannedTarget) throw new Error('Restore path changed');
   const stage = mkdtempSync(join(dirname(target), '.directory-restore-'));
   try {
     cpSync(join(backup, 'database.db'), join(stage, 'database.db'), { force: false });
@@ -37,7 +44,9 @@ async function main() {
     cpSync(join(backup, 'billing.key'), join(stage, 'billing.key'), { force: false });
     chmodSync(join(stage, 'billing.key'), 0o600);
     inspectDatabase(join(stage, 'database.db'), join(stage, 'media'), key);
-    if (existsSync(target)) throw new Error('Restore target already exists');
+    if (pathEntryExists(target) || canonicalPath(target) !== plannedTarget) {
+      throw new Error('Restore target changed or already exists');
+    }
     renameSync(stage, target);
     process.stdout.write('Isolated restore verified. Point a stopped installation at the new files.\n');
   } catch (error) {
