@@ -30,7 +30,7 @@ export function AppearanceSwitch({ initialMode }: { initialMode: Mode }) {
   }
 
   return (
-    <button type="button" aria-label="Appearance" aria-pressed={mode === "dark"}
+    <button type="button" aria-label="Appearance" aria-pressed={effectiveDark ?? undefined}
       title={effectiveDark === null ? "Change appearance" :
         `Switch to ${effectiveDark ? "light" : "dark"} appearance`}
       onClick={toggle}
