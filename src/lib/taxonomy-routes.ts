@@ -1,4 +1,5 @@
 import { adminReadResponse, adminWriteGuard } from "@/lib/admin-api";
+import { canEditArticles, sameOrigin, sessionUser } from "@/lib/admin";
 import { requestJson } from "@/lib/request-json";
 import { createTaxon, deleteTaxon, listTaxa, renameTaxon, taxonomyErrorResponse, type TaxonKind } from "@/lib/taxonomy";
 
@@ -9,11 +10,23 @@ function nameFrom(body: unknown): unknown {
 
 export async function listTaxonomy(kind: TaxonKind, request: Request): Promise<Response> {
   const payload = () => ({ items: listTaxa(kind) });
-  return adminReadResponse(request, payload);
+  if (kind !== "article-category") return adminReadResponse(request, payload);
+  const user = await sessionUser(request.headers);
+  return canEditArticles(user?.role)
+    ? Response.json(payload()) : Response.json({ error: "Forbidden" }, { status: 403 });
 }
 
-async function taxonomyWrite(request: Request, action: (name: unknown) => string, status: number): Promise<Response> {
-  const denied = await adminWriteGuard(request);
+async function taxonomyWriteGuard(kind: TaxonKind, request: Request): Promise<Response | null> {
+  if (kind !== "article-category") return adminWriteGuard(request);
+  const user = await sessionUser(request.headers);
+  if (!canEditArticles(user?.role)) return Response.json({ error: "Forbidden" }, { status: 403 });
+  if (!sameOrigin(request)) return Response.json({ error: "Invalid origin" }, { status: 403 });
+  return null;
+}
+
+async function taxonomyWrite(kind: TaxonKind, request: Request,
+  action: (name: unknown) => string, status: number): Promise<Response> {
+  const denied = await taxonomyWriteGuard(kind, request);
   if (denied) return denied;
   let body: unknown;
   try { body = await requestJson(request); }
@@ -26,15 +39,15 @@ async function taxonomyWrite(request: Request, action: (name: unknown) => string
 }
 
 export function createTaxonomy(kind: TaxonKind, request: Request): Promise<Response> {
-  return taxonomyWrite(request, (name) => createTaxon(kind, name), 201);
+  return taxonomyWrite(kind, request, (name) => createTaxon(kind, name), 201);
 }
 
 export function renameTaxonomy(kind: TaxonKind, request: Request, original: string): Promise<Response> {
-  return taxonomyWrite(request, (name) => renameTaxon(kind, original, name), 200);
+  return taxonomyWrite(kind, request, (name) => renameTaxon(kind, original, name), 200);
 }
 
 export async function removeTaxonomy(kind: TaxonKind, request: Request, original: string): Promise<Response> {
-  const denied = await adminWriteGuard(request);
+  const denied = await taxonomyWriteGuard(kind, request);
   if (denied) return denied;
   try {
     deleteTaxon(kind, original);

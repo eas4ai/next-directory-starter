@@ -28,7 +28,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (request.nextUrl.pathname.startsWith("/admin/articles")) {
+  if (request.nextUrl.pathname.startsWith("/admin/articles") ||
+      request.nextUrl.pathname.startsWith("/admin/taxonomy")) {
     const { canEditArticles, sessionUser } = await import("@/lib/admin");
     if (!canEditArticles((await sessionUser(request.headers))?.role)) {
       return new NextResponse("Forbidden", { status: 403 });

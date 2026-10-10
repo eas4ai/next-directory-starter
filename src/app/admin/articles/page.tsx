@@ -27,7 +27,7 @@ export default async function AdminArticlesPage({ searchParams }: { searchParams
   return (
     <main className="mx-auto w-full max-w-[1400px] px-6 py-10">
       <Link href="/articles" className="text-sm text-muted-foreground hover:text-foreground">← Public articles</Link>
-      {user?.role?.split(",").includes("admin") && <Link href="/admin/taxonomy" className="ml-4 text-sm underline">Categories and tags</Link>}
+      <Link href="/admin/taxonomy" className="ml-4 text-sm underline">Article categories</Link>
       <h1 className="mt-7 text-3xl font-semibold tracking-tight">Articles</h1>
       <p className="mt-3 text-muted-foreground">Save drafts and control which articles appear publicly.</p>
       <ArticleEditor initialArticles={articles}

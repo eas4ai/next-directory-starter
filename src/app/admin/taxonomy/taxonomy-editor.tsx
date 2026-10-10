@@ -90,14 +90,14 @@ function TaxonomySection({ kind, title, items }: { kind: TaxonKind; title: strin
   );
 }
 
-export function TaxonomyEditor({ categories, articleCategories, tags }: {
-  categories: Taxon[]; articleCategories: Taxon[]; tags: Taxon[];
+export function TaxonomyEditor({ categories, articleCategories, tags, operator }: {
+  categories: Taxon[]; articleCategories: Taxon[]; tags: Taxon[]; operator: boolean;
 }) {
   return (
     <div className="mt-8 grid gap-6 lg:grid-cols-2">
-      <TaxonomySection kind="category" title="Listing categories" items={categories} />
+      {operator && <TaxonomySection kind="category" title="Listing categories" items={categories} />}
       <TaxonomySection kind="article-category" title="Article categories" items={articleCategories} />
-      <TaxonomySection kind="tag" title="Tags" items={tags} />
+      {operator && <TaxonomySection kind="tag" title="Tags" items={tags} />}
     </div>
   );
 }
