@@ -332,6 +332,31 @@ function migrateArticleCategories(): void {
   }).immediate();
 }
 
+function migrateMedia(): void {
+  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 13").get()) return;
+  database.transaction(() => {
+    database.exec(`CREATE TABLE media_assets (
+        id TEXT PRIMARY KEY NOT NULL,
+        target_kind TEXT NOT NULL CHECK (target_kind IN ('listing', 'article')),
+        target_slug TEXT NOT NULL,
+        uploaded_by TEXT NOT NULL,
+        alt TEXT NOT NULL,
+        width INTEGER NOT NULL,
+        height INTEGER NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE TABLE media_assignments (
+        target_kind TEXT NOT NULL CHECK (target_kind IN ('listing', 'article')),
+        target_slug TEXT NOT NULL,
+        slot TEXT NOT NULL CHECK (slot IN ('draft', 'public')),
+        asset_id TEXT NOT NULL REFERENCES media_assets(id),
+        PRIMARY KEY (target_kind, target_slug, slot)
+      );
+      CREATE INDEX media_assignments_asset ON media_assignments(asset_id);`);
+    database.prepare("INSERT INTO catalog_migrations (version) VALUES (13)").run();
+  }).immediate();
+}
+
 export function migrateCatalog(): void {
   migrate.immediate();
   migratePlanModes();
@@ -340,6 +365,7 @@ export function migrateCatalog(): void {
   migratePaymentOutcomes();
   migrateArticleRevisions();
   migrateArticleCategories();
+  migrateMedia();
 }
 
 export function seedCatalog(): void {

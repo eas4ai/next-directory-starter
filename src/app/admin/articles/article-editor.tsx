@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import type { Article } from "@/lib/articles";
+import { ImageUploader } from "@/components/image-uploader";
 
 function ArticleFields({ article, categories, includeSlug, includeStatus = true }: {
   article?: Article; categories: string[]; includeSlug?: boolean; includeStatus?: boolean;
@@ -167,6 +168,7 @@ export function ArticleEditor({ initialArticles, categories }: { initialArticles
             <Button type="button" variant="ghost" onClick={() => setEditing(null)}>Close</Button>
           </div>
           <ArticleFields article={editing} categories={categories} includeStatus={false} />
+          <ImageUploader kind="article" slug={editing.slug} onUploaded={() => { void edit(editing); }} />
           <div className="flex flex-wrap items-center gap-3">
             <Button type="submit" disabled={pending}>Save revision</Button>
             <Button type="button" variant="outline" asChild><Link href={`/admin/articles/${editing.slug}/preview`} target="_blank">Private preview</Link></Button>
