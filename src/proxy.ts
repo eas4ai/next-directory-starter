@@ -1,8 +1,27 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { publishedListingBySlug } from "@/lib/listings";
 import { publishedArticleBySlug } from "@/lib/articles";
+import { articleMarkdown, listingMarkdown, markdownHeaders } from "@/lib/markdown-twins";
 import { recordNotFound, redirectForPath } from "@/lib/seo-redirects";
 import { randomUUID } from "node:crypto";
+
+const llmUserAgent = /(?:^|[\s(;])(?:ChatGPT-User|GPTBot|OAI-SearchBot|ClaudeBot|Claude-User|Claude-SearchBot|PerplexityBot|Perplexity-User)(?:\/|[\s;)]|$)/i;
+
+function wantsMarkdown(request: NextRequest, suffix: boolean): boolean {
+  if (suffix) return true;
+  const markdownRanges = (request.headers.get("accept") ?? "").split(",")
+    .map((range) => range.split(";").map((part) => part.trim()))
+    .filter(([type]) => type.toLowerCase() === "text/markdown");
+  if (markdownRanges.length) {
+    return markdownRanges.some(([, ...parameters]) => {
+      const quality = parameters.find((part) => /^q\s*=/i.test(part));
+      if (!quality) return true;
+      const value = Number(quality.slice(quality.indexOf("=") + 1).trim());
+      return Number.isFinite(value) && value > 0 && value <= 1;
+    });
+  }
+  return llmUserAgent.test(request.headers.get("user-agent") ?? "");
+}
 
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
@@ -19,29 +38,41 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL(destination, base.origin), 301);
     }
   }
-  const next = () => {
+  const next = (vary = false) => {
     const headers = new Headers(request.headers);
     headers.set("x-directory-path", path);
     headers.set("x-directory-request-id", requestId);
-    return NextResponse.next({ request: { headers } });
+    const response = NextResponse.next({ request: { headers } });
+    if (vary) response.headers.set("Vary", "Accept, User-Agent");
+    return response;
   };
 
   if (path.startsWith("/listings/")) {
-    const slug = path.slice("/listings/".length);
-    if (!publishedListingBySlug(slug)) {
+    const suffix = path.endsWith(".md");
+    const slug = path.slice("/listings/".length, suffix ? -3 : undefined);
+    const listing = publishedListingBySlug(slug);
+    if (!listing) {
       recordNotFound(path, requestId);
       return new NextResponse("Not Found", { status: 404 });
     }
-    return next();
+    if (request.method === "GET" && wantsMarkdown(request, suffix)) {
+      return new NextResponse(listingMarkdown(listing), { headers: markdownHeaders });
+    }
+    return next(true);
   }
 
   if (path.startsWith("/articles/")) {
-    const slug = path.slice("/articles/".length);
-    if (!publishedArticleBySlug(slug)) {
+    const suffix = path.endsWith(".md");
+    const slug = path.slice("/articles/".length, suffix ? -3 : undefined);
+    const article = publishedArticleBySlug(slug);
+    if (!article) {
       recordNotFound(path, requestId);
       return new NextResponse("Not Found", { status: 404 });
     }
-    return next();
+    if (request.method === "GET" && wantsMarkdown(request, suffix)) {
+      return new NextResponse(articleMarkdown(article), { headers: markdownHeaders });
+    }
+    return next(true);
   }
 
   if (path.startsWith("/owner/listings") || path.startsWith("/owner/billing")) {
@@ -84,4 +115,4 @@ export async function proxy(request: NextRequest) {
   return next();
 }
 
-export const config = { matcher: ["/((?!_next/|.*\\..*).*)"] };
+export const config = { matcher: ["/((?!_next/|.*\\..*).*)", "/listings/:slug.md", "/articles/:slug.md"] };

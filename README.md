@@ -25,6 +25,8 @@ The search settings page also shows paged findings for current public listings a
 
 Eligible listing and article pages link to a `text/markdown` version at `/markdown/listings/:slug` or `/markdown/articles/:slug`. Markdown responses use the current public revision only, carry `X-Robots-Tag: noindex` and `Cache-Control: no-store`, and return 404 as soon as the source is no longer public.
 
+The same Markdown is available from each public detail URL with `Accept: text/markdown`, a `.md` suffix (for example, `/listings/example-tool.md`), or one of these user agents: `ChatGPT-User`, `GPTBot`, `OAI-SearchBot`, `ClaudeBot`, `Claude-User`, `Claude-SearchBot`, `PerplexityBot`, or `Perplexity-User`. The suffix takes precedence. An explicit `text/markdown;q=0` keeps an unsuffixed request in HTML even with a listed user agent. Other routes, including indexes and private pages, do not negotiate Markdown. Both detail representations vary on `Accept` and `User-Agent`; the Markdown response is nonindexable and not stored. This uses the existing public Markdown serializers rather than the archived next-geo package, whose automatic HTML conversion and caching do not match this directory's publication rules.
+
 Initialize the database, seed sample listings, and create the first administrator:
 
 ```sh
