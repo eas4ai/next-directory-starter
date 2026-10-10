@@ -87,20 +87,22 @@ try {
   'Operator manual uses a job limit outside the scripts\' accepted range');
 
   const context = join(scratch, 'context');
-  for (const directory of ['src/app/media', 'src/media', 'scripts', 'fixtures', 'media']) {
+  for (const directory of ['src/app/media', 'src/app/api/media', 'src/media',
+    'scripts', 'fixtures', 'media']) {
     mkdirSync(join(context, directory), { recursive: true });
   }
   copyFileSync(join(root, '.dockerignore'), join(context, '.dockerignore'));
   for (const [path, value] of Object.entries({
     'package.json': '{}', 'src/keep.ts': 'export {};',
     'src/app/media/route.ts': 'export {};', 'scripts/keep.mjs': '',
+    'src/app/api/media/route.ts': 'export {};',
     'fixtures/keep.json': '{}', 'src/private.key': 'sentinel',
     'src/.env.local': 'sentinel', 'src/media/upload.png': 'sentinel',
     'media/upload.png': 'sentinel', 'deploy.pem': 'sentinel',
     'directory.db-wal': 'sentinel', 'directory.db-shm': 'sentinel',
   })) writeFileSync(join(context, path), value);
   const contextDockerfile = join(scratch, 'Context.Dockerfile');
-  writeFileSync(contextDockerfile, `FROM node:24-bookworm-slim\nCOPY . /context\nRUN test -f /context/package.json && test -f /context/src/keep.ts && test -f /context/src/app/media/route.ts && test -f /context/scripts/keep.mjs && test -f /context/fixtures/keep.json && test ! -e /context/src/private.key && test ! -e /context/src/.env.local && test ! -e /context/src/media/upload.png && test ! -e /context/media/upload.png && test ! -e /context/deploy.pem && test ! -e /context/directory.db-wal && test ! -e /context/directory.db-shm\n`);
+  writeFileSync(contextDockerfile, `FROM node:24-bookworm-slim\nCOPY . /context\nRUN test -f /context/package.json && test -f /context/src/keep.ts && test -f /context/src/app/media/route.ts && test -f /context/src/app/api/media/route.ts && test -f /context/scripts/keep.mjs && test -f /context/fixtures/keep.json && test ! -e /context/src/private.key && test ! -e /context/src/.env.local && test ! -e /context/src/media/upload.png && test ! -e /context/media/upload.png && test ! -e /context/deploy.pem && test ! -e /context/directory.db-wal && test ! -e /context/directory.db-shm\n`);
   run('docker', ['build', '--quiet', '-f', contextDockerfile, '-t', contextImage, context], 120_000);
   contextBuilt = true;
 
