@@ -1,9 +1,0 @@
-{
-  "command": "node mechanisms/check-social-cards.mjs",
-  "cwd": null,
-  "documents": [],
-  "identity": { "env": [], "image": null, "tools": { "node": "node --version", "npm": "npm --version" } },
-  "inputs": [".env.example", "README.md", "fixtures", "mechanisms/check-social-cards.mjs", "mechanisms/social-cards.def.json", "package-lock.json", "package.json", "public", "scripts", "src", "tests"],
-  "requirements": ["SEO-012"],
-  "results": "per-requirement"
-}
