@@ -259,7 +259,8 @@ function applyEffect(evidence: VerifiedEvidence): void {
   }
 }
 
-export function retainVerifiedEvidence(evidence: VerifiedEvidence): { processed: boolean } {
+export function retainVerifiedEvidence(evidence: VerifiedEvidence,
+  options: { retryExhausted?: boolean } = {}): { processed: boolean } {
   if (!evidence.eventId || evidence.eventId.length > 200 || !evidence.eventType ||
       evidence.eventType.length > 200) {
     throw new PaymentLifecycleError(400, "Invalid payment event envelope");
@@ -280,7 +281,7 @@ export function retainVerifiedEvidence(evidence: VerifiedEvidence): { processed:
         { payload: string; state: string; attempts: number };
     if (current.payload !== payload) throw new PaymentLifecycleError(409, "Event ID has conflicting evidence");
     if (current.state === "processed") return { processed: true };
-    if (current.attempts >= 8) return { processed: false };
+    if (current.attempts >= 8 && !options.retryExhausted) return { processed: false };
     try {
       database.transaction(() => applyEffect(evidence))();
       database.prepare(`UPDATE payment_evidence SET state = 'processed', attempts = attempts + 1,

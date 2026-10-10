@@ -9,6 +9,7 @@
     "lint": "eslint",
     "db:migrate": "auth migrate --yes --config ./src/lib/auth.ts && tsx scripts/migrate-catalog.ts",
     "db:seed": "tsx scripts/seed-catalog.ts",
+    "billing:reconcile": "tsx scripts/reconcile-billing.ts",
     "account:provision": "auth create-admin --config ./src/lib/auth.ts"
   },
   "dependencies": {

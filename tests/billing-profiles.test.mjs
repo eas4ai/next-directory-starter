@@ -18,7 +18,7 @@ test('billing profiles encrypt secrets, isolate modes, and honor disabled and st
   let database;
   try {
     ({ database } = await import('../src/lib/database.ts'));
-    const { saveBillingProfile, stripeCheckoutConfiguration,
+    const { saveBillingProfile, stripeCheckoutConfiguration, providerRecoveryConfiguration,
       stripeWebhookCandidates, listBillingProfiles } = await import('../src/lib/billing-profiles.ts');
     const input = (mode, version, enabled, suffix) => ({
       provider: 'stripe', mode, version, enabled, publicKey: `pk_${mode}_${suffix}`,
@@ -44,6 +44,7 @@ test('billing profiles encrypt secrets, isolate modes, and honor disabled and st
       apiKey: 'sk_test_wrong_mode' }, 'admin'), /must match the selected checkout mode/);
     saveBillingProfile({ provider: 'stripe', mode: 'live', version: 1, enabled: false }, 'admin');
     assert.equal(stripeCheckoutConfiguration(), null);
+    assert.equal(providerRecoveryConfiguration('stripe', 'live').apiKey, 'sk_live_saved');
     assert.ok(stripeWebhookCandidates().some(({ mode, secret }) =>
       mode === 'live' && secret === 'whsec_live_saved'));
     process.env.BILLING_CHECKOUT_MODE = 'test';

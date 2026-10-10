@@ -107,12 +107,17 @@ try {
 
   await check('COM-009', async () => {
     const response = await fetch(`${origin}/owner/billing`, { redirect: 'manual' });
+    const denied = await fetch(`${origin}/api/owner/billing/unknown/cancel`, {
+      method: 'POST', headers: { Origin: origin },
+    });
     const location = response.headers.get('location') ?? '';
     const { scripts = {} } = JSON.parse(readFileSync('package.json', 'utf8'));
     if (![302, 303, 307, 308].includes(response.status) ||
-        !location.includes('/owner/sign-in') || !scripts['billing:reconcile']) {
+        !location.includes('/owner/sign-in') || denied.status !== 401 ||
+        !scripts['billing:reconcile']) {
       throw new Error('The owner payment status route or bounded reconciliation command is unavailable.');
     }
+    nodeTests(['tests/owner-billing.test.mjs', 'tests/payment-reconciliation.test.mjs']);
   });
 } catch (error) {
   process.stderr.write(`payment-lifecycle setup: ${error.message}\n`);
