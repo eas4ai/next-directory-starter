@@ -288,27 +288,52 @@ try {
     const approved = await request(`/api/admin/submissions/${submission.id}/decision`,
       json({ decision: 'approve', reason: 'Fixture is valid' }, admin.cookie));
     if (!approved.ok) throw new Error('Owner listing fixture could not be approved.');
+    const searchPath = '/listings?q=Suspension%20Check';
+    const visibleSearch = await (await request(searchPath)).text();
+    const visibleSitemap = await (await request('/sitemap.xml')).text();
+    if (!visibleSearch.includes('href="/listings/suspension-check"') ||
+        !visibleSitemap.includes('/listings/suspension-check')) {
+      throw new Error(`Published owner listing is absent before suspension (search ${visibleSearch.includes('href="/listings/suspension-check"')}, sitemap ${visibleSitemap.includes('/listings/suspension-check')}).`);
+    }
+    const moderator = await provision('suspend-moderator@example.invalid', 'moderator');
     const denied = await request(`/api/admin/accounts/${owner.id}/suspension`,
       json({ suspended: true, reason: 'Fixture' }, owner.cookie, 'PATCH'));
+    const moderatorDenied = await request(`/api/admin/accounts/${owner.id}/suspension`,
+      json({ suspended: true, reason: 'Fixture' }, moderator.cookie, 'PATCH'));
     const suspended = await request(`/api/admin/accounts/${owner.id}/suspension`,
       json({ suspended: true, reason: 'Fixture' }, admin.cookie, 'PATCH'));
-    if (denied.ok || !suspended.ok) throw new Error('Account suspension authorization or action failed.');
+    if (denied.ok || moderatorDenied.ok || !suspended.ok) {
+      throw new Error('Account suspension authorization or action failed.');
+    }
     const oldSession = await request('/api/owner/listings', { headers: { Cookie: owner.cookie } });
+    const directWrite = await request('/api/owner/listings/suspension-check',
+      json({ name: 'Suspension Bypass' }, owner.cookie, 'PATCH'));
     const newSession = await signIn('suspend-owner@example.invalid');
     const publicPage = await request('/listings/suspension-check');
+    const hiddenSearch = await (await request(searchPath)).text();
+    const hiddenSitemap = await (await request('/sitemap.xml')).text();
     const finalAdmin = await request(`/api/admin/accounts/${admin.id}/suspension`,
       json({ suspended: true, reason: 'Fixture' }, admin.cookie, 'PATCH'));
     const audit = withDb((db) => db.prepare(`SELECT actor_user_id FROM audit_events
       WHERE action = 'account.suspend' AND target = ? ORDER BY occurred_at DESC LIMIT 1`).get(owner.id));
     if (oldSession.ok) throw new Error('Suspended account retained an existing session.');
+    if (directWrite.ok) throw new Error('Suspended owner could still directly edit a listing.');
     if (newSession.response.ok) throw new Error('Suspended account signed in again.');
     if (publicPage.ok) throw new Error('Suspended account listing remains public.');
+    if (hiddenSearch.includes('href="/listings/suspension-check"') || hiddenSitemap.includes('/listings/suspension-check')) {
+      throw new Error('Suspended account listing remains in search or sitemap.');
+    }
     if (finalAdmin.ok) throw new Error('Final active administrator was suspended.');
     if (audit?.actor_user_id !== admin.id) throw new Error('Suspension lacks actor audit record.');
     const restored = await request(`/api/admin/accounts/${owner.id}/suspension`,
       json({ suspended: false }, admin.cookie, 'PATCH'));
     const restoredPage = await request('/listings/suspension-check');
-    if (!restored.ok || !restoredPage.ok) throw new Error('Reinstatement did not restore approved listing.');
+    const restoredSearch = await (await request(searchPath)).text();
+    const restoredSitemap = await (await request('/sitemap.xml')).text();
+    if (!restored.ok || !restoredPage.ok || !restoredSearch.includes('href="/listings/suspension-check"') ||
+        !restoredSitemap.includes('/listings/suspension-check')) {
+      throw new Error('Reinstatement did not restore approved listing across public surfaces.');
+    }
     const adminPage = await request('/admin/accounts', { headers: { Cookie: admin.cookie } });
     if (!adminPage.ok || !(await adminPage.text()).includes('Suspend')) {
       throw new Error('Account administration has no suspension control.');
