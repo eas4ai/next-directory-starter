@@ -28,6 +28,10 @@ Account holders can save a private listing draft, submit it for review, and prop
 
 Editors can draft articles, save revisions, preview them privately, and publish them. The public article index supports text search, categories, tags, and pagination; published articles appear in the RSS feed. Listing descriptions and article bodies render Markdown. See [article publication](src/lib/articles.ts), the [article index](src/app/articles/page.tsx), and the [feed route](src/app/feed.xml/route.ts).
 
+### Listing and article images
+
+Owners can upload an image for a listing, and article editors can upload an image for an article. Uploads remain private drafts until the listing submission is approved or the article revision is published. A public image is served only while its listing or article is published. See [image assignments and public eligibility](src/lib/media.ts), [listing approval](src/lib/moderation.ts), and [article publication](src/lib/articles.ts).
+
 ### Identity and staff access
 
 Better Auth handles accounts with email verification, password recovery, and sign-in links for verified existing accounts. Administrators can assign separate moderation, article, catalog, taxonomy, and billing capabilities and suspend accounts. Access checks protect the corresponding workspaces and API routes. See [authentication](src/lib/auth.ts), [staff capabilities](src/lib/staff-roles.ts), and [account management](src/lib/accounts.ts). Public registration and account email flows require a configured Resend sender.

@@ -13,6 +13,7 @@ const sections = [
   ['Public discovery', 'src/lib/listings.ts', 'searchPublishedListings'],
   ['Owner submissions', 'src/lib/moderation.ts', 'submitOwnerListing'],
   ['Editorial publishing', 'src/lib/articles.ts', 'publishArticleRevision'],
+  ['Listing and article images', 'src/lib/media.ts', 'promoteDraftMedia'],
   ['Identity and staff access', 'src/lib/auth.ts', 'requireEmailVerification'],
   ['Branding and themes', 'src/lib/theme-selection.ts', 'templateOptions'],
   ['Search and sharing', 'src/lib/page-metadata.ts', 'pageMetadata'],
