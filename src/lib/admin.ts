@@ -35,7 +35,7 @@ export function canManageTaxonomy(role: string | null | undefined): boolean {
 }
 
 export function canManageBilling(role: string | null | undefined): boolean {
-  return hasAnyRole(role, ["admin", "billing", "catalog"]);
+  return hasAnyRole(role, ["admin", "billing"]);
 }
 
 export function canOpenOverview(role: string | null | undefined): boolean {
