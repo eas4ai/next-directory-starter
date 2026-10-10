@@ -33,6 +33,9 @@ try {
     expect(readme.includes(`### ${heading}`), `README omits ${heading}`);
     expect(readme.includes(`](${path})`), `README lacks a source link for ${heading}`);
   }
+  source('src/app/admin/import/import-workspace.tsx', 'context.registerTool');
+  expect(readme.includes('WebMCP') && readme.includes('](src/app/admin/import/import-workspace.tsx)'),
+    'README omits browser agent import tools');
   source('src/lib/listings.ts', 'name: string;');
   source('src/lib/listings.ts', 'category: string;');
   source('src/lib/listings.ts', 'url: string;');
@@ -49,6 +52,8 @@ try {
   expect(brief.includes('# Operator manual brief') &&
     brief.includes('Verify against source') && brief.includes('## Chapters'),
   'Manual brief lacks source-verification scope');
+  expect(brief.includes('WebMCP') && brief.includes('](../src/app/admin/import/import-workspace.tsx)'),
+    'Manual brief omits browser agent import path');
   const paths = [...brief.matchAll(/\]\(\.\.\/(src\/[^)]+|scripts\/[^)]+)\)/g)].map((match) => match[1]);
   expect(new Set(paths).size >= 12 && paths.every((path) => existsSync(path)),
     'Manual brief needs at least 12 valid implementation links');
