@@ -52,6 +52,14 @@ export async function proxy(request: NextRequest) {
     return next();
   }
 
+  if (path.startsWith("/admin/overview")) {
+    const { canOpenOverview, sessionUser } = await import("@/lib/admin");
+    if (!canOpenOverview((await sessionUser(request.headers))?.role)) {
+      return new NextResponse("Forbidden", { status: 403 });
+    }
+    return next();
+  }
+
   if (path.startsWith("/admin/articles") || path.startsWith("/admin/taxonomy")) {
     const { canEditArticles, sessionUser } = await import("@/lib/admin");
     if (!canEditArticles((await sessionUser(request.headers))?.role)) {
