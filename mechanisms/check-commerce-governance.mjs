@@ -5,6 +5,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
+import { startAccountMail } from './account-test-mail.mjs';
 
 const ids = ['COM-001', 'COM-002', 'COM-003', 'ADM-001', 'ADM-002'];
 const results = Object.fromEntries(ids.map((id) => [id, false]));
@@ -26,6 +27,7 @@ let adminId;
 let ownerId;
 let otherId;
 let planCreated = false;
+let mail;
 
 function command(program, args) {
   return spawnSync(program, args, { env: appEnv, encoding: 'utf8', timeout: 120_000 });
@@ -92,18 +94,27 @@ async function session(cookie) {
 }
 
 async function signIn(email, password) {
-  const response = await request('/api/auth/sign-in/email', json({ email, password }));
-  const cookie = cookieFrom(response);
-  if (!response.ok || !cookie) throw new Error(`Sign-in returned ${response.status}.`);
-  return cookie;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const response = await request('/api/auth/sign-in/email', json({ email, password }));
+    if (response.status === 429) {
+      await new Promise((resolve) => setTimeout(resolve, 2_500));
+      continue;
+    }
+    const cookie = cookieFrom(response);
+    if (!response.ok || !cookie) throw new Error(`Sign-in returned ${response.status}.`);
+    return cookie;
+  }
+  throw new Error(`Sign-in rate limit persisted for ${email}.`);
 }
 
 async function signUp(email, password) {
+  const before = mail.count();
   const response = await request('/api/auth/sign-up/email',
     json({ email, password, name: email.split('@')[0] }));
-  const cookie = cookieFrom(response);
-  if (!response.ok || !cookie) throw new Error(`Sign-up returned ${response.status}.`);
-  return cookie;
+  if (!response.ok || cookieFrom(response)) throw new Error(`Sign-up failed or bypassed verification: ${response.status}.`);
+  const verified = await request(await mail.link(email, before));
+  if (verified.status >= 400) throw new Error(`Verification returned ${verified.status}.`);
+  return signIn(email, password);
 }
 
 async function prepareContent() {
@@ -186,15 +197,18 @@ async function check(id, run) {
 }
 
 try {
+  mail = await startAccountMail();
   origin = `http://127.0.0.1:${await freePort()}`;
   appEnv = {
     ...process.env,
+    ...mail.env,
     CI: '1', DATABASE_URL: `file:${databasePath}`,
     BETTER_AUTH_SECRET: randomBytes(32).toString('hex'),
     BETTER_AUTH_URL: origin, SITE_URL: origin,
     STRIPE_WEBHOOK_SECRET: webhookSecret,
   };
   requireCommand('npm', ['run', 'db:migrate']);
+  requireCommand('npm', ['run', 'db:seed']);
   requireCommand('npm', ['run', 'db:seed']);
   requireCommand('npm', ['run', 'build']);
   await startApp();
@@ -345,6 +359,7 @@ try {
   process.stderr.write(`Commerce mechanism setup: ${error.message}\n`);
 } finally {
   await stopApp();
+  if (mail) await mail.close();
   rmSync(workspace, { recursive: true, force: true });
   for (const [id, ok] of Object.entries(results)) {
     process.stdout.write(`sudus: ${id}: ${ok ? 'pass' : 'fail'}\n`);

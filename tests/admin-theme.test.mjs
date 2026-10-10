@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:net';
 import { randomBytes } from 'node:crypto';
+import { startAccountMail } from '../mechanisms/account-test-mail.mjs';
 
 const adminEmail = 'theme-admin@example.invalid';
 const memberEmail = 'theme-member@example.invalid';
@@ -16,6 +17,7 @@ let app;
 let appEnv;
 let adminCookie;
 let memberCookie;
+let mail;
 
 function command(args) {
   const done = spawnSync('npm', args, {
@@ -83,9 +85,11 @@ const json = (body, cookie) => ({
 
 before(async () => {
   workspace = mkdtempSync(join(tmpdir(), 'directory-theme-'));
+  mail = await startAccountMail();
   origin = `http://127.0.0.1:${await freePort()}`;
   appEnv = {
     ...process.env,
+    ...mail.env,
     CI: '1',
     DATABASE_URL: `file:${join(workspace, 'directory.db')}`,
     BETTER_AUTH_SECRET: randomBytes(32).toString('hex'),
@@ -95,14 +99,19 @@ before(async () => {
   command(['run', 'db:migrate']);
   command(['run', 'account:provision', '--', '--email', adminEmail, '--password', password, '--role', 'admin', '--yes']);
   await startApp();
+  const before = mail.count();
   const member = await request('/api/auth/sign-up/email', json({ name: 'Member', email: memberEmail, password }));
   assert.equal(member.status, 200, await member.text());
+  assert.equal(member.headers.getSetCookie().length, 0, 'signup must await verification');
+  const verified = await request(await mail.link(memberEmail, before));
+  assert.ok(verified.status < 400, `verification returned ${verified.status}`);
   adminCookie = await signIn(adminEmail);
   memberCookie = await signIn(memberEmail);
 });
 
 after(async () => {
   await stopApp();
+  if (mail) await mail.close();
   if (workspace) rmSync(workspace, { recursive: true, force: true });
 });
 

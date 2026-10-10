@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { startAccountMail } from './account-test-mail.mjs';
 
 const ids = ['PUB-001', 'PUB-002', 'PUB-003', 'PUB-004', 'PUB-005', 'ADM-003'];
 const results = Object.fromEntries(ids.map((id) => [id, false]));
@@ -15,6 +16,7 @@ let adminCookie;
 let ownerACookie;
 let ownerBCookie;
 let moderatorCookie;
+let mail;
 
 function command(args) {
   return spawnSync('npm', args, { env: appEnv, encoding: 'utf8', timeout: 120_000 });
@@ -77,17 +79,26 @@ function cookieFrom(response) {
 }
 
 async function signIn(email, password) {
-  const response = await request('/api/auth/sign-in/email', json({ email, password }));
-  const cookie = cookieFrom(response);
-  if (!response.ok || !cookie) throw new Error(`Sign-in failed for ${email}: ${response.status}.`);
-  return cookie;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const response = await request('/api/auth/sign-in/email', json({ email, password }));
+    if (response.status === 429) {
+      await new Promise((resolve) => setTimeout(resolve, 2_500));
+      continue;
+    }
+    const cookie = cookieFrom(response);
+    if (!response.ok || !cookie) throw new Error(`Sign-in failed for ${email}: ${response.status}.`);
+    return cookie;
+  }
+  throw new Error(`Sign-in rate limit persisted for ${email}.`);
 }
 
 async function signUp(email, password) {
+  const before = mail.count();
   const response = await request('/api/auth/sign-up/email', json({ email, password, name: email.split('@')[0] }));
-  const cookie = cookieFrom(response);
-  if (!response.ok || !cookie) throw new Error(`Owner sign-up failed: ${response.status}.`);
-  return cookie;
+  if (!response.ok || cookieFrom(response)) throw new Error(`Owner sign-up failed or bypassed verification: ${response.status}.`);
+  const verified = await request(await mail.link(email, before));
+  if (verified.status >= 400) throw new Error(`Owner verification returned ${verified.status}.`);
+  return signIn(email, password);
 }
 
 async function identities() {
@@ -112,7 +123,7 @@ function draft(slug, name = `Owner ${slug}`) {
 
 async function createDraft(slug, cookie = ownerACookie, name) {
   const response = await request('/api/owner/listings', json(draft(slug, name), cookie));
-  if (response.status !== 201) throw new Error(`Owner draft creation returned ${response.status}.`);
+  if (response.status !== 201) throw new Error(`Owner draft creation returned ${response.status}: ${await response.text()}`);
   return response.json();
 }
 
@@ -147,9 +158,11 @@ async function check(id, run) {
 }
 
 try {
+  mail = await startAccountMail();
   origin = `http://127.0.0.1:${await freePort()}`;
   appEnv = {
     ...process.env,
+    ...mail.env,
     CI: '1',
     DATABASE_URL: `file:${join(workspace, 'directory.db')}`,
     BETTER_AUTH_SECRET: randomBytes(32).toString('hex'),
@@ -157,6 +170,7 @@ try {
     SITE_URL: origin,
   };
   requireCommand(['run', 'db:migrate']);
+  requireCommand(['run', 'db:seed']);
   requireCommand(['run', 'build']);
   await startApp();
   await identities();
@@ -303,6 +317,7 @@ try {
   process.stderr.write(`Owner mechanism setup: ${error.message}\n`);
 } finally {
   await stopApp();
+  if (mail) await mail.close();
   rmSync(workspace, { recursive: true, force: true });
   for (const [id, ok] of Object.entries(results)) {
     process.stdout.write(`sudus: ${id}: ${ok ? 'pass' : 'fail'}\n`);
