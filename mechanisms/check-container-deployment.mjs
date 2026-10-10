@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -10,10 +10,12 @@ const scratch = mkdtempSync(join(tmpdir(), 'directory-container-check-'));
 const suffix = randomBytes(4).toString('hex');
 const project = `directory-check-${suffix}`;
 const image = `${project}:test`;
+const contextImage = `${project}-context:test`;
 const fixtureKey = randomBytes(32).toString('base64url');
 const envFile = join(scratch, 'container.env');
 let passed = false;
 let built = false;
+let contextBuilt = false;
 
 function expect(condition, message) {
   if (!condition) throw new Error(message);
@@ -84,6 +86,24 @@ try {
     Number.isInteger(reconciliationLimit) && reconciliationLimit >= 1 && reconciliationLimit <= 50,
   'Operator manual uses a job limit outside the scripts\' accepted range');
 
+  const context = join(scratch, 'context');
+  for (const directory of ['src/app/media', 'src/media', 'scripts', 'fixtures', 'media']) {
+    mkdirSync(join(context, directory), { recursive: true });
+  }
+  copyFileSync(join(root, '.dockerignore'), join(context, '.dockerignore'));
+  for (const [path, value] of Object.entries({
+    'package.json': '{}', 'src/keep.ts': 'export {};',
+    'src/app/media/route.ts': 'export {};', 'scripts/keep.mjs': '',
+    'fixtures/keep.json': '{}', 'src/private.key': 'sentinel',
+    'src/.env.local': 'sentinel', 'src/media/upload.png': 'sentinel',
+    'media/upload.png': 'sentinel', 'deploy.pem': 'sentinel',
+    'directory.db-wal': 'sentinel', 'directory.db-shm': 'sentinel',
+  })) writeFileSync(join(context, path), value);
+  const contextDockerfile = join(scratch, 'Context.Dockerfile');
+  writeFileSync(contextDockerfile, `FROM node:24-bookworm-slim\nCOPY . /context\nRUN test -f /context/package.json && test -f /context/src/keep.ts && test -f /context/src/app/media/route.ts && test -f /context/scripts/keep.mjs && test -f /context/fixtures/keep.json && test ! -e /context/src/private.key && test ! -e /context/src/.env.local && test ! -e /context/src/media/upload.png && test ! -e /context/media/upload.png && test ! -e /context/deploy.pem && test ! -e /context/directory.db-wal && test ! -e /context/directory.db-shm\n`);
+  run('docker', ['build', '--quiet', '-f', contextDockerfile, '-t', contextImage, context], 120_000);
+  contextBuilt = true;
+
   const port = await freePort();
   writeFileSync(envFile, [
     `DIRECTORY_ENV_FILE=${envFile}`, `DIRECTORY_IMAGE=${image}`, `DIRECTORY_PORT=${port}`,
@@ -151,6 +171,9 @@ try {
   try { compose(['down', '-v', '--remove-orphans'], 60_000); } catch { /* best effort cleanup */ }
   if (built) {
     try { run('docker', ['image', 'rm', '-f', image], 60_000); } catch { /* best effort cleanup */ }
+  }
+  if (contextBuilt) {
+    try { run('docker', ['image', 'rm', '-f', contextImage], 60_000); } catch { /* best effort cleanup */ }
   }
   rmSync(scratch, { recursive: true, force: true });
   process.stdout.write(`sudus: OPS-003: ${passed ? 'pass' : 'fail'}\n`);
