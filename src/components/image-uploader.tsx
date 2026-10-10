@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -11,6 +12,18 @@ export function ImageUploader({ kind, slug, onUploaded }: {
   const [alt, setAlt] = useState("");
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
+  const [asset, setAsset] = useState<{ id: string; alt: string; width: number; height: number } | null>(null);
+  const endpoint = kind === "listing"
+    ? `/api/owner/listings/${encodeURIComponent(slug)}/media`
+    : `/api/admin/articles/${encodeURIComponent(slug)}/media`;
+
+  useEffect(() => {
+    let active = true;
+    void fetch(endpoint).then((response) => response.ok ? response.json() : null)
+      .then((data) => { if (active) setAsset(data?.asset ?? null); })
+      .catch(() => { if (active) setAsset(null); });
+    return () => { active = false; };
+  }, [endpoint]);
 
   async function upload() {
     if (!file || !alt.trim()) {
@@ -23,9 +36,6 @@ export function ImageUploader({ kind, slug, onUploaded }: {
     }
     setPending(true);
     setMessage("");
-    const endpoint = kind === "listing"
-      ? `/api/owner/listings/${encodeURIComponent(slug)}/media`
-      : `/api/admin/articles/${encodeURIComponent(slug)}/media`;
     try {
       const response = await fetch(endpoint, { method: "POST", body: file,
         headers: { "Content-Type": file.type, "X-Image-Alt": encodeURIComponent(alt.trim()) } });
@@ -33,6 +43,7 @@ export function ImageUploader({ kind, slug, onUploaded }: {
         setMessage((await response.json()).error ?? "Could not upload the image.");
         return;
       }
+      setAsset((await response.json() as { asset: typeof asset }).asset);
       setFile(null);
       setAlt("");
       setMessage("Image saved privately. It will be public after approval or publication.");
@@ -47,6 +58,8 @@ export function ImageUploader({ kind, slug, onUploaded }: {
   return (
     <div className="space-y-3 rounded-md border p-4">
       <p className="text-sm font-medium">Image</p>
+      {asset && <Image unoptimized src={`/api/media/${asset.id}`} alt={asset.alt}
+        width={asset.width} height={asset.height} className="max-h-48 w-auto max-w-full rounded-md object-contain" />}
       <Input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
       <Input value={alt} onChange={(event) => setAlt(event.target.value)} maxLength={160} placeholder="Describe the image for visitors" aria-label="Image alt text" />
       <Button type="button" variant="outline" disabled={pending} onClick={upload}>Upload image privately</Button>

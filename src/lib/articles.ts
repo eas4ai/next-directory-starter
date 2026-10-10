@@ -2,6 +2,7 @@ import { database } from "@/lib/database";
 import { migrateCatalog } from "@/lib/catalog-migrations";
 import { HttpError, httpErrorResponse } from "@/lib/http-error";
 import { recordAudit } from "@/lib/audit";
+import { promoteDraftMedia } from "@/lib/media";
 
 migrateCatalog();
 
@@ -288,6 +289,7 @@ export function publishArticleRevision(slug: string, expectedVersion: number,
       database.prepare(`UPDATE articles SET status = 'published', updated_at = ?,
         published_at = ?, revision = revision + 1 WHERE slug = ?`).run(now, now, slug);
     }
+    promoteDraftMedia("article", slug);
     recordAudit("article.publish", actorId, slug);
     return articleBySlug(slug)!;
   }).immediate();
@@ -310,6 +312,9 @@ export function updateArticle(slug: string, changes: unknown, actorId: string): 
       article.title, article.summary, article.body, article.status, category, now, publishedAt, slug,
     );
     if (article.status === "draft") database.prepare("DELETE FROM article_revisions WHERE slug = ?").run(slug);
+    if (article.status === "published" && current.status !== "published") {
+      promoteDraftMedia("article", slug);
+    }
     setTags(slug, article.tags);
     recordAudit(article.status === "published" ? "article.publish" :
       current.status === "published" ? "article.unpublish" : "article.update", actorId, slug);

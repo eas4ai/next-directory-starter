@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import sharp from "sharp";
-import { canEditArticles } from "@/lib/admin";
+import { canEditArticles, canModerate } from "@/lib/admin";
 import { database } from "@/lib/database";
 import { migrateCatalog } from "@/lib/catalog-migrations";
 import { HttpError, httpErrorResponse } from "@/lib/http-error";
@@ -144,4 +144,64 @@ export async function uploadPrivateImage(input: {
     throw error;
   }
   return { id, kind: input.kind, slug: input.slug, alt, width, height };
+}
+
+type MediaRow = { id: string; target_kind: MediaKind; target_slug: string;
+  alt: string; width: number; height: number };
+
+function fromMediaRow(row: MediaRow): MediaAsset {
+  return { id: row.id, kind: row.target_kind, slug: row.target_slug,
+    alt: row.alt, width: row.width, height: row.height };
+}
+
+export function assignedMedia(kind: MediaKind, slug: string, slot: "draft" | "public"): MediaAsset | undefined {
+  const row = database.prepare(`SELECT a.id, a.target_kind, a.target_slug, a.alt, a.width, a.height
+    FROM media_assignments m JOIN media_assets a ON a.id = m.asset_id
+    WHERE m.target_kind = ? AND m.target_slug = ? AND m.slot = ?
+      AND a.target_kind = m.target_kind AND a.target_slug = m.target_slug`)
+    .get(kind, slug, slot) as MediaRow | undefined;
+  return row ? fromMediaRow(row) : undefined;
+}
+
+export function promoteDraftMedia(kind: MediaKind, slug: string): void {
+  const draft = assignedMedia(kind, slug, "draft");
+  if (!draft) return;
+  database.prepare(`INSERT INTO media_assignments (target_kind, target_slug, slot, asset_id)
+    VALUES (?, ?, 'public', ?) ON CONFLICT(target_kind, target_slug, slot)
+    DO UPDATE SET asset_id = excluded.asset_id`).run(kind, slug, draft.id);
+  database.prepare(`DELETE FROM media_assignments
+    WHERE target_kind = ? AND target_slug = ? AND slot = 'draft'`).run(kind, slug);
+}
+
+export function privateMediaAsset(id: string, actorId: string,
+  actorRole: string | null | undefined): MediaAsset {
+  const row = database.prepare(`SELECT id, target_kind, target_slug, alt, width, height
+    FROM media_assets WHERE id = ?`).get(id) as MediaRow | undefined;
+  if (!row) throw new MediaError(404, "Image not found");
+  if (row.target_kind === "listing") {
+    const listing = database.prepare("SELECT owner_user_id FROM listings WHERE slug = ?")
+      .get(row.target_slug) as { owner_user_id: string | null } | undefined;
+    if (!listing || (listing.owner_user_id !== actorId && !canModerate(actorRole))) {
+      throw new MediaError(404, "Image not found");
+    }
+  } else if (!canEditArticles(actorRole) ||
+      !database.prepare("SELECT 1 FROM articles WHERE slug = ?").get(row.target_slug)) {
+    throw new MediaError(404, "Image not found");
+  }
+  return fromMediaRow(row);
+}
+
+export function publicMediaAsset(id: string): MediaAsset | undefined {
+  const row = database.prepare(`SELECT a.id, a.target_kind, a.target_slug, a.alt, a.width, a.height
+    FROM media_assignments m JOIN media_assets a ON a.id = m.asset_id
+    WHERE a.id = ? AND m.slot = 'public' AND a.target_kind = m.target_kind
+      AND a.target_slug = m.target_slug`).get(id) as MediaRow | undefined;
+  if (!row) return undefined;
+  const eligible = row.target_kind === "listing"
+    ? database.prepare(`SELECT 1 FROM listings l WHERE l.slug = ? AND l.status = 'published'
+      AND NOT EXISTS (SELECT 1 FROM "user" u WHERE u.id = l.owner_user_id AND u.banned = 1)`)
+      .get(row.target_slug)
+    : database.prepare("SELECT 1 FROM articles WHERE slug = ? AND status = 'published'")
+      .get(row.target_slug);
+  return eligible ? fromMediaRow(row) : undefined;
 }
