@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: content-and-notifications
+Current: seo-operations
 
 ## public-starter-and-theme
 
@@ -211,3 +211,25 @@ until explicit publication and stale saves are refused; public article filters
 exclude drafts and stay bounded; each named state change produces one private
 notice despite replay; and a failed Resend delivery remains retryable after
 restart without repeating the underlying domain action.
+
+## seo-operations
+
+Requirements: SEO-006, SEO-007, SEO-008, SEO-009, SEO-010
+
+Delivery: add administrator-controlled site metadata and verification values,
+and revision-bound search/social overrides for listings and articles. Apply
+current public eligibility and indexability to initial HTML, structured data,
+sitemap and robots output. Add bounded same-site redirects, old article slug
+aliases, and a path-only missing-page report. Show current SEO findings and
+search/social previews to authorized administrators. Serve Markdown versions of
+eligible listings and articles with matching public content and explicit
+nonindexable, noncached responses. Preserve existing public routes and the
+shadcn/ui visual system.
+
+Done-when: unpublished changes do not alter public search metadata; overrides
+and verification values appear only where authorized and eligible; sitemap,
+robots, canonical, social and structured output agree with public content;
+unsafe redirects and query-bearing 404 records are rejected; old published
+article slugs redirect safely; an administrator sees reproducible findings and
+accurate previews; and Markdown versions track publication and eligibility on
+every request without exposing private revisions.
