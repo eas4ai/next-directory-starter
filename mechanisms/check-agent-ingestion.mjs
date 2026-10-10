@@ -5,6 +5,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
+import { chromium } from 'playwright-core';
 import sharp from 'sharp';
 
 const ids = ['ING-001', 'ING-002', 'ING-003', 'ING-004'];
@@ -16,9 +17,11 @@ let origin;
 let env;
 let app;
 let adminCookie;
+let staffCookie;
 let ownerCookie;
 let token;
 let staged;
+let browser;
 
 function assert(value, message) {
   if (!value) throw new Error(message);
@@ -124,13 +127,15 @@ try {
   command(['run', 'build']);
   await start();
   adminCookie = await provision('agent-admin@example.invalid', 'admin');
+  staffCookie = await provision('agent-staff@example.invalid', 'catalog');
   ownerCookie = await provision('agent-owner@example.invalid', 'user');
 
   await check('ING-001', async () => {
     const guest = await request('/admin/import');
     const owner = await request('/admin/import', { headers: { Cookie: ownerCookie } });
     const admin = await request('/admin/import', { headers: { Cookie: adminCookie } });
-    assert(guest.status === 403 && owner.status === 403 && admin.ok,
+    const staff = await request('/admin/import', { headers: { Cookie: staffCookie } });
+    assert(guest.status === 403 && owner.status === 403 && admin.ok && staff.ok,
       'Import workspace access did not follow catalog permissions.');
     const deniedKey = await request('/api/agent/keys', json({ name: 'denied' }, ownerCookie));
     assert(deniedKey.status === 403, 'Ordinary owner created an agent credential.');
@@ -149,6 +154,47 @@ try {
       'publish_import', 'attach_screenshot', 'preview_card']) {
       assert(listed.tools?.some((entry) => entry.name === name), `MCP omitted ${name}.`);
     }
+    const staffCreated = await request('/api/agent/keys',
+      json({ name: 'staff-check', expiresInDays: 7 }, staffCookie));
+    assert(staffCreated.status === 201, 'Catalog staff could not create a credential.');
+    const staffKey = await staffCreated.json();
+    assert(staffKey.id && staffKey.secret, 'Staff credential response is incomplete.');
+    const staffTools = await mcp('tools/list', {}, staffKey.secret);
+    assert(staffTools.tools?.some((entry) => entry.name === 'stage_links'),
+      'Catalog staff cannot list import tools.');
+    const revoke = await request(`/api/agent/keys/${staffKey.id}`,
+      { method: 'DELETE', headers: { Origin: origin, Cookie: staffCookie } });
+    assert(revoke.ok, 'Catalog staff could not revoke their credential.');
+    const revoked = await request('/api/mcp', { method: 'POST',
+      headers: { Authorization: `Bearer ${staffKey.secret}`,
+        'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) });
+    assert(revoked.status === 401, 'Revoked credential still lists tools.');
+    const currentKey = await request('/api/agent/keys',
+      json({ name: 'current-role-check', expiresInDays: 7 }, staffCookie));
+    assert(currentKey.status === 201, 'Could not create the current-role probe.');
+    const currentSecret = (await currentKey.json()).secret;
+    const db = new Database(databasePath);
+    try {
+      db.prepare('UPDATE "user" SET role = ? WHERE email = ?')
+        .run('user', 'agent-staff@example.invalid');
+      const removedRole = await request('/api/mcp', { method: 'POST',
+        headers: { Authorization: `Bearer ${currentSecret}`,
+          'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' }) });
+      assert([401, 403].includes(removedRole.status), 'Removed catalog role kept MCP access.');
+      db.prepare('UPDATE "user" SET role = ?, banned = 1 WHERE email = ?')
+        .run('catalog', 'agent-staff@example.invalid');
+      const suspended = await request('/api/mcp', { method: 'POST',
+        headers: { Authorization: `Bearer ${currentSecret}`,
+          'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/list' }) });
+      assert([401, 403].includes(suspended.status), 'Suspended account kept MCP access.');
+    } finally {
+      db.prepare('UPDATE "user" SET role = ?, banned = 0 WHERE email = ?')
+        .run('catalog', 'agent-staff@example.invalid');
+      db.close();
+    }
     assert(readFileSync('README.md', 'utf8').includes('claude mcp add --transport http') &&
       readFileSync('README.md', 'utf8').includes('agent-browser') &&
       readFileSync('README.md', 'utf8').includes('single URL') &&
@@ -156,6 +202,28 @@ try {
     'Claude Code and agent-browser setup for each source shape is undocumented.');
     const databaseBytes = readFileSync(databasePath);
     assert(!databaseBytes.includes(Buffer.from(token)), 'Credential is stored in database plaintext.');
+    browser = await chromium.launch({ headless: true,
+      ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: 'chrome' }),
+      args: ['--no-sandbox'] });
+    const context = await browser.newContext();
+    try {
+      await context.addCookies(adminCookie.split('; ').map((pair) => {
+        const separator = pair.indexOf('=');
+        return { name: pair.slice(0, separator), value: pair.slice(separator + 1), url: origin };
+      }));
+      await context.addInitScript(() => {
+        window.__agentTools = [];
+        Object.defineProperty(document, 'modelContext', { configurable: true, value: {
+          registerTool: async (definition) => { window.__agentTools.push(definition.name); },
+        } });
+      });
+      const page = await context.newPage();
+      await page.goto(`${origin}/admin/import`, { waitUntil: 'networkidle' });
+      await page.waitForFunction(() => window.__agentTools?.includes('stage_links'));
+      const names = await page.evaluate(() => window.__agentTools);
+      assert(names.includes('publish_import') && names.includes('attach_screenshot'),
+        'Supported browser did not register its import tools.');
+    } finally { await context.close(); }
   });
 
   await check('ING-002', async () => {
@@ -260,6 +328,7 @@ try {
 } catch (error) {
   process.stderr.write(`agent-ingestion setup: ${error.message}\n`);
 } finally {
+  if (browser) await browser.close();
   if (app?.pid) {
     try { process.kill(-app.pid, 'SIGTERM'); } catch { /* already stopped */ }
   }
