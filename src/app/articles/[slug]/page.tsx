@@ -7,6 +7,8 @@ import { pageMetadata, publicUrl } from "@/lib/page-metadata";
 import { getSiteConfig } from "@/lib/site-config";
 import { JsonLd } from "@/components/json-ld";
 import { MarkdownContent } from "@/components/markdown-content";
+import { ContentImage } from "@/components/content-image";
+import { assignedMedia } from "@/lib/media";
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -21,6 +23,7 @@ export default async function ArticlePage({ params }: Params) {
   await connection();
   const article = publishedArticleBySlug((await params).slug);
   if (!article) notFound();
+  const image = assignedMedia("article", article.slug, "public");
   return (
     <main className="mx-auto w-full max-w-[1400px] px-6 py-12">
       <JsonLd data={{
@@ -38,6 +41,7 @@ export default async function ArticlePage({ params }: Params) {
           Published {new Date(article.publishedAt).toLocaleDateString("en-US", { timeZone: "UTC" })}
         </time>}
         {article.category && <p className="mt-4 text-sm">Category: <Link className="underline" href={`/articles?category=${encodeURIComponent(article.category)}`}>{article.category}</Link></p>}
+        {image && <div className="mt-8"><ContentImage asset={image} /></div>}
         <div className="mt-10"><MarkdownContent source={article.body} /></div>
         {article.tags.length > 0 && <p className="mt-10 flex flex-wrap gap-2 border-t pt-5 text-sm text-muted-foreground">Tags:
           {article.tags.map((tag) => <Link key={tag} href={`/articles?tag=${encodeURIComponent(tag)}`} className="underline">{tag}</Link>)}

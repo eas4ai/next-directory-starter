@@ -9,6 +9,8 @@ import { reviewSubmissions } from "@/lib/moderation";
 import { getSiteConfig } from "@/lib/site-config";
 import { ReviewDecision } from "./review-decision";
 import { SuspendButton } from "./suspend-button";
+import { assignedMedia } from "@/lib/media";
+import { ContentImage } from "@/components/content-image";
 
 export async function generateMetadata(): Promise<Metadata> {
   await connection();
@@ -34,7 +36,11 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       <h1 className="mt-7 text-3xl font-semibold tracking-tight">Submission review</h1>
       <p className="mt-3 text-muted-foreground">Inspect proposed listings and past decisions.</p>
       <div className="mt-8 space-y-4">
-        {submissions.map((submission) => (
+        {submissions.map((submission) => {
+          const draftImage = submission.status === "pending"
+            ? assignedMedia("listing", submission.slug, "draft") : undefined;
+          const image = draftImage ?? assignedMedia("listing", submission.slug, "public");
+          return (
           <section key={submission.id} className="rounded-lg border p-5" aria-labelledby={`submission-${submission.id}`}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -46,6 +52,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
             <p className="mt-3 text-sm">{submission.proposed.summary}</p>
             <p className="mt-2 text-sm text-muted-foreground">{submission.proposed.description}</p>
             <p className="mt-2 text-sm text-muted-foreground">{submission.proposed.category} · <a href={submission.proposed.url} target="_blank" rel="noopener noreferrer" className="underline">{submission.proposed.url}</a></p>
+            {image && <div className="mt-4"><ContentImage asset={image} privateView={Boolean(draftImage)} /></div>}
             {submission.status === "pending" ? (
               <ReviewDecision id={submission.id} />
             ) : (
@@ -55,7 +62,8 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
               </p>
             )}
           </section>
-        ))}
+          );
+        })}
         {submissions.length === 0 && <p className="rounded-lg border p-5 text-muted-foreground">No submissions yet.</p>}
       </div>
       {pages > 1 && (

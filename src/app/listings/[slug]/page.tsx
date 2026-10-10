@@ -9,6 +9,8 @@ import { pageMetadata, publicUrl } from "@/lib/page-metadata";
 import { getSiteConfig } from "@/lib/site-config";
 import { JsonLd } from "@/components/json-ld";
 import { MarkdownContent } from "@/components/markdown-content";
+import { ContentImage } from "@/components/content-image";
+import { assignedMedia } from "@/lib/media";
 
 export const instant = false;
 
@@ -26,6 +28,7 @@ export default async function ListingPage({ params }: PageProps<"/listings/[slug
   if (!listing) notFound();
   const preset = getThemePreset();
   const featured = activeFeaturedSlugs([listing.slug]).has(listing.slug);
+  const image = assignedMedia("listing", listing.slug, "public");
 
   return (
     <main className="mx-auto w-full max-w-[1400px] wrap-anywhere px-6 py-12">
@@ -39,6 +42,7 @@ export default async function ListingPage({ params }: PageProps<"/listings/[slug
       {featured && <p className="mt-3 w-fit rounded-full bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground">Featured</p>}
       <h1 className="mt-3 text-4xl font-semibold tracking-tight">{listing.name}</h1>
       <p className="mt-5 text-lg text-muted-foreground">{listing.summary}</p>
+      {image && <div className="mt-8"><ContentImage asset={image} /></div>}
       <div className="mt-8"><MarkdownContent source={listing.description} /></div>
       <div className="mt-8"><Button asChild className="h-auto min-h-8 max-w-full whitespace-normal wrap-anywhere text-center"><a href={listing.url} target="_blank" rel="noopener noreferrer">Visit {listing.name} <PresetExternalLinkIcon library={preset.iconLibrary} /></a></Button></div>
     </main>

@@ -5,6 +5,7 @@ import { parseListing } from "@/lib/catalog-input";
 import type { Listing } from "@/lib/listings";
 import { HttpError, httpErrorResponse } from "@/lib/http-error";
 import { recordAudit } from "@/lib/audit";
+import { promoteDraftMedia } from "@/lib/media";
 
 migrateCatalog();
 
@@ -196,6 +197,7 @@ export function decideSubmission(id: string, actorId: string, decision: "approve
         proposed.name, proposed.summary, proposed.description, proposed.category,
         proposed.url, row.slug, row.owner_user_id,
       );
+      promoteDraftMedia("listing", row.slug);
       database.prepare("DELETE FROM owner_drafts WHERE slug = ?").run(row.slug);
     }
     database.prepare(`UPDATE submissions SET status = ?, reason = ?, decided_at = ?, decided_by = ?
