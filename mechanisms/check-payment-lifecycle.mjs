@@ -87,6 +87,7 @@ try {
         throw new Error(`Unsigned ${provider} event returned ${response.status}, not an authentication rejection.`);
       }
     }
+    nodeTests(['tests/payment-evidence.test.mjs', 'tests/payment-webhooks.test.mjs']);
   });
 
   await check('COM-008', async () => {
