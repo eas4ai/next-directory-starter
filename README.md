@@ -48,6 +48,8 @@ The command prompts for a password and asks for confirmation if accounts already
 
 Moderation decisions and confirmed payment changes add a private notice to the affected owner's workspace. The latest 20 notices appear at `/owner/listings`. Each notice is written in the same database transaction as its moderation or payment change, so retries do not repeat it and a failed notice insert rolls back the change.
 
+Run `npm run notifications:deliver -- --limit 10` from a scheduled job to send at most ten due owner notices through Resend per invocation (maximum 50). Delivery state and bounded retries live in SQLite, so a restart does not lose pending notices. `/admin/notifications` shows the latest delivery states and lets an administrator retry exhausted notices without repeating the moderation or payment operation. A send whose outcome remains unknown after the provider idempotency window needs inspection in Resend before an operator retries it.
+
 ## Articles
 
 An administrator can edit articles at `/admin/articles`. To give a separate account article editing access without administrator controls, provision it against the same database:

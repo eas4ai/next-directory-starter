@@ -25,6 +25,7 @@ export default async function AuditPage() {
       <Link href="/admin/catalog" className="text-sm text-muted-foreground hover:text-foreground">← Catalog</Link>
       <h1 className="mt-7 text-3xl font-semibold tracking-tight">Audit history</h1>
       <p className="mt-3 text-muted-foreground">The 100 most recent protected changes and account email delivery failures. Resolve email failures before affected accounts can sign in or recover access.</p>
+      <Link href="/admin/notifications" className="mt-3 inline-block text-sm underline">Owner notification delivery</Link>
       <div className="mt-8 overflow-x-auto rounded-lg border">
         <table className="w-full min-w-[620px] text-left text-sm">
           <thead className="border-b bg-muted/40">
