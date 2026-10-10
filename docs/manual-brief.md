@@ -34,7 +34,7 @@ Describe canonical metadata, site verification, public-only sitemap, per-page SE
 
 ### 7. Agent-assisted catalog imports
 
-Document how a staff member issues and revokes an agent key, connects to the MCP endpoint, lists categories, stages observed URLs with source excerpts, attaches a screenshot, previews a card, reviews private imports, and publishes explicitly. Check [MCP tool definitions](../src/app/api/mcp/route.ts), [key management](../src/lib/agent-keys.ts), [import validation and duplicate handling](../src/lib/agent-imports.ts), and [card rendering](../src/lib/agent-cards.ts). Verify authentication, provenance, batch limit, invalid URL handling, and publication boundaries. Do not claim the server crawls a URL on its own.
+Document the two access paths separately: a staff-issued key for remote MCP, and a catalog-authorized session on `/admin/import` for WebMCP in supported browsers. Then cover listing categories, staging observed URLs with source excerpts, attaching a screenshot, previewing a card, reviewing private imports, and publishing explicitly. Check [remote MCP tool definitions](../src/app/api/mcp/route.ts), [browser WebMCP registration](../src/app/admin/import/import-workspace.tsx), [catalog access gate](../src/app/admin/import/page.tsx), [key management](../src/lib/agent-keys.ts), [import validation and duplicate handling](../src/lib/agent-imports.ts), and [card rendering](../src/lib/agent-cards.ts). Verify authentication, provenance, batch limit, invalid URL handling, and publication boundaries for both paths. Do not claim the server crawls a URL on its own.
 
 ### 8. Plans, providers, and owner billing
 
