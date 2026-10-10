@@ -9,7 +9,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const user = await sessionUser(request.headers);
-  if (!user || !canManageBilling(user.role)) return Response.json({ error: "Forbidden" }, { status: 403 });
+  if (!user || (!canManageBilling(user.role) && user.role !== "editor")) return Response.json({ error: "Forbidden" }, { status: 403 });
   if (!sameOrigin(request)) return Response.json({ error: "Invalid origin" }, { status: 403 });
   let input: unknown;
   try {
