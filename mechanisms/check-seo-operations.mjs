@@ -12,6 +12,9 @@ let app;
 let origin;
 let env;
 let adminCookie;
+let editorCookie;
+let ownerACookie;
+let ownerBCookie;
 
 async function freePort() {
   const server = createServer();
@@ -58,13 +61,34 @@ try {
   const password = randomBytes(20).toString('hex');
   command(['run', 'account:provision', '--', '--email', 'seo-admin@example.invalid',
     '--password', password, '--role', 'admin', '--yes']);
+  for (const [email, role] of [
+    ['seo-editor@example.invalid', 'editor'],
+    ['seo-owner-a@example.invalid', 'user'],
+    ['seo-owner-b@example.invalid', 'user'],
+  ]) {
+    command(['run', 'account:provision', '--', '--email', email,
+      '--password', password, '--role', role, '--yes']);
+  }
   command(['run', 'build']);
   await start();
-  const signedIn = await request('/api/auth/sign-in/email',
-    json({ email: 'seo-admin@example.invalid', password }));
-  if (!signedIn.ok) throw new Error(`Admin sign-in returned ${signedIn.status}`);
-  adminCookie = signedIn.headers.getSetCookie().map((value) => value.split(';')[0]).join('; ');
-  if (!adminCookie) throw new Error('Admin sign-in returned no session');
+  async function signIn(email) {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const response = await request('/api/auth/sign-in/email', json({ email, password }));
+      if (response.status === 429) {
+        await new Promise((resolve) => setTimeout(resolve, 2_500));
+        continue;
+      }
+      if (!response.ok) throw new Error(`${email} sign-in returned ${response.status}`);
+      const cookie = response.headers.getSetCookie().map((value) => value.split(';')[0]).join('; ');
+      if (!cookie) throw new Error(`${email} sign-in returned no session`);
+      return cookie;
+    }
+    throw new Error(`${email} sign-in remained rate limited`);
+  }
+  adminCookie = await signIn('seo-admin@example.invalid');
+  editorCookie = await signIn('seo-editor@example.invalid');
+  ownerACookie = await signIn('seo-owner-a@example.invalid');
+  ownerBCookie = await signIn('seo-owner-b@example.invalid');
 
   await check('SEO-006', async () => {
     const guest = await request('/api/admin/seo/settings');
@@ -82,6 +106,71 @@ try {
     const html = await home.text();
     if (!html.includes('google-check-value') || !html.includes('bing-check-value')) {
       throw new Error('Saved verification values did not appear in initial HTML');
+    }
+    const editorSettings = await request('/api/admin/seo/settings',
+      json({ titleFormat: '%s | Intruder', description: 'Wrong role' }, editorCookie, 'PATCH'));
+    const ownerSettings = await request('/api/admin/seo/settings',
+      { headers: { Cookie: ownerACookie } });
+    if (![401, 403, 404].includes(editorSettings.status) ||
+        ![401, 403, 404].includes(ownerSettings.status)) {
+      throw new Error('A non-admin accessed site search settings');
+    }
+    const created = await request('/api/owner/listings', json({
+      slug: 'seo-owned', name: 'SEO Owned', summary: 'Approved owner listing',
+      description: 'Owner listing for direct SEO authorization checks.', category: 'Tools',
+      url: 'https://example.org/seo-owned',
+      seo: { title: 'Approved Owner SEO', description: null, socialImage: null, indexable: null },
+    }, ownerACookie));
+    if (created.status !== 201) throw new Error(`Owner SEO fixture unavailable: HTTP ${created.status}`);
+    const wrongOwner = await request('/api/owner/listings/seo-owned', json({
+      seo: { title: 'Hijacked SEO', description: null, socialImage: null, indexable: false },
+    }, ownerBCookie, 'PATCH'));
+    const wrongEditor = await request('/api/owner/listings/seo-owned', json({
+      seo: { title: 'Editor hijack', description: null, socialImage: null, indexable: false },
+    }, editorCookie, 'PATCH'));
+    if (![401, 403, 404].includes(wrongOwner.status) ||
+        ![401, 403, 404].includes(wrongEditor.status)) {
+      throw new Error('A different owner or editor changed listing search overrides');
+    }
+    const submitted = await request('/api/owner/listings/seo-owned/submit', json({}, ownerACookie));
+    if (!submitted.ok) throw new Error('Owner SEO listing could not be submitted');
+    const submissionId = (await submitted.json()).submission?.id;
+    const approved = await request(`/api/admin/submissions/${submissionId}/decision`,
+      json({ decision: 'approve', reason: 'SEO release check' }, adminCookie));
+    if (!approved.ok || !(await (await request('/listings/seo-owned')).text())
+      .includes('Approved Owner SEO')) {
+      throw new Error('Approved owner search override did not become public');
+    }
+    const article = await request('/api/admin/articles', json({
+      slug: 'staged-seo-article', title: 'Staged SEO article', summary: 'Public article summary',
+      body: 'Public article body', status: 'published', category: '', tags: [],
+      seo: { title: 'Approved Article SEO', description: null, socialImage: null, indexable: null },
+    }, adminCookie));
+    if (article.status !== 201) throw new Error('Staged article fixture could not be created');
+    const version = (await article.json()).article.version;
+    const wrongArticleEditor = await request('/api/admin/articles/staged-seo-article',
+      json({ action: 'save', version, seo: { title: 'Owner hijack', indexable: false } },
+        ownerACookie, 'PATCH'));
+    if (![401, 403, 404].includes(wrongArticleEditor.status)) {
+      throw new Error('An owner changed article search overrides');
+    }
+    const staged = await request('/api/admin/articles/staged-seo-article',
+      json({ action: 'save', version,
+        seo: { title: 'Unpublished Article SEO', description: null,
+          socialImage: null, indexable: false } }, editorCookie, 'PATCH'));
+    if (!staged.ok) throw new Error(`Editor could not stage article SEO: HTTP ${staged.status}`);
+    const beforePublish = await (await request('/articles/staged-seo-article')).text();
+    if (!beforePublish.includes('Approved Article SEO') ||
+        beforePublish.includes('Unpublished Article SEO') || beforePublish.includes('content="noindex')) {
+      throw new Error('Staged article SEO leaked into initial public HTML');
+    }
+    const stagedVersion = (await staged.json()).article.version;
+    const published = await request('/api/admin/articles/staged-seo-article',
+      json({ action: 'publish', version: stagedVersion }, editorCookie, 'PATCH'));
+    const afterPublish = await (await request('/articles/staged-seo-article')).text();
+    if (!published.ok || !afterPublish.includes('Unpublished Article SEO') ||
+        !afterPublish.includes('content="noindex')) {
+      throw new Error('Published article SEO did not replace the staged values');
     }
   });
 
@@ -115,6 +204,29 @@ try {
         sitemap.includes(`${origin}/articles/noindex-seo-article`) ||
         !sitemap.includes(`${origin}/listings/example-tool`)) {
       throw new Error('Published noindex page metadata and sitemap eligibility disagree');
+    }
+    const stagedListing = await request('/api/owner/listings/seo-owned', json({
+      seo: { title: 'Noindex Owner SEO', description: null, socialImage: null, indexable: false },
+    }, ownerACookie, 'PATCH'));
+    if (!stagedListing.ok) throw new Error('Owner could not stage a noindex listing revision');
+    const beforeApprovalHtml = await (await request('/listings/seo-owned')).text();
+    const beforeApprovalSitemap = await (await request('/sitemap.xml')).text();
+    if (beforeApprovalHtml.includes('Noindex Owner SEO') ||
+        beforeApprovalHtml.includes('content="noindex') ||
+        !beforeApprovalSitemap.includes(`${origin}/listings/seo-owned`)) {
+      throw new Error('Staged noindex listing changed public crawl state before approval');
+    }
+    const submitted = await request('/api/owner/listings/seo-owned/submit', json({}, ownerACookie));
+    if (!submitted.ok) throw new Error('Noindex listing revision could not be submitted');
+    const submissionId = (await submitted.json()).submission?.id;
+    const approved = await request(`/api/admin/submissions/${submissionId}/decision`,
+      json({ decision: 'approve', reason: 'Noindex release check' }, adminCookie));
+    const afterApprovalHtml = await (await request('/listings/seo-owned')).text();
+    const afterApprovalSitemap = await (await request('/sitemap.xml')).text();
+    if (!approved.ok || !afterApprovalHtml.includes('Noindex Owner SEO') ||
+        !afterApprovalHtml.includes('content="noindex') ||
+        afterApprovalSitemap.includes(`${origin}/listings/seo-owned`)) {
+      throw new Error('Approved noindex listing metadata and sitemap eligibility disagree');
     }
   });
 
