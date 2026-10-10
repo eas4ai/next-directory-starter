@@ -1,0 +1,382 @@
+import { randomBytes } from 'node:crypto';
+import { spawn, spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { createServer } from 'node:net';
+import { createServer as createHttpServer } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import Database from 'better-sqlite3';
+import { chromium } from 'playwright-core';
+import sharp from 'sharp';
+
+const ids = ['ING-001', 'ING-002', 'ING-003', 'ING-004'];
+const results = Object.fromEntries(ids.map((id) => [id, false]));
+const workspace = mkdtempSync(join(tmpdir(), 'directory-agent-check-'));
+const databasePath = join(workspace, 'directory.db');
+const password = randomBytes(20).toString('hex');
+let origin;
+let env;
+let app;
+let adminCookie;
+let staffCookie;
+let ownerCookie;
+let token;
+let staged;
+let browser;
+
+function assert(value, message) {
+  if (!value) throw new Error(message);
+}
+
+async function freePort() {
+  const server = createServer();
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const port = server.address().port;
+  await new Promise((resolve) => server.close(resolve));
+  return port;
+}
+
+function command(args) {
+  const result = spawnSync('npm', args, { env, encoding: 'utf8', timeout: 180_000 });
+  if (result.status !== 0) throw new Error(`npm ${args[1] ?? args[0]} failed: ${(result.stderr || result.stdout).slice(-1600)}`);
+}
+
+async function start() {
+  app = spawn('npm', ['run', 'start', '--', '-p', new URL(origin).port],
+    { env, detached: true, stdio: 'ignore' });
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    if (app.exitCode !== null) break;
+    try {
+      if ((await fetch(origin, { signal: AbortSignal.timeout(1000) })).status < 500) return;
+    } catch { /* startup */ }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error('Production server did not start.');
+}
+
+const request = (path, options = {}) => fetch(new URL(path, origin), { redirect: 'manual', ...options });
+const json = (body, cookie, method = 'POST') => ({
+  method, body: JSON.stringify(body),
+  headers: { Origin: origin, 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) },
+});
+const cookieFrom = (response) => response.headers.getSetCookie()
+  .map((value) => value.split(';')[0]).join('; ');
+
+async function provision(email, role) {
+  command(['run', 'account:provision', '--', '--email', email,
+    '--password', password, '--role', role, '--yes']);
+  const response = await request('/api/auth/sign-in/email', json({ email, password }));
+  assert(response.ok, `${role} sign-in failed: ${response.status}`);
+  const cookie = cookieFrom(response);
+  assert(cookie, `${role} sign-in returned no cookie`);
+  return cookie;
+}
+
+async function mcp(method, params = {}, bearer = token) {
+  const response = await request('/api/mcp', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json',
+      Accept: 'application/json, text/event-stream' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: randomBytes(4).toString('hex'), method, params }),
+  });
+  const text = await response.text();
+  assert(response.ok, `MCP ${method} returned ${response.status}: ${text.slice(0, 180)}`);
+  const message = text.startsWith('event:')
+    ? text.split('\n').find((line) => line.startsWith('data:'))?.slice(5).trim()
+    : text;
+  const result = JSON.parse(message || '{}');
+  assert(!result.error, `MCP ${method} error: ${JSON.stringify(result.error)}`);
+  return result.result;
+}
+
+async function tool(name, args = {}) {
+  const result = await mcp('tools/call', { name, arguments: args });
+  assert(!result.isError, `Tool ${name} failed: ${JSON.stringify(result.content).slice(0, 220)}`);
+  const content = result.content?.find((part) => part.type === 'text')?.text;
+  assert(content, `Tool ${name} returned no text result`);
+  return JSON.parse(content);
+}
+
+async function check(id, run) {
+  try { await run(); results[id] = true; }
+  catch (error) { process.stderr.write(`${id}: ${error.message}\n`); }
+}
+
+const first = {
+  idempotencyKey: 'awesome-first', url: 'https://example.org/first',
+  sourceUrl: 'https://github.com/example/awesome-links',
+  sourceExcerpt: 'First Resource is a useful browser tool.',
+  name: 'First Resource', summary: 'A useful browser tool found in the source list.',
+  description: 'A browser tool described by the source list and its linked page.',
+  category: 'Tools',
+};
+const second = {
+  idempotencyKey: 'awesome-second', url: 'https://example.org/second',
+  sourceUrl: 'https://example.org/resource-directory',
+  sourceExcerpt: 'The resource directory links to Second Resource.',
+  name: 'Second Resource', summary: 'A second browser tool with a clear purpose.',
+  description: 'A second resource described by the source list.',
+  category: 'Tools',
+};
+
+try {
+  origin = `http://127.0.0.1:${await freePort()}`;
+  env = { ...process.env, CI: '1', DATABASE_URL: `file:${databasePath}`,
+    BETTER_AUTH_SECRET: randomBytes(32).toString('hex'), BETTER_AUTH_URL: origin, SITE_URL: origin };
+  command(['run', 'db:migrate']);
+  command(['run', 'db:seed']);
+  command(['run', 'build']);
+  await start();
+  adminCookie = await provision('agent-admin@example.invalid', 'admin');
+  staffCookie = await provision('agent-staff@example.invalid', 'catalog');
+  ownerCookie = await provision('agent-owner@example.invalid', 'user');
+
+  await check('ING-001', async () => {
+    const guest = await request('/admin/import');
+    const owner = await request('/admin/import', { headers: { Cookie: ownerCookie } });
+    const admin = await request('/admin/import', { headers: { Cookie: adminCookie } });
+    const staff = await request('/admin/import', { headers: { Cookie: staffCookie } });
+    assert(guest.status === 403 && owner.status === 403 && admin.ok && staff.ok,
+      'Import workspace access did not follow catalog permissions.');
+    const deniedKey = await request('/api/agent/keys', json({ name: 'denied' }, ownerCookie));
+    assert(deniedKey.status === 403, 'Ordinary owner created an agent credential.');
+    const created = await request('/api/agent/keys', json({ name: 'directory-check', expiresInDays: 7 }, adminCookie));
+    assert(created.status === 201, `Admin credential creation returned ${created.status}`);
+    const body = await created.json();
+    token = body.secret;
+    assert(typeof token === 'string' && token.length >= 32, 'Credential was not returned once.');
+    const unauthenticated = await request('/api/mcp', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+    });
+    assert(unauthenticated.status === 401, 'MCP exposed tools without a credential.');
+    const listed = await mcp('tools/list');
+    for (const name of ['list_categories', 'stage_links', 'list_imports',
+      'publish_import', 'attach_screenshot', 'preview_card']) {
+      assert(listed.tools?.some((entry) => entry.name === name), `MCP omitted ${name}.`);
+    }
+    const staffCreated = await request('/api/agent/keys',
+      json({ name: 'staff-check', expiresInDays: 7 }, staffCookie));
+    assert(staffCreated.status === 201, 'Catalog staff could not create a credential.');
+    const staffKey = await staffCreated.json();
+    assert(staffKey.id && staffKey.secret, 'Staff credential response is incomplete.');
+    const staffTools = await mcp('tools/list', {}, staffKey.secret);
+    assert(staffTools.tools?.some((entry) => entry.name === 'stage_links'),
+      'Catalog staff cannot list import tools.');
+    const revoke = await request(`/api/agent/keys/${staffKey.id}`,
+      { method: 'DELETE', headers: { Origin: origin, Cookie: staffCookie } });
+    assert(revoke.ok, 'Catalog staff could not revoke their credential.');
+    const revoked = await request('/api/mcp', { method: 'POST',
+      headers: { Authorization: `Bearer ${staffKey.secret}`,
+        'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) });
+    assert(revoked.status === 401, 'Revoked credential still lists tools.');
+    const currentKey = await request('/api/agent/keys',
+      json({ name: 'current-role-check', expiresInDays: 7 }, staffCookie));
+    assert(currentKey.status === 201, 'Could not create the current-role probe.');
+    const currentSecret = (await currentKey.json()).secret;
+    const db = new Database(databasePath);
+    try {
+      db.prepare('UPDATE "user" SET role = ? WHERE email = ?')
+        .run('user', 'agent-staff@example.invalid');
+      const removedRole = await request('/api/mcp', { method: 'POST',
+        headers: { Authorization: `Bearer ${currentSecret}`,
+          'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' }) });
+      assert([401, 403].includes(removedRole.status), 'Removed catalog role kept MCP access.');
+      db.prepare('UPDATE "user" SET role = ?, banned = 1 WHERE email = ?')
+        .run('catalog', 'agent-staff@example.invalid');
+      const suspended = await request('/api/mcp', { method: 'POST',
+        headers: { Authorization: `Bearer ${currentSecret}`,
+          'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/list' }) });
+      assert([401, 403].includes(suspended.status), 'Suspended account kept MCP access.');
+    } finally {
+      db.prepare('UPDATE "user" SET role = ?, banned = 0 WHERE email = ?')
+        .run('catalog', 'agent-staff@example.invalid');
+      db.close();
+    }
+    assert(readFileSync('README.md', 'utf8').includes('claude mcp add --transport http') &&
+      readFileSync('README.md', 'utf8').includes('agent-browser') &&
+      readFileSync('README.md', 'utf8').includes('single URL') &&
+      readFileSync('README.md', 'utf8').includes('directory page'),
+    'Claude Code and agent-browser setup for each source shape is undocumented.');
+    const databaseBytes = readFileSync(databasePath);
+    assert(!databaseBytes.includes(Buffer.from(token)), 'Credential is stored in database plaintext.');
+    browser = await chromium.launch({ headless: true,
+      ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: 'chrome' }),
+      args: ['--no-sandbox'] });
+    const context = await browser.newContext();
+    try {
+      await context.addCookies(adminCookie.split('; ').map((pair) => {
+        const separator = pair.indexOf('=');
+        return { name: pair.slice(0, separator), value: pair.slice(separator + 1), url: origin };
+      }));
+      await context.addInitScript(() => {
+        window.__agentTools = [];
+        Object.defineProperty(document, 'modelContext', { configurable: true, value: {
+          registerTool: async (definition) => { window.__agentTools.push(definition.name); },
+        } });
+      });
+      const page = await context.newPage();
+      await page.goto(`${origin}/admin/import`, { waitUntil: 'networkidle' });
+      await page.waitForFunction(() => window.__agentTools?.includes('stage_links'));
+      const names = await page.evaluate(() => window.__agentTools);
+      assert(names.includes('publish_import') && names.includes('attach_screenshot'),
+        'Supported browser did not register its import tools.');
+    } finally { await context.close(); }
+  });
+
+  await check('ING-002', async () => {
+    const stageResponse = await request('/api/agent/imports',
+      json({ items: [first,
+        { ...first, idempotencyKey: 'bad-category', url: 'https://example.org/bad', category: 'Missing' },
+        second] }, adminCookie));
+    assert(stageResponse.ok, `Browser import staging returned ${stageResponse.status}.`);
+    const batch = await stageResponse.json();
+    assert(batch.items?.length === 3, 'Batch did not return one result per item.');
+    assert(batch.items[0].status === 'created' && batch.items[1].status === 'invalid' &&
+      batch.items[2].status === 'created', 'Valid and invalid items were not isolated.');
+    staged = { first: batch.items[0].slug, second: batch.items[2].slug };
+    assert(staged.first && staged.second, 'Created items have no slugs.');
+    assert(token, 'Remote credential is unavailable.');
+    const categories = await tool('list_categories');
+    assert(categories.categories?.includes('Tools'), 'Known category is not discoverable.');
+    const single = { ...first, idempotencyKey: 'single-url',
+      url: 'https://example.org/single', sourceUrl: 'https://example.org/single',
+      sourceExcerpt: 'Single Resource introduces its own browser workflow.',
+      name: 'Single Resource' };
+    const singleResult = await tool('stage_links', { items: [single] });
+    assert(singleResult.items?.[0]?.status === 'created',
+      'A single observed URL cannot be staged through MCP.');
+    const retry = await tool('stage_links', { items: [first] });
+    assert(retry.items?.[0]?.slug === staged.first && retry.items[0].status !== 'created',
+      'Retry created a second listing.');
+    const duplicate = await tool('stage_links', { items: [{ ...first,
+      idempotencyKey: 'different-key-same-url' }] });
+    assert(duplicate.items?.[0]?.status === 'duplicate',
+      'A different key created a duplicate destination.');
+    const missingSource = await tool('stage_links', { items: [{ ...first,
+      idempotencyKey: 'missing-source', url: 'https://example.org/missing', sourceExcerpt: '' }] });
+    assert(missingSource.items?.[0]?.status === 'invalid', 'Missing source evidence was accepted.');
+    const overLimit = await mcp('tools/call', { name: 'stage_links', arguments: {
+      items: Array.from({ length: 21 }, (_, index) => ({ ...first,
+        idempotencyKey: `too-many-${index}`, url: `https://example.org/too-many-${index}` })) } });
+    assert(overLimit.isError, 'A batch above 20 items was accepted.');
+    let privateFetches = 0;
+    const privateServer = createHttpServer((_incoming, outgoing) => {
+      privateFetches += 1;
+      outgoing.writeHead(200).end('private service');
+    });
+    await new Promise((resolve) => privateServer.listen(0, '127.0.0.1', resolve));
+    try {
+      const privateUrl = `http://127.0.0.1:${privateServer.address().port}/private`;
+      const privateResult = await tool('stage_links', { items: [{ ...first,
+        idempotencyKey: 'private-address', url: privateUrl }] });
+      assert(privateResult.items?.[0]?.status === 'invalid',
+        'A private network destination was accepted.');
+      assert(privateFetches === 0, 'The directory fetched a submitted private address.');
+    } finally {
+      await new Promise((resolve) => privateServer.close(resolve));
+    }
+    const publicDraft = await request(`/listings/${staged.first}`);
+    assert(publicDraft.status === 404, 'Staged import is already public.');
+    const imports = await tool('list_imports');
+    assert(imports.items?.some((item) => item.slug === staged.first &&
+      item.sourceUrl === first.sourceUrl && item.sourceExcerpt === first.sourceExcerpt),
+    'Import provenance is absent from the private listing.');
+  });
+
+  await check('ING-003', async () => {
+    assert(staged?.first, 'Staging prerequisite did not pass.');
+    const ownerPublish = await request(`/api/agent/imports/${staged.first}/publish`,
+      json({}, ownerCookie));
+    assert(ownerPublish.status === 403, 'Ordinary owner published an agent import.');
+    const published = await tool('publish_import', { slug: staged.first });
+    assert(published.status === 'published', 'Publish tool did not publish the import.');
+    const page = await request(`/listings/${staged.first}`);
+    const html = await page.text();
+    assert(page.ok && html.includes(first.name) && html.includes(first.summary) &&
+      html.includes(first.url), 'Public listing differs from the staged fields.');
+    const db = new Database(databasePath, { readonly: true });
+    try {
+      const audit = db.prepare("SELECT actor_user_id, occurred_at FROM audit_events WHERE action = 'catalog.publish' AND target = ?")
+        .get(staged.first);
+      assert(audit?.actor_user_id && audit?.occurred_at, 'Publication audit lacks actor or time.');
+    } finally { db.close(); }
+  });
+
+  await check('ING-004', async () => {
+    assert(staged?.second, 'Staging prerequisite did not pass.');
+    const screenshot = await sharp({ create: { width: 640, height: 400,
+      channels: 3, background: '#ee00ee' } }).jpeg().toBuffer();
+    const attached = await tool('attach_screenshot', { slug: staged.second,
+      mimeType: 'image/jpeg', base64: screenshot.toString('base64') });
+    assert(attached.slug === staged.second, 'Agent-browser screenshot was not attached.');
+    const forged = await mcp('tools/call', { name: 'attach_screenshot', arguments: {
+      slug: staged.second, mimeType: 'image/png', base64: screenshot.toString('base64') } });
+    assert(forged.isError, 'Forged screenshot MIME was accepted.');
+    const oversizedDimensions = await sharp({ create: { width: 4097, height: 1,
+      channels: 3, background: '#ee00ee' } }).png().toBuffer();
+    const oversized = await mcp('tools/call', { name: 'attach_screenshot', arguments: {
+      slug: staged.second, mimeType: 'image/png', base64: oversizedDimensions.toString('base64') } });
+    assert(oversized.isError, 'Oversized screenshot dimensions were accepted.');
+    const rawGuest = await request(`/api/agent/imports/${staged.second}/screenshot`);
+    assert([401, 403, 404].includes(rawGuest.status), 'Guest can read a raw screenshot.');
+    const draftPublic = await request(`/og/listings/${staged.second}.png`);
+    assert(draftPublic.status === 404, 'Draft social card is public.');
+    const draftGuest = await request(`/api/agent/imports/${staged.second}/card`);
+    assert(draftGuest.status === 401 || draftGuest.status === 403, 'Guest can preview draft card.');
+    const draftPreview = await request(`/api/agent/imports/${staged.second}/card`,
+      { headers: { Cookie: adminCookie } });
+    assert(draftPreview.ok, 'Authorized draft card preview failed.');
+    const previewBytes = Buffer.from(await draftPreview.arrayBuffer());
+    const preview = await sharp(previewBytes).metadata();
+    assert(preview.format === 'png' && preview.width === 1200 && preview.height === 630,
+      'Generated card format or dimensions are wrong.');
+    const { data: pixels, info } = await sharp(previewBytes).raw().toBuffer({ resolveWithObject: true });
+    let screenshotPixels = 0;
+    for (let offset = 0; offset < pixels.length; offset += info.channels) {
+      if (pixels[offset] > 190 && pixels[offset + 1] < 90 && pixels[offset + 2] > 190) {
+        screenshotPixels += 1;
+      }
+    }
+    assert(screenshotPixels > 1000, 'Generated card omitted the attached screenshot.');
+    await tool('publish_import', { slug: staged.second });
+    const publishedCard = await request(`/og/listings/${staged.second}.png`);
+    assert(publishedCard.ok && publishedCard.headers.get('content-type')?.includes('image/png'),
+      'Published card is unavailable as PNG.');
+    const publishedPage = await request(`/listings/${staged.second}`);
+    const html = await publishedPage.text();
+    assert(html.includes(`/og/listings/${staged.second}.png`) &&
+      html.includes('og:image') && html.includes('twitter:image'),
+    'Public social metadata does not reference the generated card.');
+    const db = new Database(databasePath);
+    try {
+      db.prepare(`INSERT INTO seo_overrides (kind, slug, public_json, updated_at)
+        VALUES ('listing', ?, ?, ?) ON CONFLICT(kind, slug) DO UPDATE SET
+        public_json = excluded.public_json, updated_at = excluded.updated_at`)
+        .run(staged.second, JSON.stringify({ title: null, description: null,
+          socialImage: 'https://cdn.example.org/custom.png', indexable: null }),
+        new Date().toISOString());
+    } finally { db.close(); }
+    const customHtml = await (await request(`/listings/${staged.second}`)).text();
+    assert(customHtml.includes('https://cdn.example.org/custom.png'),
+      'Published custom social image was replaced by the generated card.');
+    const suspend = await request(`/api/admin/listings/${staged.second}`,
+      json({ ...second, slug: staged.second, status: 'suspended' }, adminCookie, 'PATCH'));
+    assert(suspend.ok, `Suspending the listing returned ${suspend.status}`);
+    assert((await request(`/og/listings/${staged.second}.png`)).status === 404,
+      'Suspended listing kept a public card.');
+  });
+} catch (error) {
+  process.stderr.write(`agent-ingestion setup: ${error.message}\n`);
+} finally {
+  if (browser) await browser.close();
+  if (app?.pid) {
+    try { process.kill(-app.pid, 'SIGTERM'); } catch { /* already stopped */ }
+  }
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  rmSync(workspace, { recursive: true, force: true });
+  process.stdout.write(JSON.stringify(results) + '\n');
+}
