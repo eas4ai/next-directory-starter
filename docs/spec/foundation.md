@@ -31,3 +31,8 @@ Status: Agreed 2026-10-10
 Falsifier: On a fresh isolated installation with only `.env.local` naming a custom SQLite file, migration or seed creates or reads a different default database; a maintenance command targets that default; an exported `DATABASE_URL` is ignored; or the manual still says a shell export is required to avoid split databases.
 Mechanism: cli-env-consistency
 Status: Agreed 2026-10-10
+
+[FOUND-007] The repository provides one documented command that runs every `tests/*.test.mjs` file without concurrent changes to the shared `.next` build output. Migration fixtures represent the schema versions they claim are already applied, and HTTP access assertions reflect the current staff role permissions.
+Falsifier: The documented test command omits a test file or fails from concurrent builds, a migration fixture claims applied versions while missing their tables, or an HTTP test expects access that the declared role is denied.
+Mechanism: test-suite
+Status: Agreed 2026-10-10

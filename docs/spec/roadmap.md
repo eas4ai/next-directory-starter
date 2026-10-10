@@ -407,3 +407,17 @@ Done-when: a clean image build and isolated Compose run serve the public
 directory; migration, seed, and maintenance commands share its database; a
 container replacement preserves content and media; the container is non-root;
 and the image contains neither deployment secrets nor operator data.
+
+## test-suite-regressions
+
+Requirements: FOUND-007
+
+Delivery: add a single repository test command that runs all Node tests without
+allowing the production-build tests to contend for `.next`. Correct the legacy
+plan migration fixture to include its declared prior schema, and align the
+content HTTP test with the current staff role permissions. Keep the production
+permission and migration behavior intact.
+
+Done-when: the command covers every `tests/*.test.mjs` file and completes with
+no failures; the isolated legacy-plan fixture migrates with valid foreign keys;
+and the content HTTP checks enforce the current editor and taxonomy boundaries.
