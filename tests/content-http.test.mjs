@@ -98,16 +98,19 @@ try {
   const first = (await uploaded.json()).asset.id;
   assert.equal((await request(`/api/media/${first}`)).status, 404);
   assert.equal((await request(`/api/media/${first}`, { headers: { Cookie: editor } })).status, 404);
+  assert.equal((await request(`/api/media/${first}`, { headers: { Cookie: moderator } })).status, 404);
   assert.equal((await request(`/api/media/${first}`, { headers: { Cookie: owner } })).status, 200);
   assert.equal((await request(`/media/${first}`)).status, 404);
 
   const submission = await request('/api/owner/listings/http-media/submit', json({}, owner));
   await expectStatus(submission, 200);
   const submissionId = (await submission.json()).submission.id;
+  assert.equal((await request(`/api/media/${first}`, { headers: { Cookie: moderator } })).status, 200);
   const approved = await request(`/api/admin/submissions/${submissionId}/decision`,
     json({ decision: 'approve', reason: 'Good' }, moderator));
   await expectStatus(approved, 200);
   assert.equal((await request(`/media/${first}`)).status, 200);
+  assert.equal((await request(`/api/media/${first}`, { headers: { Cookie: moderator } })).status, 404);
   const revised = await upload('http-media', owner, image);
   await expectStatus(revised, 201);
   const second = (await revised.json()).asset.id;
