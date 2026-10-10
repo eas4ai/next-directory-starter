@@ -36,7 +36,7 @@ adapted to a subject other than developer resources.
 | Source-verified product overview and operator manual | documentation.md | DOC |
 | Visitor light and dark appearance | appearance.md | UI |
 | Custom themes, templates, branding, and the creation skill | theming.md | THM |
-| Backup, restore, and upgrade operations | operations.md | OPS |
+| Container deployment, backup, restore, and upgrades | operations.md | OPS |
 | Account verification, recovery, magic links, and suspension | accounts.md | ACC |
 | Public discovery, search, categories, and listing pages | directory.md | DIR |
 | Accounts, ownership, submission, and moderation | publishing.md | PUB |

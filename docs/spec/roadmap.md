@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: cli-env-local-mismatch
+Current: container-deployment
 
 ## public-starter-and-theme
 
@@ -392,3 +392,18 @@ migrates authentication and catalog tables, seeds listings, and runs its
 maintenance commands against that one file without creating the default file;
 an explicit process environment path overrides the local file; the manual
 matches the verified behavior.
+
+## container-deployment
+
+Requirements: OPS-003
+
+Delivery: add a multi-stage Dockerfile, a secret-excluding build context, and a
+single-host Compose service with a persistent SQLite and media volume. Keep
+runtime configuration outside the image and expose a local port for an operator
+reverse proxy. Document first start, explicit migrations and optional seed,
+scheduled jobs, backup, restore, and upgrade commands for that container.
+
+Done-when: a clean image build and isolated Compose run serve the public
+directory; migration, seed, and maintenance commands share its database; a
+container replacement preserves content and media; the container is non-root;
+and the image contains neither deployment secrets nor operator data.
