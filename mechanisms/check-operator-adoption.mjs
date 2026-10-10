@@ -403,6 +403,31 @@ try {
         }
       }
     } finally { await context.close(); await other.close(); }
+      const systemContext = await chromiumBrowser.newContext({ viewport: { width: 320, height: 740 },
+        colorScheme: 'dark' });
+      try {
+        const systemPage = await systemContext.newPage();
+        await systemPage.goto(origin, { waitUntil: 'domcontentloaded' });
+        const switchButton = systemPage.getByRole('button', { name: 'Appearance' });
+        await systemPage.waitForFunction(() => document.querySelector(
+          'button[aria-label="Appearance"]')?.getAttribute('title') === 'Switch to light appearance');
+        if (await systemPage.locator('html').getAttribute('data-mode') !== 'system' ||
+            await switchButton.getAttribute('aria-pressed') !== 'true' ||
+            (await switchButton.textContent())?.trim() !== 'Dark') {
+          throw new Error('System mode did not report the dark OS appearance');
+        }
+        await switchButton.focus();
+        await systemPage.keyboard.press('Enter');
+        await systemPage.waitForFunction(() => document.documentElement.dataset.mode === 'light');
+        if (await switchButton.getAttribute('title') !== 'Switch to dark appearance' ||
+            await switchButton.getAttribute('aria-pressed') !== 'false') {
+          throw new Error('System appearance switch reported the wrong next action');
+        }
+        await systemPage.reload({ waitUntil: 'domcontentloaded' });
+        if (await systemPage.locator('html').getAttribute('data-mode') !== 'light') {
+          throw new Error('System appearance choice did not persist');
+        }
+      } finally { await systemContext.close(); }
   });
 
   await check('OPS-001', async () => {
