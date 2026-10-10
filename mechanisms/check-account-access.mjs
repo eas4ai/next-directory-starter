@@ -18,6 +18,7 @@ let mailServer;
 let app;
 let appEnv;
 let origin;
+let mailFailure = false;
 
 function requireCommand(args) {
   const result = spawnSync('npm', args, { env: appEnv, encoding: 'utf8', timeout: 120_000 });
@@ -45,6 +46,11 @@ async function startMail() {
     let body = '';
     for await (const chunk of request) body += chunk.toString('utf8');
     const email = JSON.parse(body);
+    if (mailFailure) {
+      response.writeHead(401, { 'Content-Type': 'application/json' })
+        .end(JSON.stringify({ error: { message: 'Invalid test Resend credential' } }));
+      return;
+    }
     messages.push({ to: String(email.to?.[0]).toLowerCase(), body: String(email.text ?? '') });
     response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ id: `test-${messages.length}` }));
   });
@@ -82,7 +88,14 @@ async function startApp() {
 
 async function stopApp() {
   if (!app) return;
-  try { process.kill(-app.pid, 'SIGTERM'); } catch { /* already stopped */ }
+  const child = app;
+  try { process.kill(-child.pid, 'SIGTERM'); } catch { /* already stopped */ }
+  if (child.exitCode === null) {
+    await Promise.race([
+      new Promise((resolve) => child.once('exit', resolve)),
+      new Promise((resolve) => setTimeout(resolve, 2_000)),
+    ]);
+  }
   app = undefined;
   await new Promise((resolve) => setTimeout(resolve, 300));
 }
@@ -97,8 +110,15 @@ const json = (body, cookie, method = 'POST') => ({
 });
 
 async function signIn(email, secret = password) {
-  const response = await request('/api/auth/sign-in/email', json({ email, password: secret }));
-  return { response, cookie: cookieFrom(response) };
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const response = await request('/api/auth/sign-in/email', json({ email, password: secret }));
+    if (response.status === 429 && attempt < 4) {
+      await new Promise((resolve) => setTimeout(resolve, 2_500));
+      continue;
+    }
+    return { response, cookie: cookieFrom(response) };
+  }
+  throw new Error('Sign-in rate limit persisted.');
 }
 
 async function provision(email, role = 'user', markVerified = true) {
@@ -177,7 +197,37 @@ try {
     if (expiredVerified) throw new Error('Expired verification link verified an account.');
     const admin = await provision('first-admin@example.invalid', 'admin', false);
     if (!admin.cookie) throw new Error('First host-provisioned administrator cannot sign in.');
+    const failureEmail = 'delivery-failure@example.invalid';
+    mailFailure = true;
+    const failedDeliverySignup = await request('/api/auth/sign-up/email',
+      json({ name: 'Delivery Failure', email: failureEmail, password }));
+    if (!failedDeliverySignup.ok) throw new Error('Configured sender could not open public signup.');
+    let deliveryAudit;
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      deliveryAudit = withDb((db) => db.prepare(`SELECT actor_user_id FROM audit_events
+        WHERE action = 'account.email_delivery_failed' AND target = ?`).get(`verification:${failureEmail}`));
+      if (deliveryAudit) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (deliveryAudit?.actor_user_id !== 'system') {
+      throw new Error('Resend rejection is absent from operator audit history.');
+    }
+    const auditPage = await request('/admin/audit', { headers: { Cookie: admin.cookie } });
+    if (!auditPage.ok || !(await auditPage.text()).includes('account.email_delivery_failed')) {
+      throw new Error('Operator audit page does not expose account email delivery failures.');
+    }
+    mailFailure = false;
+    const beforeRecovery = messages.length;
+    await signIn(failureEmail);
+    const recoveryLink = await mailLink(failureEmail, beforeRecovery);
+    const recovery = await request(recoveryLink);
+    const recoveredSession = await signIn(failureEmail);
+    if (recovery.status >= 400 || !recoveredSession.response.ok || !recoveredSession.cookie) {
+      throw new Error(`Account could not recover after the sender was repaired (link ${recovery.status}, sign-in ${recoveredSession.response.status}, cookie ${Boolean(recoveredSession.cookie)}).`);
+    }
   });
+  mailFailure = false;
+  appEnv.RESEND_FROM = 'Directory test <mail@test.local>';
   await stopApp();
   await startApp();
 
@@ -339,6 +389,21 @@ try {
       throw new Error('Account administration has no suspension control.');
     }
   });
+  await stopApp();
+  appEnv.RESEND_FROM = '';
+  await startApp();
+  try {
+    const unavailableEmail = 'unavailable-signup@example.invalid';
+    const unavailable = await request('/api/auth/sign-up/email',
+      json({ name: 'Unavailable Signup', email: unavailableEmail, password }));
+    const absent = withDb((db) => db.prepare('SELECT id FROM "user" WHERE email = ?').get(unavailableEmail));
+    if (unavailable.status !== 503 || absent) {
+      throw new Error('Missing Resend sender did not stop public signup before account creation.');
+    }
+  } catch (error) {
+    results['ACC-001'] = false;
+    process.stderr.write(`ACC-001: ${error.message}\n`);
+  }
 } catch (error) {
   process.stderr.write(`Account mechanism setup: ${error.message}\n`);
 } finally {

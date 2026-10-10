@@ -13,7 +13,7 @@ export const auth = betterAuth({
     expiresIn: Number(process.env.ACCOUNT_VERIFY_TTL_SECONDS ?? "3600"),
     sendVerificationEmail: async ({ user, url }) => {
       after(async () => {
-        try { await sendAccountEmail(user.email, "Verify your email address", `Verify your account: ${url}`); }
+        try { await sendAccountEmail(user.email, "Verify your email address", `Verify your account: ${url}`, "verification"); }
         catch { console.error("Account verification email delivery failed."); }
       });
     },
@@ -24,7 +24,7 @@ export const auth = betterAuth({
     revokeSessionsOnPasswordReset: true,
     sendResetPassword: async ({ user, url }) => {
       after(async () => {
-        try { await sendAccountEmail(user.email, "Reset your password", `Reset your password: ${url}`); }
+        try { await sendAccountEmail(user.email, "Reset your password", `Reset your password: ${url}`, "reset"); }
         catch { console.error("Password reset email delivery failed."); }
       });
     },
@@ -40,7 +40,7 @@ export const auth = betterAuth({
           .get(email) as { emailVerified: number; banned: number } | undefined;
         if (!account?.emailVerified || account.banned) return;
         after(async () => {
-          try { await sendAccountEmail(email, "Your sign-in link", `Sign in to your account: ${url}`); }
+          try { await sendAccountEmail(email, "Your sign-in link", `Sign in to your account: ${url}`, "magic"); }
           catch { console.error("Magic sign-in email delivery failed."); }
         });
       },
