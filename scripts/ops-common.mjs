@@ -80,6 +80,22 @@ export function readKey(file) {
   return encoded;
 }
 
+function inspectBrandAssets(db, mediaDirectory) {
+  const brand = db.prepare("SELECT value FROM site_settings WHERE key = 'site_branding'").get();
+  if (!brand) return;
+  let settings;
+  try { settings = JSON.parse(brand.value); }
+  catch { throw new Error('Saved branding settings are invalid'); }
+  for (const field of ['logoUrl', 'iconUrl', 'socialImage']) {
+    const value = settings[field];
+    if (typeof value !== 'string' || !value.startsWith('/brand-assets/')) continue;
+    const id = /^\/brand-assets\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.webp$/.exec(value)?.[1];
+    if (!id || !lstatSync(join(mediaDirectory, `${id}.webp`), { throwIfNoEntry: false })?.isFile()) {
+      throw new Error('A current brand image is missing');
+    }
+  }
+}
+
 export function inspectDatabase(file, mediaDirectory, encodedKey) {
   const db = new Database(file, { readonly: true, fileMustExist: true });
   try {
@@ -95,6 +111,7 @@ export function inspectDatabase(file, mediaDirectory, encodedKey) {
         }
       }
     }
+    if (tables.includes('site_settings')) inspectBrandAssets(db, mediaDirectory);
     if (tables.includes('billing_profiles')) {
       const key = Buffer.from(encodedKey, 'base64url');
       for (const row of db.prepare(`SELECT provider, mode, api_key_cipher, webhook_secret_cipher

@@ -1,4 +1,4 @@
-import { declarationBlock, presetCss, type ThemePreset } from "@/lib/theme";
+import { declarationBlock, presetCss, presetSocialColors, type ThemePreset } from "@/lib/theme";
 import { themeDefinitions } from "@/themes";
 
 export const colorTokenNames = [
@@ -58,6 +58,9 @@ export function defineTheme(definition: ThemeDefinition): ThemeDefinition {
   requireValues("spacing", definition.spacing, ["section", "card", "gap"]);
   requireValues("width", definition.width, ["page", "reading"]);
   requireValues("social", definition.social, ["background", "foreground", "accent", "muted"]);
+  if (Object.values(definition.social).some((value) => !/^#[0-9a-fA-F]{6}$/.test(value))) {
+    throw new Error("Social palette colors must be six-digit hex values");
+  }
   for (const name of ["radius", "shadow", "controlHeight"] as const) {
     if (!safeValue(definition[name])) throw new Error(`Invalid theme token: ${name}`);
   }
@@ -76,6 +79,39 @@ if (Object.keys(installedThemes).length !== themeDefinitions.length) {
 
 export function isInstalledTheme(id: string): boolean {
   return id === "preset" || Object.hasOwn(installedThemes, id);
+}
+
+function oklchToHex(value: string): string {
+  const match = /^oklch\(([0-9.]+) ([0-9.]+) ([0-9.]+)\)$/.exec(value);
+  if (!match) throw new Error("Invalid preset social color");
+  const lightness = Number(match[1]);
+  const chroma = Number(match[2]);
+  const hue = Number(match[3]) * Math.PI / 180;
+  const a = chroma * Math.cos(hue);
+  const b = chroma * Math.sin(hue);
+  const l = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (lightness - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  const channels = [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -0.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+  ];
+  return `#${channels.map((channel) => {
+    const linear = Math.max(0, Math.min(1, channel));
+    const srgb = linear <= 0.0031308 ? 12.92 * linear :
+      1.055 * linear ** (1 / 2.4) - 0.055;
+    return Math.round(srgb * 255).toString(16).padStart(2, "0");
+  }).join("")}`;
+}
+
+export function socialPaletteForSelection(preset: ThemePreset, id: string): ThemeDefinition["social"] {
+  if (!isInstalledTheme(id)) throw new Error("Unknown theme");
+  if (id !== "preset") return installedThemes[id].social;
+  const colors = presetSocialColors(preset);
+  return { background: oklchToHex(colors.background),
+    foreground: oklchToHex(colors.foreground),
+    accent: oklchToHex(colors.accent), muted: oklchToHex(colors.muted) };
 }
 
 function themeVariables(theme: ThemeDefinition, mode: "light" | "dark"): Record<string, string> {

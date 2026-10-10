@@ -32,6 +32,7 @@ export default async function ThemePage() {
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Theme</h1>
         <p className="mt-3 text-muted-foreground">Choose a preset and preview it before saving it for the directory.</p>
         <Link href="/admin/catalog" className="mt-3 inline-block text-sm underline">Manage listings</Link>
+        <Link href="/admin/branding" className="ml-4 mt-3 inline-block text-sm underline">Branding</Link>
       </div>
       <ThemeEditor options={themeOptions} initialPreset={preset} initialSelection={selection}
         themes={themeChoices} templates={templateOptions} />

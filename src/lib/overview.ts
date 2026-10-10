@@ -41,6 +41,7 @@ export function overviewDestinations(role: string | null | undefined): { href: s
     { href: "/admin/accounts", label: "Accounts and roles" },
     { href: "/admin/seo", label: "Search settings" },
     { href: "/admin/theme", label: "Theme" },
+    { href: "/admin/branding", label: "Branding" },
     { href: "/admin/audit", label: "Audit history" },
   );
   return destinations;
