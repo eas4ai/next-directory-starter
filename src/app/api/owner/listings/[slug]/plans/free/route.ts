@@ -11,10 +11,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   catch (error) { return requestJsonErrorResponse(error); }
   const planKey = input && typeof input === "object" && !Array.isArray(input)
     ? (input as Record<string, unknown>).planKey : undefined;
+  const offerToken = input && typeof input === "object" && !Array.isArray(input)
+    ? (input as Record<string, unknown>).offerToken : undefined;
   if (typeof planKey !== "string") return Response.json({ error: "Choose a plan" }, { status: 400 });
+  if (typeof offerToken !== "string") return Response.json({ error: "Invalid plan terms" }, { status: 400 });
   const { slug } = await params;
   try {
-    return Response.json(acceptFreePlan(user.id, slug, planKey));
+    return Response.json(acceptFreePlan(user.id, slug, planKey, offerToken));
   } catch (error) {
     return checkoutErrorResponse(error);
   }

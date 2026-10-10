@@ -85,9 +85,11 @@ function reservePurchase(ownerUserId: string, listingSlug: string, planKey: stri
   }).immediate();
 }
 
-export function acceptFreePlan(ownerUserId: string, listingSlug: string, planKey: string): {
+export function acceptFreePlan(ownerUserId: string, listingSlug: string, planKey: string,
+  offerToken: string): {
   purchaseId: string; status: "free";
 } {
+  if (!/^[0-9a-f]{64}$/.test(offerToken)) throw new CheckoutError(400, "Invalid plan terms");
   return database.transaction(() => {
     const listing = database.prepare(`SELECT slug FROM listings
       WHERE slug = ? AND owner_user_id = ? AND status = 'published'`)
@@ -96,6 +98,9 @@ export function acceptFreePlan(ownerUserId: string, listingSlug: string, planKey
     const plan = planByKey(planKey);
     if (!plan || !plan.enabled || plan.mode !== checkoutMode() || plan.billingMode !== "free") {
       throw new CheckoutError(404, "Available free plan not found");
+    }
+    if (planOfferToken(plan) !== offerToken) {
+      throw new CheckoutError(409, "Plan terms changed. Refresh and review the plan");
     }
     const previous = database.prepare(`SELECT id FROM purchases
       WHERE listing_slug = ? AND owner_user_id = ? AND plan_key = ?

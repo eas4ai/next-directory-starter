@@ -19,7 +19,7 @@ export function CheckoutButton({ slug, planKey, offerToken, billingMode }: {
       const response = await fetch(`/api/owner/listings/${encodeURIComponent(slug)}/${billingMode === "free" ? "plans/free" : "checkout"}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(billingMode === "free" ? { planKey } :
+        body: JSON.stringify(billingMode === "free" ? { planKey, offerToken } :
           { planKey, offerToken, requestId: requestId.current }),
       });
       const result = await response.json();
