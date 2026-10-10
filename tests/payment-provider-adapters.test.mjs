@@ -45,6 +45,14 @@ test('provider SDK recovery reads existing payments and cancellation schedules o
     purchase('stripe-purchase', 'stripe', 'cs_stripe', 'price_once');
     purchase('paddle-purchase', 'paddle', 'txn_paddle', 'pri_once');
     purchase('now-purchase', 'nowpayments', 'invoice_now', null);
+    database.prepare(`INSERT INTO purchases
+      (id, listing_slug, owner_user_id, plan_key, plan_mode, billing_mode, plan_name,
+        plan_description, amount_minor, currency, duration_days, accepted_duration_days,
+        featured, stripe_session_id, checkout_request_id, status, created_at,
+        provider, provider_price_id)
+      VALUES ('stripe-early', 'mine', 'owner', 'once', 'test', 'one-time', 'Once', '',
+        1200, 'usd', 30, 30, 1, 'pending:stripe-early', 'early-request',
+        'pending', ?, 'stripe', 'price_once')`).run(new Date().toISOString());
     for (const provider of ['stripe', 'paddle', 'nowpayments']) {
       saveBillingProfile({ provider, mode: 'test', version: 0, enabled: false,
         apiKey: provider === 'stripe' ? 'sk_test_fixture' : `test_${provider}_key`,
@@ -58,12 +66,17 @@ test('provider SDK recovery reads existing payments and cancellation schedules o
       const url = new URL(String(input));
       const method = init.method ?? 'GET';
       requested.push(`${method} ${url.pathname}`);
-      if (url.pathname === '/v1/checkout/sessions/cs_stripe') return reply({
-        id: 'cs_stripe', object: 'checkout.session', client_reference_id: 'stripe-purchase',
-        payment_status: 'paid', payment_intent: 'pi_stripe', amount_total: 1200,
+      if (url.pathname === '/v1/checkout/sessions/cs_stripe' ||
+          url.pathname === '/v1/checkout/sessions/cs_early') {
+        const early = url.pathname.endsWith('cs_early');
+        return reply({
+        id: early ? 'cs_early' : 'cs_stripe', object: 'checkout.session',
+        client_reference_id: early ? 'stripe-early' : 'stripe-purchase',
+        payment_status: 'paid', payment_intent: early ? 'pi_early' : 'pi_stripe', amount_total: 1200,
         currency: 'usd', line_items: { object: 'list', data: [{ quantity: 1,
           price: { id: 'price_once' } }] },
-      });
+        });
+      }
       if (url.pathname === '/v1/charges' || url.pathname === '/v1/disputes') {
         return reply({ object: 'list', data: [], has_more: false });
       }
@@ -87,7 +100,12 @@ test('provider SDK recovery reads existing payments and cancellation schedules o
         purchaseId: id, found: 1, processed: 1, unresolved: 0,
       });
     }
-    assert.equal(database.prepare('SELECT COUNT(*) AS n FROM payment_periods').get().n, 3);
+    assert.deepEqual(await reconcilePurchase('stripe-early', 5, undefined, 'cs_early'), {
+      purchaseId: 'stripe-early', found: 1, processed: 1, unresolved: 0,
+    });
+    assert.equal(database.prepare("SELECT provider_resource_id FROM purchases WHERE id = 'stripe-early'")
+      .get().provider_resource_id, 'cs_early');
+    assert.equal(database.prepare('SELECT COUNT(*) AS n FROM payment_periods').get().n, 4);
     assert.equal(requested.includes('GET /v1/checkout/sessions/cs_stripe'), true);
     assert.equal(requested.includes('GET /transactions/txn_paddle'), true);
     assert.equal(requested.includes('GET /v1/payment/'), true);

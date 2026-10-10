@@ -51,6 +51,14 @@ test('signed Stripe hosted checkout, recurring invoice, and refund match the pur
       VALUES ('early-purchase', 'mine', 'owner', 'once', 'test', 'one-time', 'Once', '',
         1200, 'usd', 30, 30, 1, 'pending:early-purchase', 'early-request',
         'pending', ?, 'stripe')`).run(new Date().toISOString());
+    database.prepare(`INSERT INTO purchases
+      (id, listing_slug, owner_user_id, plan_key, plan_mode, billing_mode, plan_name,
+        plan_description, amount_minor, currency, duration_days, accepted_duration_days,
+        featured, stripe_session_id, checkout_request_id, status, created_at,
+        provider, provider_price_id)
+      VALUES ('early-month', 'mine', 'owner', 'monthly', 'test', 'monthly', 'Monthly', '',
+        1200, 'usd', 0, NULL, 1, 'pending:early-month', 'early-month-request',
+        'pending', ?, 'stripe', 'price_month')`).run(new Date().toISOString());
     saveBillingProfile({ provider: 'stripe', mode: 'test', version: 0, enabled: false,
       apiKey: 'sk_test_fixture', webhookSecret: 'whsec_hosted_fixture' }, 'admin');
     const stripe = new Stripe('sk_test_fixture');
@@ -78,6 +86,10 @@ test('signed Stripe hosted checkout, recurring invoice, and refund match the pur
       ...oneTime.data.object, id: 'cs_early', client_reference_id: 'early-purchase',
       payment_intent: 'pi_early',
     });
+    assert.equal((await send({ ...early, id: 'evt_early_wrong_currency',
+      data: { object: { ...early.data.object, currency: 'eur' } } })).status, 202);
+    assert.equal(database.prepare("SELECT provider_resource_id FROM purchases WHERE id = 'early-purchase'")
+      .get().provider_resource_id, null);
     assert.equal((await send(early)).status, 200);
     assert.equal(database.prepare("SELECT provider_resource_id FROM purchases WHERE id = 'early-purchase'")
       .get().provider_resource_id, 'cs_early');
@@ -109,6 +121,15 @@ test('signed Stripe hosted checkout, recurring invoice, and refund match the pur
       client_reference_id: 'month-purchase', subscription: 'sub_month', payment_status: 'paid',
     });
     assert.equal((await send(linked)).status, 200);
+    const earlyLinked = event('evt_early_linked', 'checkout.session.completed', {
+      ...linked.data.object, id: 'cs_early_month', client_reference_id: 'early-month',
+      subscription: 'sub_early_month',
+    });
+    assert.equal((await send(earlyLinked)).status, 200);
+    assert.deepEqual(database.prepare(`SELECT provider_resource_id, provider_subscription_id
+      FROM purchases WHERE id = 'early-month'`).get(), {
+      provider_resource_id: 'cs_early_month', provider_subscription_id: 'sub_early_month',
+    });
     const periodStart = Math.floor(Date.now() / 1000) - 60;
     const periodEnd = periodStart + 30 * 86_400;
     const invoice = event('evt_invoice', 'invoice.paid', {

@@ -12,6 +12,7 @@ type Purchase = {
   id: string; provider: BillingProvider; plan_mode: BillingMode; billing_mode: string;
   provider_resource_id: string | null; provider_subscription_id: string | null;
   provider_price_id: string | null; amount_minor: number; currency: string;
+  checkout_request_id: string | null; stripe_session_id: string; status: string;
 };
 
 function bound(limit: number): number {
@@ -216,15 +217,25 @@ const inspectProvider: ProviderInspector = (purchase, limit) => purchase.provide
     ? inspectPaddle(purchase, limit) : inspectNowPayments(purchase, limit);
 
 export async function reconcilePurchase(purchaseId: string, limit: number,
-  inspect: ProviderInspector = inspectProvider): Promise<{
+  inspect: ProviderInspector = inspectProvider, resourceId?: string): Promise<{
     purchaseId: string; found: number; processed: number; unresolved: number;
   }> {
   bound(limit);
   const purchase = database.prepare(`SELECT id, provider, plan_mode, billing_mode,
-      provider_resource_id, provider_subscription_id, provider_price_id, amount_minor, currency
+      provider_resource_id, provider_subscription_id, provider_price_id, amount_minor, currency,
+      checkout_request_id, stripe_session_id, status
     FROM purchases WHERE id = ?`).get(purchaseId) as Purchase | undefined;
-  if (!purchase || !purchase.provider_resource_id) throw new Error("Hosted purchase not found");
-  const found = await inspect(purchase, limit);
+  if (!purchase) throw new Error("Hosted purchase not found");
+  if (resourceId && (!/^[0-9A-Za-z_.:-]{1,200}$/.test(resourceId) ||
+      purchase.provider_resource_id && resourceId !== purchase.provider_resource_id)) {
+    throw new Error("Recovery resource does not match the purchase");
+  }
+  if (!purchase.provider_resource_id && (!resourceId || purchase.status !== "pending" ||
+      !purchase.checkout_request_id || purchase.stripe_session_id !== `pending:${purchase.id}`)) {
+    throw new Error("Resource-less checkout needs its provider resource ID for bounded recovery");
+  }
+  const found = await inspect({ ...purchase,
+    provider_resource_id: purchase.provider_resource_id ?? resourceId! }, limit);
   if (found.length > limit) throw new Error("Provider inspection exceeded the requested limit");
   let processed = 0;
   for (const item of found) {

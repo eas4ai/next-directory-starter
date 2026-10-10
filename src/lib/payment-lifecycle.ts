@@ -59,8 +59,37 @@ type Purchase = {
   plan_mode: BillingMode; billing_mode: string; amount_minor: number; currency: string;
   duration_days: number; featured: number; provider_price_id: string | null;
   provider_resource_id: string | null; provider_subscription_id: string | null;
-  status: string;
+  stripe_session_id: string; checkout_request_id: string | null; status: string;
 };
+
+function bindEarlyResource(evidence: VerifiedEvidence, purchase: Purchase,
+  resourceId: string, linkedSubscription = false): boolean {
+  if (purchase.provider_resource_id !== null || purchase.status !== "pending" ||
+      !purchase.checkout_request_id || purchase.stripe_session_id !== `pending:${purchase.id}` ||
+      !resourceId || resourceId.length > 200) return false;
+  const supported = evidence.provider === "stripe"
+    ? (evidence.eventType === "checkout.session.completed" ||
+        evidence.eventType === "checkout.session.async_payment_succeeded" ||
+        evidence.eventType === "reconcile.session" ||
+        evidence.eventType === "reconcile.subscription-link") &&
+      (linkedSubscription ? purchase.billing_mode === "monthly" ||
+        purchase.billing_mode === "annual" : purchase.billing_mode === "one-time")
+    : !linkedSubscription && (evidence.provider === "paddle"
+      ? evidence.eventType === "transaction.completed" ||
+        evidence.eventType === "reconcile.transaction"
+      : evidence.provider === "nowpayments" &&
+        (evidence.eventType === "payment.status_changed" ||
+          evidence.eventType === "reconcile.payment-finished"));
+  if (!supported) return false;
+  const updated = database.prepare(`UPDATE purchases SET provider_resource_id = ?,
+    stripe_session_id = CASE WHEN provider = 'stripe' THEN ? ELSE stripe_session_id END
+    WHERE id = ? AND provider = ? AND plan_mode = ? AND status = 'pending'
+      AND provider_resource_id IS NULL AND stripe_session_id = ?`).run(
+    resourceId, resourceId, purchase.id, evidence.provider, evidence.mode,
+    `pending:${purchase.id}`,
+  );
+  return updated.changes === 1;
+}
 
 function paidPeriod(evidence: VerifiedEvidence, effect: PaidEffect): void {
   const purchase = database.prepare("SELECT * FROM purchases WHERE id = ?")
@@ -69,17 +98,18 @@ function paidPeriod(evidence: VerifiedEvidence, effect: PaidEffect): void {
       purchase.status === "refunded" || purchase.billing_mode === "free") {
     throw new PaymentLifecycleError(409, "Payment has no eligible matching purchase");
   }
-  const resourceMatches = effect.resourceId === purchase.provider_resource_id;
-  const subscriptionMatches = Boolean(effect.subscriptionId &&
-    effect.subscriptionId === purchase.provider_subscription_id);
-  if (!resourceMatches && !subscriptionMatches) {
-    throw new PaymentLifecycleError(409, "Payment resource does not match the purchase");
-  }
   if (purchase.provider_price_id !== (effect.priceId ?? null) ||
       effect.amountMinor !== purchase.amount_minor ||
       effect.currency.toLowerCase() !== purchase.currency ||
       !effect.paymentId || effect.paymentId.length > 200) {
     throw new PaymentLifecycleError(409, "Payment terms do not match the accepted purchase");
+  }
+  const resourceMatches = effect.resourceId === purchase.provider_resource_id ||
+    bindEarlyResource(evidence, purchase, effect.resourceId);
+  const subscriptionMatches = Boolean(effect.subscriptionId &&
+    effect.subscriptionId === purchase.provider_subscription_id);
+  if (!resourceMatches && !subscriptionMatches) {
+    throw new PaymentLifecycleError(409, "Payment resource does not match the purchase");
   }
   if (effect.subscriptionId && purchase.provider_subscription_id &&
       effect.subscriptionId !== purchase.provider_subscription_id) {
@@ -246,6 +276,13 @@ function applyEffect(evidence: VerifiedEvidence): void {
     const { purchaseId, resourceId, subscriptionId } = evidence.effect;
     if (!subscriptionId || subscriptionId.length > 200) {
       throw new PaymentLifecycleError(400, "Invalid provider subscription ID");
+    }
+    const purchase = database.prepare("SELECT * FROM purchases WHERE id = ?")
+      .get(purchaseId) as Purchase | undefined;
+    if (!purchase || purchase.provider !== evidence.provider || purchase.plan_mode !== evidence.mode ||
+        (purchase.provider_resource_id !== resourceId &&
+          !bindEarlyResource(evidence, purchase, resourceId, true))) {
+      throw new PaymentLifecycleError(409, "Subscription does not match the checkout purchase");
     }
     const changed = database.prepare(`UPDATE purchases SET provider_subscription_id = ?
       WHERE id = ? AND provider = ? AND plan_mode = ? AND provider_resource_id = ?

@@ -42,8 +42,13 @@ function hostedPurchase(event: Stripe.Event): boolean {
       (event.type === "customer.subscription.updated" ||
         event.type === "customer.subscription.deleted") ? data.id : null;
   if (purchaseId) {
-    return Boolean(database.prepare(`SELECT id FROM purchases WHERE id = ?
-      AND provider = 'stripe' AND provider_resource_id IS NOT NULL`).get(purchaseId));
+    const purchase = database.prepare(`SELECT provider_resource_id, stripe_session_id,
+      checkout_request_id FROM purchases WHERE id = ? AND provider = 'stripe'`).get(
+      purchaseId,
+    ) as { provider_resource_id: string | null; stripe_session_id: string;
+      checkout_request_id: string | null } | undefined;
+    return Boolean(purchase && (purchase.provider_resource_id ||
+      purchase.checkout_request_id && purchase.stripe_session_id === `pending:${purchaseId}`));
   }
   if (subscriptionId) {
     return Boolean(database.prepare(`SELECT id FROM purchases WHERE provider = 'stripe'
