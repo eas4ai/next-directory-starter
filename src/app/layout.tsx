@@ -5,14 +5,20 @@ import Link from "next/link";
 import { PresetExternalLinkIcon } from "@/components/preset-icon";
 import { connection } from "next/server";
 import { getSiteConfig } from "@/lib/site-config";
+import { getSeoSettings } from "@/lib/seo-settings";
 
 export async function generateMetadata(): Promise<Metadata> {
   await connection();
   const site = getSiteConfig();
+  const search = getSeoSettings();
   return {
     title: site.name,
-    description: site.description,
+    description: search.description,
     icons: site.iconUrl ? { icon: site.iconUrl } : undefined,
+    verification: {
+      google: search.googleVerification ?? undefined,
+      other: search.bingVerification ? { "msvalidate.01": search.bingVerification } : undefined,
+    },
   };
 }
 

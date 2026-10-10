@@ -7,6 +7,8 @@ import { HttpError, httpErrorResponse } from "@/lib/http-error";
 import { recordAudit } from "@/lib/audit";
 import { promoteDraftMedia } from "@/lib/media";
 import { recordOwnerNotification } from "@/lib/notifications";
+import { editableSeoOverrides, hasDraftSeo, publishDraftSeo, saveDraftSeo,
+  type SeoOverrides } from "@/lib/seo-settings";
 
 migrateCatalog();
 
@@ -27,6 +29,7 @@ type StoredSubmission = {
   owner_email?: string;
   decided_by_email?: string | null;
   listing_status?: Listing["status"];
+  seo_json: string | null;
 };
 
 export type ReviewSubmission = {
@@ -42,6 +45,7 @@ export type ReviewSubmission = {
   decidedBy: string | null;
   decidedByEmail: string | null;
   listingStatus: Listing["status"] | null;
+  proposedSeo: SeoOverrides;
 };
 
 function reviewSubmission(row: StoredSubmission): ReviewSubmission {
@@ -58,6 +62,24 @@ function reviewSubmission(row: StoredSubmission): ReviewSubmission {
     decidedBy: row.decided_by,
     decidedByEmail: row.decided_by_email ?? null,
     listingStatus: row.listing_status ?? null,
+    proposedSeo: row.seo_json ? JSON.parse(row.seo_json) as SeoOverrides :
+      editableSeoOverrides("listing", row.slug),
+  };
+}
+
+function listingSeoInput(input: unknown): unknown | undefined {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
+  const value = input as Record<string, unknown>;
+  if ("seo" in value) return value.seo;
+  if (!["seoTitle", "seoDescription", "seoImage", "seoIndexable"].some((key) => key in value)) {
+    return undefined;
+  }
+  if (value.seoIndexable !== undefined && !["inherit", "index", "noindex"].includes(String(value.seoIndexable))) {
+    throw new ModerationError(400, "Invalid search indexing choice");
+  }
+  return {
+    title: value.seoTitle, description: value.seoDescription, socialImage: value.seoImage,
+    indexable: value.seoIndexable === "index" ? true : value.seoIndexable === "noindex" ? false : null,
   };
 }
 
@@ -81,7 +103,9 @@ function existingCategory(name: string, status = 400): string {
 
 export function ownerListings(userId: string): (Listing & { hasDraft: boolean; pending: boolean })[] {
   const rows = database.prepare(`SELECT l.*,
-    EXISTS(SELECT 1 FROM owner_drafts d WHERE d.slug = l.slug) AS has_draft,
+    (EXISTS(SELECT 1 FROM owner_drafts d WHERE d.slug = l.slug) OR
+      EXISTS(SELECT 1 FROM seo_overrides seo WHERE seo.kind = 'listing' AND seo.slug = l.slug
+        AND seo.draft_json IS NOT NULL)) AS has_draft,
     EXISTS(SELECT 1 FROM submissions s WHERE s.slug = l.slug AND s.status = 'pending') AS pending
     FROM listings l WHERE l.owner_user_id = ? ORDER BY l.name COLLATE NOCASE, l.slug`)
     .all(userId) as (StoredListing & { has_draft: number; pending: number })[];
@@ -90,10 +114,13 @@ export function ownerListings(userId: string): (Listing & { hasDraft: boolean; p
   }));
 }
 
-export function ownerListing(userId: string, slug: string): { listing: Listing; proposal: Listing | null; pending: boolean } {
+export function ownerListing(userId: string, slug: string): {
+  listing: Listing; proposal: Listing | null; pending: boolean; seo: SeoOverrides;
+} {
   const listing = ownedListing(userId, slug);
   const draft = database.prepare("SELECT payload FROM owner_drafts WHERE slug = ?").get(slug) as { payload: string } | undefined;
-  return { listing, proposal: draft ? JSON.parse(draft.payload) as Listing : null, pending: pendingSubmission(slug) };
+  return { listing, proposal: draft ? JSON.parse(draft.payload) as Listing : null,
+    pending: pendingSubmission(slug), seo: editableSeoOverrides("listing", slug) };
 }
 
 export function createOwnerListing(userId: string, input: unknown): Listing {
@@ -108,6 +135,8 @@ export function createOwnerListing(userId: string, input: unknown): Listing {
         listing.slug, listing.name, listing.summary, listing.description,
         listing.category, listing.url, userId,
       );
+      const seo = listingSeoInput(input);
+      if (seo !== undefined) saveDraftSeo("listing", listing.slug, seo);
     }).immediate();
   } catch (error) {
     if (error instanceof Error && error.message.includes("UNIQUE constraint")) {
@@ -140,6 +169,8 @@ export function updateOwnerListing(userId: string, slug: string, changes: unknow
         VALUES (?, ?, ?, ?) ON CONFLICT(slug) DO UPDATE SET payload = excluded.payload,
         updated_at = excluded.updated_at`).run(slug, userId, JSON.stringify(listing), new Date().toISOString());
     }
+    const seo = listingSeoInput(changes);
+    if (seo !== undefined) saveDraftSeo("listing", slug, seo);
     return listing;
   }).immediate();
 }
@@ -150,17 +181,21 @@ export function submitOwnerListing(userId: string, slug: string): ReviewSubmissi
     if (current.status === "suspended") throw new ModerationError(409, "Suspended listings cannot be submitted");
     if (pendingSubmission(slug)) throw new ModerationError(409, "Listing already awaits review");
     const draft = database.prepare("SELECT payload FROM owner_drafts WHERE slug = ?").get(slug) as { payload: string } | undefined;
-    if (current.status !== "draft" && !draft) throw new ModerationError(400, "Save changes before submitting");
+    if (current.status !== "draft" && !draft && !hasDraftSeo("listing", slug)) {
+      throw new ModerationError(400, "Save changes before submitting");
+    }
     const proposed = draft ? JSON.parse(draft.payload) as Listing : current;
     const id = randomUUID();
     const submittedAt = new Date().toISOString();
+    const proposedSeo = editableSeoOverrides("listing", slug);
     database.prepare(`INSERT INTO submissions
-      (id, slug, owner_user_id, payload, status, submitted_at)
-      VALUES (?, ?, ?, ?, 'pending', ?)`).run(id, slug, userId, JSON.stringify(proposed), submittedAt);
+      (id, slug, owner_user_id, payload, status, submitted_at, seo_json)
+      VALUES (?, ?, ?, ?, 'pending', ?, ?)`).run(id, slug, userId, JSON.stringify(proposed),
+        submittedAt, JSON.stringify(proposedSeo));
     return {
       id, slug, ownerUserId: userId, ownerEmail: "", proposed,
       status: "pending" as const, reason: null, submittedAt, decidedAt: null,
-      decidedBy: null, decidedByEmail: null, listingStatus: current.status,
+      decidedBy: null, decidedByEmail: null, listingStatus: current.status, proposedSeo,
     };
   }).immediate();
 }
@@ -199,6 +234,10 @@ export function decideSubmission(id: string, actorId: string, decision: "approve
         proposed.url, row.slug, row.owner_user_id,
       );
       promoteDraftMedia("listing", row.slug);
+      if (row.seo_json) {
+        saveDraftSeo("listing", row.slug, JSON.parse(row.seo_json));
+        publishDraftSeo("listing", row.slug);
+      }
       database.prepare("DELETE FROM owner_drafts WHERE slug = ?").run(row.slug);
     }
     database.prepare(`UPDATE submissions SET status = ?, reason = ?, decided_at = ?, decided_by = ?

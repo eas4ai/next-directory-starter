@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getSiteConfig } from "@/lib/site-config";
+import { getSeoSettings, type SeoOverrides } from "@/lib/seo-settings";
 
 export function publicUrl(path: string): string {
   const configured = process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || process.env.BETTER_AUTH_URL;
@@ -13,14 +14,23 @@ export function publicUrl(path: string): string {
   return new URL(path, base).toString();
 }
 
-export function pageMetadata(path: string, title: string, description: string): Metadata {
+export function pageMetadata(path: string, title: string, description: string,
+  overrides?: SeoOverrides): Metadata {
   const url = publicUrl(path);
   const site = getSiteConfig();
+  const settings = getSeoSettings();
+  const searchTitle = settings.titleFormat.replace("%s", overrides?.title || title);
+  const searchDescription = overrides?.description || description;
+  const image = overrides?.socialImage || settings.socialImage;
+  const imageUrl = image?.startsWith("/") ? publicUrl(image) : image;
   return {
-    title,
-    description,
+    title: searchTitle,
+    description: searchDescription,
     alternates: { canonical: url },
-    openGraph: { type: "website", siteName: site.name, title, description, url },
-    twitter: { card: "summary", title, description },
+    openGraph: { type: "website", siteName: site.name, title: searchTitle,
+      description: searchDescription, url, images: imageUrl ? [imageUrl] : undefined },
+    twitter: { card: imageUrl ? "summary_large_image" : "summary", title: searchTitle,
+      description: searchDescription, images: imageUrl ? [imageUrl] : undefined },
+    robots: overrides?.indexable === false ? { index: false, follow: true } : undefined,
   };
 }

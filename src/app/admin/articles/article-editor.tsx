@@ -44,6 +44,27 @@ function ArticleFields({ article, categories, includeSlug, includeStatus = true 
           </select>
         </Field>}
       </div>
+      <fieldset className="grid gap-4 rounded-md border p-4">
+        <legend className="px-1 text-sm font-semibold">Search and social preview</legend>
+        <p className="text-xs text-muted-foreground">Overrides remain private until this revision is published.</p>
+        <Field><FieldLabel htmlFor={`${prefix}-seo-title`}>Search title</FieldLabel>
+          <Input id={`${prefix}-seo-title`} name="seoTitle" defaultValue={article?.seo.title ?? ""} maxLength={160} />
+        </Field>
+        <Field><FieldLabel htmlFor={`${prefix}-seo-description`}>Search description</FieldLabel>
+          <Input id={`${prefix}-seo-description`} name="seoDescription" defaultValue={article?.seo.description ?? ""} maxLength={320} />
+        </Field>
+        <Field><FieldLabel htmlFor={`${prefix}-seo-image`}>Social image URL or path</FieldLabel>
+          <Input id={`${prefix}-seo-image`} name="seoImage" defaultValue={article?.seo.socialImage ?? ""} maxLength={2048} />
+        </Field>
+        <Field><FieldLabel htmlFor={`${prefix}-seo-indexable`}>Search indexing</FieldLabel>
+          <select id={`${prefix}-seo-indexable`} name="seoIndexable"
+            defaultValue={article?.seo.indexable === null || article?.seo.indexable === undefined ? "inherit" : article.seo.indexable ? "index" : "noindex"}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+            <option value="inherit">Use site default</option><option value="index">Allow indexing</option>
+            <option value="noindex">Noindex</option>
+          </select>
+        </Field>
+      </fieldset>
     </FieldGroup>
   );
 }
@@ -53,6 +74,11 @@ function formArticle(form: HTMLFormElement) {
   return {
     ...values,
     tags: String(values.tags ?? "").split(",").map((tag) => tag.trim()).filter(Boolean),
+    seo: {
+      title: values.seoTitle, description: values.seoDescription,
+      socialImage: values.seoImage,
+      indexable: values.seoIndexable === "index" ? true : values.seoIndexable === "noindex" ? false : null,
+    },
   };
 }
 

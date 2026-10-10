@@ -5,11 +5,12 @@ import { pageMetadata } from "@/lib/page-metadata";
 import { getSiteConfig } from "@/lib/site-config";
 import { JsonLd } from "@/components/json-ld";
 import { publicUrl } from "@/lib/page-metadata";
+import { getSeoSettings } from "@/lib/seo-settings";
 
 export async function generateMetadata() {
   await connection();
   const site = getSiteConfig();
-  return pageMetadata("/", site.name, site.description);
+  return pageMetadata("/", site.name, getSeoSettings().description);
 }
 
 export default function Home() {

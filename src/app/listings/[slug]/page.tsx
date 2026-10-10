@@ -11,6 +11,7 @@ import { JsonLd } from "@/components/json-ld";
 import { MarkdownContent } from "@/components/markdown-content";
 import { ContentImage } from "@/components/content-image";
 import { assignedMedia } from "@/lib/media";
+import { publicSeoOverrides } from "@/lib/seo-settings";
 
 export const instant = false;
 
@@ -19,7 +20,8 @@ export async function generateMetadata({ params }: PageProps<"/listings/[slug]">
   const { slug } = await params;
   const listing = publishedListingBySlug(slug);
   if (!listing) notFound();
-  return pageMetadata(`/listings/${listing.slug}`, `${listing.name} | ${getSiteConfig().name}`, listing.summary);
+  return pageMetadata(`/listings/${listing.slug}`, `${listing.name} | ${getSiteConfig().name}`,
+    listing.summary, publicSeoOverrides("listing", listing.slug));
 }
 
 export default async function ListingPage({ params }: PageProps<"/listings/[slug]">) {

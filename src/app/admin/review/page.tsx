@@ -52,6 +52,15 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
             <p className="mt-3 text-sm">{submission.proposed.summary}</p>
             <p className="mt-2 text-sm text-muted-foreground">{submission.proposed.description}</p>
             <p className="mt-2 text-sm text-muted-foreground">{submission.proposed.category} · <a href={submission.proposed.url} target="_blank" rel="noopener noreferrer" className="underline">{submission.proposed.url}</a></p>
+            {(submission.proposedSeo.title || submission.proposedSeo.description ||
+              submission.proposedSeo.socialImage || submission.proposedSeo.indexable !== null) && (
+              <div className="mt-3 rounded-md border p-3 text-sm">
+                <p className="font-medium">Proposed search settings</p>
+                <p className="mt-1 text-muted-foreground">Title: {submission.proposedSeo.title || "Default"} · Indexing: {submission.proposedSeo.indexable === null ? "Default" : submission.proposedSeo.indexable ? "Allowed" : "Noindex"}</p>
+                {submission.proposedSeo.description && <p className="mt-1">{submission.proposedSeo.description}</p>}
+                {submission.proposedSeo.socialImage && <p className="mt-1 break-all text-muted-foreground">Social image: {submission.proposedSeo.socialImage}</p>}
+              </div>
+            )}
             {image && <div className="mt-4"><ContentImage asset={image} privateView={Boolean(draftImage)} /></div>}
             {submission.status === "pending" ? (
               <ReviewDecision id={submission.id} />
