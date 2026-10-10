@@ -18,7 +18,7 @@ export function ThemePreview({ library, mode, styleName, scope, templateId }: Pr
           <h2 className="theme-preview-heading mt-2 text-2xl font-semibold">Find something useful</h2>
           <p className="theme-preview-muted mt-2 text-sm">A sample directory card in your selected palette and type.</p>
         </div>
-        <div className="theme-preview-card rounded-lg border p-5">
+        <div className="theme-preview-card rounded-lg border">
           <p className="text-sm font-semibold">Example Tool</p>
           <p className="theme-preview-muted mt-1 text-sm">A sample link for your directory</p>
           <div className="mt-4 flex items-center gap-3">

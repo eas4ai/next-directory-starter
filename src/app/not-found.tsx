@@ -10,7 +10,7 @@ export default async function NotFoundPage() {
   const requestId = requestHeaders.get("x-directory-request-id");
   if (path && requestId) recordNotFound(path, requestId);
   return (
-    <main className="mx-auto w-full max-w-[1400px] px-6 py-20">
+    <main className="mx-auto w-full theme-page-width px-6 py-20">
       <p className="text-sm font-medium text-muted-foreground">404</p>
       <h1 className="mt-3 text-3xl font-semibold">Page not found</h1>
       <p className="mt-4 text-muted-foreground">This address is unavailable. Try the directory index.</p>

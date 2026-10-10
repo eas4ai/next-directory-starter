@@ -28,7 +28,7 @@ export default async function OverviewPage() {
   }
   const destinations = overviewDestinations(user?.role);
   return (
-    <main className="mx-auto w-full max-w-[1400px] px-5 py-10 sm:px-8">
+    <main className="mx-auto w-full theme-page-width px-5 py-10 sm:px-8">
       <h1 className="text-3xl font-semibold tracking-tight">Administration overview</h1>
       <p className="mt-3 text-muted-foreground">Current public content and review work.</p>
       {overview ? (

@@ -22,7 +22,7 @@ export default async function ArticlePreview({ params }: Params) {
   const image = assignedMedia("article", article.slug, "draft") ??
     assignedMedia("article", article.slug, "public");
   return (
-    <main className="mx-auto w-full max-w-[1400px] px-6 py-12">
+    <main className="mx-auto w-full theme-page-width px-6 py-12">
       <Link href="/admin/articles" className="text-sm underline">← Article editor</Link>
       <p className="mt-8 text-sm font-medium uppercase tracking-wide text-muted-foreground">Private preview · {article.staged ? "saved revision" : article.status}</p>
       <h1 className="mt-4 text-4xl font-semibold">{article.title}</h1>

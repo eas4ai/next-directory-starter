@@ -163,7 +163,7 @@ function themeVariables(theme: ThemeDefinition, mode: "light" | "dark"): Record<
 function layoutTokens(selector: string): string {
   return declarationBlock(selector, {
     "theme-space-section": "3rem",
-    "theme-space-card": "1.5rem",
+    "theme-space-card": "1rem",
     "theme-space-gap": "1rem",
     "theme-page-width": "1400px",
     "theme-reading-width": "48rem",

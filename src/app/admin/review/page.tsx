@@ -31,7 +31,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const published = searchPublishedListings({ page: query.catalogPage });
 
   return (
-    <main className="mx-auto w-full max-w-[1400px] px-6 py-10">
+    <main className="mx-auto w-full theme-page-width px-6 py-10">
       <Link href={user?.role?.split(",").includes("admin") ? "/admin/catalog" : "/owner/listings"} className="text-sm text-muted-foreground hover:text-foreground">← {user?.role?.split(",").includes("admin") ? "Catalog" : "My listings"}</Link>
       <h1 className="mt-7 text-3xl font-semibold tracking-tight">Submission review</h1>
       <p className="mt-3 text-muted-foreground">Inspect proposed listings and past decisions.</p>

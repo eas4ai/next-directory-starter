@@ -21,7 +21,7 @@ export default async function NotificationDeliveryPage({ searchParams }: {
   if (!(await isAdmin(await headers()))) notFound();
   const { rows, page, pages, total } = notificationDeliveryPage(
     Number((await searchParams).page ?? "1"));
-  return <main className="mx-auto w-full max-w-[1400px] px-6 py-10">
+  return <main className="mx-auto w-full theme-page-width px-6 py-10">
     <Link href="/admin/audit" className="text-sm underline">← Audit history</Link>
     <h1 className="mt-7 text-3xl font-semibold tracking-tight">Notification delivery</h1>
     <p className="mt-3 max-w-3xl text-sm text-muted-foreground">All {total} retained owner emails, 100 per page. The bounded worker sends due notices through Resend. Failed deliveries show their next attempt; after five attempts an operator can retry without repeating the underlying moderation or payment action. Inspect Resend logs before retrying an unknown delivery outcome.</p>

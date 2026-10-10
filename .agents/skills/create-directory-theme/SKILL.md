@@ -11,6 +11,8 @@ Use this skill when the operator asks for a custom look for this repository. Sta
 
 Read `src/lib/theme-sdk.ts` and `src/themes/studio.ts`. Add a theme definition in `src/themes/` with a unique lowercase ID and every required light and dark semantic color, typography, radius, shadow, control height, spacing, width, and social-card color. Type it with `satisfies ThemeDefinition`; `defineTheme` validates it at runtime. Register it in `src/themes/index.ts`. Use semantic token names such as `primary` and `sidebar`, rather than page-specific color overrides. The saved shadcn preset stays available; do not replace its options or stored value.
 
+Use six or eight digit hex for theme colors and six digit hex for the social palette. Use positive `px`, `rem`, or `em` lengths for spacing and width; radius may be `0`. End font stacks with a generic family such as `sans-serif` or `serif`. Use `none` or lengths plus a hex or space-separated `rgb()` color for shadows. The supported forms are listed in the README.
+
 ## Public template
 
 Read `src/templates/editorial.css`, the `template-*` classes on public pages, and `src/lib/theme-selection.ts`. Add a CSS file in `src/templates/`, import it from `src/app/globals.css`, and register its ID and display name in `templateOptions`. Scope layout rules with `[data-template="your-id"]`; use `var(--theme-*)` and other semantic tokens for visual values. A template changes layout through shared classes. It should not need edits to page components or authored HTML style attributes/elements. Test at 320px and a wide viewport in both modes.

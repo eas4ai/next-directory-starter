@@ -139,8 +139,17 @@
 }
 
 [data-slot="card"] {
+  --card-spacing: var(--theme-space-card, 1rem);
   border-radius: var(--radius);
   box-shadow: var(--preset-shadow);
+}
+
+[data-slot="card"][data-size="sm"] {
+  --card-spacing: calc(var(--theme-space-card, 1rem) * .75);
+}
+
+.theme-page-width {
+  max-width: var(--theme-page-width, 1400px);
 }
 
 .site-container {
@@ -177,6 +186,7 @@
 .theme-preview-heading { font-family: var(--preset-heading-font); }
 .theme-preview-muted { color: var(--muted-foreground); }
 .theme-preview-card {
+  padding: var(--theme-space-card, 1rem);
   background: var(--card);
   border-color: var(--border);
   border-radius: var(--radius);
