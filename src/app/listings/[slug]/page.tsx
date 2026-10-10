@@ -20,8 +20,10 @@ export async function generateMetadata({ params }: PageProps<"/listings/[slug]">
   const { slug } = await params;
   const listing = publishedListingBySlug(slug);
   if (!listing) notFound();
-  return pageMetadata(`/listings/${listing.slug}`, `${listing.name} | ${getSiteConfig().name}`,
+  const metadata = pageMetadata(`/listings/${listing.slug}`, `${listing.name} | ${getSiteConfig().name}`,
     listing.summary, publicSeoOverrides("listing", listing.slug));
+  return { ...metadata, alternates: { ...metadata.alternates,
+    types: { "text/markdown": publicUrl(`/markdown/listings/${listing.slug}`) } } };
 }
 
 export default async function ListingPage({ params }: PageProps<"/listings/[slug]">) {
@@ -40,6 +42,8 @@ export default async function ListingPage({ params }: PageProps<"/listings/[slug
         mainEntityOfPage: publicUrl(`/listings/${listing.slug}`),
       }} />
       <Link href="/listings" className="text-sm text-muted-foreground hover:text-foreground">← Listings</Link>
+      <a href={`/markdown/listings/${listing.slug}`} type="text/markdown" rel="alternate"
+        className="ml-4 text-sm underline">Markdown version</a>
       <p className="mt-10 text-sm font-medium uppercase tracking-widest text-muted-foreground">{listing.category}</p>
       {featured && <p className="mt-3 w-fit rounded-full bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground">Featured</p>}
       <h1 className="mt-3 text-4xl font-semibold tracking-tight">{listing.name}</h1>

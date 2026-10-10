@@ -212,6 +212,7 @@ try {
     if (!response.ok || !response.headers.get('content-type')?.includes('text/markdown') ||
         !response.headers.get('x-robots-tag')?.includes('noindex') ||
         !response.headers.get('cache-control')?.includes('no-store') ||
+        response.headers.get('x-content-type-options') !== 'nosniff' ||
         !body.includes('Example Tool')) {
       throw new Error(`Eligible Markdown twin missing or invalid: HTTP ${response.status}`);
     }
@@ -221,6 +222,43 @@ try {
     const html = await (await request('/listings/example-tool')).text();
     if (!html.includes('text/markdown') || !html.includes('/markdown/listings/example-tool')) {
       throw new Error('Public HTML did not advertise its Markdown twin');
+    }
+    const article = await request('/markdown/articles/new-seo-article');
+    const articleBody = await article.text();
+    const articleHtml = await (await request('/articles/new-seo-article')).text();
+    if (!article.ok || !article.headers.get('content-type')?.includes('text/markdown') ||
+        !article.headers.get('x-robots-tag')?.includes('noindex') ||
+        !article.headers.get('cache-control')?.includes('no-store') ||
+        !articleBody.includes('Old SEO article') || !articleBody.includes('Body') ||
+        !articleHtml.includes('/markdown/articles/new-seo-article')) {
+      throw new Error('Published article Markdown twin did not match its HTML source');
+    }
+    const current = await request('/api/admin/articles/new-seo-article',
+      { headers: { Cookie: adminCookie } });
+    const version = (await current.json()).article.version;
+    const saved = await request('/api/admin/articles/new-seo-article',
+      json({ action: 'save', version, body: 'PRIVATE NEXT BODY' }, adminCookie, 'PATCH'));
+    if (!saved.ok) throw new Error('Article revision fixture could not be saved');
+    const stagedVersion = (await saved.json()).article.version;
+    const beforePublish = await (await request('/markdown/articles/new-seo-article')).text();
+    if (beforePublish.includes('PRIVATE NEXT BODY') || !beforePublish.includes('Body')) {
+      throw new Error('Private article revision leaked into public Markdown');
+    }
+    const published = await request('/api/admin/articles/new-seo-article',
+      json({ action: 'publish', version: stagedVersion }, adminCookie, 'PATCH'));
+    if (!published.ok || !(await (await request('/markdown/articles/new-seo-article')).text())
+      .includes('PRIVATE NEXT BODY')) {
+      throw new Error('Markdown did not switch to the published article revision');
+    }
+    const unpublished = await request('/api/admin/articles/new-seo-article',
+      json({ status: 'draft' }, adminCookie, 'PATCH'));
+    if (!unpublished.ok || (await request('/markdown/articles/new-seo-article')).status !== 404) {
+      throw new Error('Unpublished article retained its Markdown twin');
+    }
+    const suspended = await request('/api/admin/listings/example-tool/suspend',
+      json({ reason: 'SEO visibility check' }, adminCookie));
+    if (!suspended.ok || (await request('/markdown/listings/example-tool')).status !== 404) {
+      throw new Error('Suspended listing retained its Markdown twin');
     }
   });
 } catch (error) {
