@@ -95,7 +95,7 @@ before(async () => {
     BETTER_AUTH_SECRET: randomBytes(32).toString('hex'),
     BETTER_AUTH_URL: origin,
   };
-  command(['run', 'build']);
+  command(['run', 'build', '--', '--webpack']);
   command(['run', 'db:migrate']);
   command(['run', 'account:provision', '--', '--email', adminEmail, '--password', password, '--role', 'admin', '--yes']);
   await startApp();

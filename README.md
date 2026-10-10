@@ -77,6 +77,8 @@ Set a unique `BETTER_AUTH_SECRET` in `.env.local` before creating accounts. Set 
 
 Use `npm run build` and `npm run start` for a production build. Configure a persistent SQLite file and media directory before deployment. Public account email, billing providers, and owner-notification email depend on their respective external services; they are optional to the basic browsable directory.
 
+Run `npm test` to check the repository. It runs every Node test file in sequence because several integration tests create their own production build in the shared `.next` directory.
+
 For a single-host container installation, copy `.env.docker.example` to `.env.docker`, set the public origins and a fresh authentication secret, then follow the [Compose migration, start, job, and recovery commands](docs/operator-manual.md#container-deployment). Compose binds only to loopback for a reverse proxy and keeps SQLite and media in a named volume.
 
 ## Manual

@@ -37,7 +37,7 @@ async function app() {
   // Each acceptance run needs its own clean generated build state.
   rmSync('.next', { recursive: true, force: true });
   command(env, ['run', 'db:migrate']);
-  command(env, ['run', 'build']);
+  command(env, ['run', 'build', '--', '--webpack']);
   command(env, ['run', 'db:seed']);
   command(env, ['run', 'account:provision', '--', '--email',
     'theme-sdk-admin@example.invalid', '--password', password, '--role', 'admin', '--yes']);

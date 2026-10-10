@@ -67,7 +67,8 @@ try {
   command(['run', 'db:seed']);
   for (const [email, role] of [
     ['http-owner@example.invalid', 'user'], ['http-editor@example.invalid', 'editor'],
-    ['http-moderator@example.invalid', 'moderator'], ['http-admin@example.invalid', 'admin'],
+    ['http-moderator@example.invalid', 'moderator'],
+    ['http-taxonomy@example.invalid', 'taxonomy'], ['http-admin@example.invalid', 'admin'],
   ]) command(['run', 'account:provision', '--', '--email', email, '--password', password,
     '--role', role, '--yes']);
   const database = new Database(join(workspace, 'directory.db'));
@@ -83,7 +84,7 @@ try {
       new Date(Date.UTC(2025, 0, 1, 0, 0, index)).toISOString());
   }
   database.close();
-  command(['run', 'build']);
+  command(['run', 'build', '--', '--webpack']);
   app = spawn('npm', ['run', 'start', '--', '-p', String(port)],
     { env, detached: true, stdio: 'ignore' });
   let ready = false;
@@ -96,6 +97,7 @@ try {
   const owner = await login('http-owner@example.invalid');
   const editor = await login('http-editor@example.invalid');
   const moderator = await login('http-moderator@example.invalid');
+  const taxonomy = await login('http-taxonomy@example.invalid');
   const admin = await login('http-admin@example.invalid');
   const deliveryPage = await request('/admin/notifications?page=2', { headers: { Cookie: admin } });
   await expectStatus(deliveryPage, 200);
@@ -103,10 +105,14 @@ try {
   assert.ok(deliveryHtml.includes('Failed notice 0'), 'Oldest exhausted notice is missing from page two');
   assert.ok(deliveryHtml.includes('aria-label="Delivery pages"'));
   assert.ok(deliveryHtml.includes('Retry delivery'));
-  await expectStatus(await request('/admin/taxonomy', { headers: { Cookie: editor } }), 200);
-  await expectStatus(await request('/api/admin/article-categories', { headers: { Cookie: editor } }), 200);
+  await expectStatus(await request('/admin/taxonomy', { headers: { Cookie: editor } }), 403);
+  await expectStatus(await request('/api/admin/article-categories', { headers: { Cookie: editor } }), 403);
   await expectStatus(await request('/api/admin/article-categories',
-    json({ name: 'Editor Topic' }, editor)), 201);
+    json({ name: 'Editor Cannot Change Taxonomy' }, editor)), 403);
+  await expectStatus(await request('/admin/taxonomy', { headers: { Cookie: taxonomy } }), 200);
+  await expectStatus(await request('/api/admin/article-categories', { headers: { Cookie: taxonomy } }), 200);
+  await expectStatus(await request('/api/admin/article-categories',
+    json({ name: 'Taxonomy Topic' }, taxonomy)), 201);
   assert.equal((await request('/api/admin/categories',
     json({ name: 'Editor Cannot Change Listings' }, editor))).status, 403);
 
