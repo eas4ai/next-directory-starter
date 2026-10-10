@@ -418,6 +418,29 @@ test('THM-004 protected branding, metadata, cards and restored assets', async ()
   assert.ok(listing.includes(`content="${origin}/brand/seo-default.png"`),
     'search setting must take priority over a generated listing card');
 
+  const nextBrand = { ...namedBrand, name: 'Copper Atlas',
+    description: 'Updated brand description.' };
+  assert.equal((await patchBrand(adminCookie, nextBrand)).status, 200);
+  home = await (await fetch(origin)).text();
+  assert.match(home, /name="description" content="Updated brand description\."/,
+    'a saved SEO row with the old default must follow a new brand description');
+  assert.match(home, /property="og:description" content="Updated brand description\."/);
+  const seoOverride = await fetch(`${origin}/api/admin/seo/settings`, {
+    method: 'PATCH', headers: { Origin: origin, Cookie: adminCookie,
+      'Content-Type': 'application/json' },
+    body: JSON.stringify({ titleFormat: '%s', description: 'Search-only description.',
+      socialImage: '/brand/seo-default.png', googleVerification: null,
+      bingVerification: null }),
+  });
+  assert.equal(seoOverride.status, 200);
+  assert.equal((await patchBrand(adminCookie, { ...nextBrand,
+    description: 'Newest brand description.' })).status, 200);
+  home = await (await fetch(origin)).text();
+  assert.match(home, /name="description" content="Search-only description\."/,
+    'an intentional SEO description must retain priority');
+  assert.match(home, /Newest brand description\./,
+    'the page body must use the current brand description');
+
   const mediaId = '12345678-1234-4234-8234-123456789abc';
   writeFileSync(join(directory, 'media', `${mediaId}.webp`),
     await sharp(logo).webp().toBuffer());
@@ -445,6 +468,8 @@ test('THM-004 protected branding, metadata, cards and restored assets', async ()
   await restartApp();
   const restoredHome = await (await fetch(origin)).text();
   assert.ok(restoredHome.includes('Copper Atlas'));
+  assert.match(restoredHome, /name="description" content="Search-only description\."/);
+  assert.match(restoredHome, /Newest brand description\./);
   assert.ok(restoredHome.includes(`href="${iconPath}"`));
   process.kill(-runtime.process.pid, 'SIGTERM');
   runtime.process = null;

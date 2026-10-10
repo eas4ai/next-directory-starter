@@ -34,7 +34,15 @@ export function saveBranding(input: unknown, actorId: string): SiteConfig {
     }
   }
   database.transaction(() => {
+    const previousDescription = getSiteConfig().description;
     writeSiteSetting("site_branding", JSON.stringify(branding));
+    // A saved SEO row that still has the old brand default should follow the brand.
+    // A distinct SEO description is an intentional override and keeps its value.
+    if (branding.description !== previousDescription) {
+      database.prepare(`UPDATE seo_settings SET description = ?, updated_at = ?
+        WHERE id = 1 AND description = ?`).run(
+        branding.description, new Date().toISOString(), previousDescription);
+    }
     recordAudit("site.brand.save", actorId, "site");
   }).immediate();
   return branding;
