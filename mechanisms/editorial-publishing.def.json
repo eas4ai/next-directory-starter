@@ -1,14 +1,14 @@
 {
-  "command": "node mechanisms/check-public-crawl-responsive.mjs",
+  "command": "node mechanisms/check-editorial-publishing.mjs",
   "cwd": null,
-  "requirements": ["SEO-003", "SEO-004", "SEO-005", "DIR-005"],
+  "requirements": ["EDIT-001", "EDIT-002", "EDIT-003"],
   "results": "per-requirement",
   "inputs": [
     ".env.example",
     "README.md",
     "fixtures/sample-listings.json",
-    "mechanisms/check-public-crawl-responsive.mjs",
-    "mechanisms/public-crawl-responsive.def.json",
+    "mechanisms/check-editorial-publishing.mjs",
+    "mechanisms/editorial-publishing.def.json",
     "package.json",
     "package-lock.json",
     "public",
@@ -18,8 +18,7 @@
   "identity": {
     "tools": {
       "node": "node --version",
-      "npm": "npm --version",
-      "chrome": "google-chrome --version"
+      "npm": "npm --version"
     },
     "env": [],
     "image": null
