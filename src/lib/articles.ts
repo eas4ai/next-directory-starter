@@ -5,6 +5,7 @@ import { recordAudit } from "@/lib/audit";
 import { promoteDraftMedia } from "@/lib/media";
 import { editableSeoOverrides, publicSeoOverrides, publishDraftSeo, saveDraftSeo,
   type SeoOverrides } from "@/lib/seo-settings";
+import { redirectForPath, saveRedirect } from "@/lib/seo-redirects";
 
 migrateCatalog();
 
@@ -332,5 +333,46 @@ export function updateArticle(slug: string, changes: unknown, actorId: string): 
     recordAudit(article.status === "published" ? "article.publish" :
       current.status === "published" ? "article.unpublish" : "article.update", actorId, slug);
     return articleBySlug(slug)!;
+  }).immediate();
+}
+
+export function renameArticle(slug: string, newSlug: unknown, expectedVersion: number,
+  actorId: string): Article {
+  if (typeof newSlug !== "string" || newSlug.length > 80 ||
+      !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(newSlug) || newSlug === slug) {
+    throw new ArticleError(400, "Invalid new article slug");
+  }
+  return database.transaction(() => {
+    const current = articleBySlug(slug);
+    if (!current) throw new ArticleError(404, "Article not found");
+    if (!Number.isSafeInteger(expectedVersion) || current.version !== expectedVersion) {
+      throw new ArticleError(409, "Article changed since it was opened; refresh before renaming");
+    }
+    if (articleBySlug(newSlug) || redirectForPath(`/articles/${newSlug}`)) {
+      throw new ArticleError(409, "New article slug is already in use");
+    }
+    const now = new Date().toISOString();
+    database.prepare(`INSERT INTO articles
+      (slug, title, summary, body, status, author_user_id, created_at, updated_at,
+        published_at, revision, category)
+      SELECT ?, title, summary, body, status, author_user_id, created_at, ?,
+        published_at, revision + 1, category FROM articles WHERE slug = ?`)
+      .run(newSlug, now, slug);
+    database.prepare(`INSERT INTO article_tags (article_slug, tag_name)
+      SELECT ?, tag_name FROM article_tags WHERE article_slug = ?`).run(newSlug, slug);
+    database.prepare(`INSERT INTO article_revisions
+      (slug, title, summary, body, tags_json, saved_at, category)
+      SELECT ?, title, summary, body, tags_json, saved_at, category
+      FROM article_revisions WHERE slug = ?`).run(newSlug, slug);
+    database.prepare("UPDATE media_assets SET target_slug = ? WHERE target_kind = 'article' AND target_slug = ?")
+      .run(newSlug, slug);
+    database.prepare("UPDATE media_assignments SET target_slug = ? WHERE target_kind = 'article' AND target_slug = ?")
+      .run(newSlug, slug);
+    database.prepare("UPDATE seo_overrides SET slug = ? WHERE kind = 'article' AND slug = ?")
+      .run(newSlug, slug);
+    database.prepare("DELETE FROM articles WHERE slug = ?").run(slug);
+    if (current.status === "published") saveRedirect(`/articles/${slug}`, `/articles/${newSlug}`, actorId);
+    recordAudit("article.rename", actorId, `${slug} -> ${newSlug}`);
+    return editableArticleBySlug(newSlug)!;
   }).immediate();
 }

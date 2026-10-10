@@ -1,6 +1,6 @@
 import { canEditArticles, sameOrigin, sessionUser } from "@/lib/admin";
 import { articleBySlug, articleErrorResponse, editableArticleBySlug,
-  publishArticleRevision, saveArticleRevision, updateArticle } from "@/lib/articles";
+  publishArticleRevision, renameArticle, saveArticleRevision, updateArticle } from "@/lib/articles";
 import { requestJson, requestJsonErrorResponse } from "@/lib/request-json";
 
 const MAX_ARTICLE_JSON_LENGTH = 512_000;
@@ -31,6 +31,9 @@ export async function PATCH(request: Request, { params }: Params) {
     const changes = input as Record<string, unknown>;
     if (changes.action === "publish") {
       return Response.json({ article: publishArticleRevision(slug, changes.version as number, user.id) });
+    }
+    if (changes.action === "rename") {
+      return Response.json({ article: renameArticle(slug, changes.newSlug, changes.version as number, user.id) });
     }
     if (changes.action === "save" || Object.keys(changes).some((key) =>
       ["title", "summary", "body", "tags"].includes(key))) {

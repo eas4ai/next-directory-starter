@@ -107,6 +107,7 @@ function SavedArticles({ articles, pending, onEdit }: {
 export function ArticleEditor({ initialArticles, categories }: { initialArticles: Article[]; categories: string[] }) {
   const router = useRouter();
   const [editing, setEditing] = useState<Article | null>(null);
+  const [renameSlug, setRenameSlug] = useState("");
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -147,7 +148,9 @@ export function ArticleEditor({ initialArticles, categories }: { initialArticles
     try {
       const response = await fetch(`/api/admin/articles/${encodeURIComponent(article.slug)}`);
       if (!response.ok) throw new Error();
-      setEditing((await response.json() as { article: Article }).article);
+      const current = (await response.json() as { article: Article }).article;
+      setEditing(current);
+      setRenameSlug(current.slug);
     } catch {
       setMessage("Could not load the latest article. Try again.");
     } finally {
@@ -178,6 +181,25 @@ export function ArticleEditor({ initialArticles, categories }: { initialArticles
     }
   }
 
+  async function rename() {
+    if (!editing || renameSlug === editing.slug) return;
+    setPending(true);
+    setMessage("");
+    try {
+      const response = await fetch(`/api/admin/articles/${encodeURIComponent(editing.slug)}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "rename", newSlug: renameSlug, version: editing.version }),
+      });
+      if (!response.ok) { setMessage((await response.json()).error ?? "Could not rename article."); return; }
+      const article = (await response.json() as { article: Article }).article;
+      setEditing(article);
+      setRenameSlug(article.slug);
+      setMessage("Article slug changed. The old published address now redirects here.");
+      router.refresh();
+    } catch { setMessage("Could not connect to the server. Try again."); }
+    finally { setPending(false); }
+  }
+
   return (
     <div className="mt-8 space-y-10">
       <form onSubmit={(event) => save(event)} className="space-y-4 rounded-lg border p-6">
@@ -195,6 +217,14 @@ export function ArticleEditor({ initialArticles, categories }: { initialArticles
           </div>
           <ArticleFields article={editing} categories={categories} includeStatus={false} />
           <ImageUploader kind="article" slug={editing.slug} onUploaded={() => { void edit(editing); }} />
+          <div className="flex flex-wrap items-end gap-3 rounded-md border p-4">
+            <label className="grid min-w-48 flex-1 gap-2 text-sm font-medium">Article slug
+              <Input value={renameSlug} onChange={(event) => setRenameSlug(event.target.value)}
+                pattern="[a-z0-9]+(-[a-z0-9]+)*" maxLength={80} />
+            </label>
+            <Button type="button" variant="outline" disabled={pending || renameSlug === editing.slug}
+              onClick={rename}>Change slug</Button>
+          </div>
           <div className="flex flex-wrap items-center gap-3">
             <Button type="submit" disabled={pending}>Save revision</Button>
             <Button type="button" variant="outline" asChild><Link href={`/admin/articles/${editing.slug}/preview`} target="_blank">Private preview</Link></Button>

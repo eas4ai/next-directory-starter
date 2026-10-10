@@ -113,15 +113,50 @@ try {
     const saved = await request('/api/admin/seo/redirects',
       json({ source: '/old-tool', destination: '/listings/example-tool' }, adminCookie));
     if (!saved.ok) throw new Error(`Same-site redirect was not saved: HTTP ${saved.status}`);
+    const shadow = await request('/api/admin/seo/redirects',
+      json({ source: '/listings/example-tool', destination: '/articles' }, adminCookie));
+    if (shadow.status < 400 || shadow.status >= 500) throw new Error('A live listing route was shadowed');
+    const firstCycle = await request('/api/admin/seo/redirects',
+      json({ source: '/cycle-one', destination: '/cycle-two' }, adminCookie));
+    const secondCycle = await request('/api/admin/seo/redirects',
+      json({ source: '/cycle-two', destination: '/cycle-one' }, adminCookie));
+    if (!firstCycle.ok || secondCycle.status < 400 || secondCycle.status >= 500) {
+      throw new Error('Redirect cycles were not rejected');
+    }
     const alias = await request('/old-tool?token=private-value');
-    if (alias.status !== 301 || alias.headers.get('location') !== '/listings/example-tool') {
+    const destination = alias.headers.get('location');
+    if (alias.status !== 301 || !destination ||
+        new URL(destination, origin).toString() !== `${origin}/listings/example-tool` ||
+        destination.includes('private-value')) {
       throw new Error(`Redirect did not return a clean permanent destination: HTTP ${alias.status}`);
     }
-    await request('/missing-seo-page?token=private-value');
+    const missing = await request('/missing-seo-page?token=private-value');
+    if (missing.status !== 404) throw new Error(`Missing page returned HTTP ${missing.status}`);
     const report = await request('/api/admin/seo/not-found', { headers: { Cookie: adminCookie } });
     const reportText = await report.text();
     if (!report.ok || !reportText.includes('/missing-seo-page') || reportText.includes('private-value')) {
       throw new Error('404 report was unavailable or retained query credentials');
+    }
+    const rows = JSON.parse(reportText).paths;
+    if (rows.find((row) => row.path === '/missing-seo-page')?.hits !== 1) {
+      throw new Error('One missing request was counted more than once');
+    }
+    const created = await request('/api/admin/articles', json({ slug: 'old-seo-article',
+      title: 'Old SEO article', summary: 'Summary', body: 'Body', status: 'published',
+      category: '', tags: [] }, adminCookie));
+    if (created.status !== 201) throw new Error(`Article for slug redirect unavailable: HTTP ${created.status}`);
+    const version = (await created.json()).article.version;
+    const renamed = await request('/api/admin/articles/old-seo-article',
+      json({ action: 'rename', newSlug: 'new-seo-article', version }, adminCookie, 'PATCH'));
+    if (!renamed.ok || (await request('/articles/new-seo-article')).status !== 200) {
+      throw new Error('Published article slug change did not retain the new article');
+    }
+    const oldArticle = await request('/articles/old-seo-article?token=private-value');
+    if (oldArticle.status !== 301 ||
+        new URL(oldArticle.headers.get('location') || '/', origin).toString() !==
+          `${origin}/articles/new-seo-article` ||
+        oldArticle.headers.get('location')?.includes('private-value')) {
+      throw new Error('Old published article slug did not redirect cleanly');
     }
   });
 

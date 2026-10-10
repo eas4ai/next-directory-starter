@@ -419,6 +419,27 @@ function migrateSeoSettings(): void {
   }).immediate();
 }
 
+function migrateSeoRoutes(): void {
+  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 17").get()) return;
+  database.transaction(() => {
+    database.exec(`CREATE TABLE seo_redirects (
+        source_path TEXT PRIMARY KEY NOT NULL,
+        destination_path TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE seo_not_found (
+        path TEXT PRIMARY KEY NOT NULL,
+        hits INTEGER NOT NULL CHECK (hits BETWEEN 1 AND 1000000),
+        first_seen_at TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL,
+        last_request_id TEXT NOT NULL
+      );
+      CREATE INDEX seo_not_found_recent ON seo_not_found(last_seen_at DESC, path);`);
+    database.prepare("INSERT INTO catalog_migrations (version) VALUES (17)").run();
+  }).immediate();
+}
+
 export function migrateCatalog(): void {
   migrate.immediate();
   migratePlanModes();
@@ -431,6 +452,7 @@ export function migrateCatalog(): void {
   migrateNotifications();
   migrateNotificationClaims();
   migrateSeoSettings();
+  migrateSeoRoutes();
 }
 
 export function seedCatalog(): void {
