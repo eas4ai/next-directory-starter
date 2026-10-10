@@ -77,8 +77,9 @@ try {
   expect(manual.includes('docker compose') && manual.includes('db:migrate') &&
     manual.includes('ops:backup') && manual.includes('ops:restore'),
   'Operator manual is missing container migration or recovery commands');
-  const notificationLimit = Number(/notifications:deliver -- --limit (\d+)/.exec(manual)?.[1]);
-  const reconciliationLimit = Number(/billing:reconcile -- --limit (\d+)/.exec(manual)?.[1]);
+  const containerSection = manual.split('### Container deployment\n')[1]?.split('\n### ')[0] ?? '';
+  const notificationLimit = Number(/notifications:deliver -- --limit (\d+)/.exec(containerSection)?.[1]);
+  const reconciliationLimit = Number(/billing:reconcile -- --limit (\d+)/.exec(containerSection)?.[1]);
   expect(Number.isInteger(notificationLimit) && notificationLimit >= 1 && notificationLimit <= 50 &&
     Number.isInteger(reconciliationLimit) && reconciliationLimit >= 1 && reconciliationLimit <= 50,
   'Operator manual uses a job limit outside the scripts\' accepted range');
