@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -411,7 +411,7 @@ try {
         !existsSync(databaseFile)) {
       throw new Error('Isolated restore lost content, media, key, or source installation');
     }
-    const probe = spawnSync('node', ['--import', 'tsx', '--input-type=module', '-e',
+    const probe = spawnSync('./node_modules/.bin/tsx', ['-e',
       `import { providerRecoveryConfiguration } from './src/lib/billing-profiles.ts';
        const value = providerRecoveryConfiguration('nowpayments', 'test');
        if (value?.apiKey !== process.env.EXPECTED_RECOVERY_SECRET) process.exit(1);`],
@@ -419,11 +419,26 @@ try {
       MEDIA_DIR: join(restore, 'media'),
       BILLING_ENCRYPTION_KEY: readFileSync(join(restore, 'billing.key'), 'utf8'),
       EXPECTED_RECOVERY_SECRET: recoverySecret }, encoding: 'utf8', timeout: 30_000 });
-    if (probe.status !== 0) throw new Error('Restored billing key could not decrypt saved settings');
+    if (probe.status !== 0) throw new Error(`Restored billing key could not decrypt saved settings: ${probe.stderr.replaceAll(recoverySecret, '[redacted]').slice(0, 800)}`);
     const repeat = spawnSync('npm', ['run', 'ops:restore', '--', '--backup', backup, '--target', restore],
       { env, encoding: 'utf8', timeout: 30_000 });
     if (repeat.status === 0 || !existsSync(join(restore, 'database.db'))) {
       throw new Error('Restore overwrote an existing target');
+    }
+    const wrongKey = join(workspace, 'wrong-billing.key');
+    writeFileSync(wrongKey, randomBytes(32).toString('base64url'), { mode: 0o600 });
+    const mismatched = spawnSync('npm', ['run', 'ops:backup', '--',
+      '--output', join(workspace, 'wrong-key-backup'), '--key-file', wrongKey],
+    { env, encoding: 'utf8', timeout: 30_000 });
+    if (mismatched.status === 0) throw new Error('Backup accepted a mismatched billing key');
+    const damaged = join(workspace, 'damaged-backup');
+    cpSync(backup, damaged, { recursive: true });
+    rmSync(join(damaged, 'media', 'backup-evidence.txt'));
+    const rejected = spawnSync('npm', ['run', 'ops:restore', '--', '--backup', damaged,
+      '--target', join(workspace, 'damaged-restore')],
+    { env, encoding: 'utf8', timeout: 30_000 });
+    if (rejected.status === 0 || existsSync(join(workspace, 'damaged-restore'))) {
+      throw new Error('Restore accepted missing media');
     }
   });
 

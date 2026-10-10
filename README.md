@@ -103,3 +103,16 @@ Run `npm run build` and `npm run start` to serve the production build. Change th
 ## License
 
 This starter is distributed under the [MIT License](LICENSE), copyright 2026 Shawn McAllister. [Third-party notices](NOTICE.md) retain the separate shadcn/ui license for generated component source and theme styling. The sample listings are fictional and replaceable; no DevList production data, branding, or image assets are bundled.
+
+## Backup and restore
+
+Stop the application and background jobs before backup so no upload can race the database snapshot. Keep the production `DATABASE_URL`, `MEDIA_DIR`, and `BILLING_ENCRYPTION_KEY` in the shell environment. The commands copy the SQLite database through SQLite's online backup API, copy uploaded media, and include the matching billing key. The key and the backup directory are sensitive. Store them outside the repository with restricted access.
+
+```sh
+umask 077
+printf '%s\n' "$BILLING_ENCRYPTION_KEY" > /secure/location/billing.key
+npm run ops:backup -- --output /secure/location/directory-backup --key-file /secure/location/billing.key
+npm run ops:restore -- --backup /secure/location/directory-backup --target /secure/location/restore-check
+```
+
+Both commands refuse to replace an existing destination. Restore writes a separate directory containing `database.db`, `media/`, and `billing.key`. To use it, keep the app stopped, set `DATABASE_URL=file:/secure/location/restore-check/database.db` and `MEDIA_DIR=/secure/location/restore-check/media`, and load `BILLING_ENCRYPTION_KEY` from the restored key file in the secret manager. Do not run `db:seed` on a restored installation. Confirm approved listings, uploaded images, and billing profile access before directing traffic to it. Retain the original installation until the restore has been checked.
