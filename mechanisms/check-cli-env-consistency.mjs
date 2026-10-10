@@ -16,7 +16,9 @@ function run(script, args = [], overrides = {}) {
   const env = { ...process.env, ...overrides };
   delete env.DATABASE_URL;
   delete env.BILLING_ENCRYPTION_KEY;
+  delete env.NODE_ENV;
   if (overrides.DATABASE_URL) env.DATABASE_URL = overrides.DATABASE_URL;
+  if (overrides.NODE_ENV) env.NODE_ENV = overrides.NODE_ENV;
   const result = spawnSync('npm', ['run', script, ...(args.length ? ['--', ...args] : [])], {
     cwd: sandbox, env, encoding: 'utf8', timeout: 120_000,
   });
@@ -92,6 +94,14 @@ try {
   expect(hasTable(layeredDb, 'user'), 'Authentication migration missed the mode-specific database');
   expect(rowCount(layeredDb, 'listings') >= 2, 'Catalog migration or seed missed the mode-specific database');
   expect(!existsSync(defaultDb), 'Mode-specific run created the default database');
+
+  const developmentDb = join(sandbox, 'development.db');
+  writeFileSync(join(sandbox, '.env.development.local'), `DATABASE_URL=file:${developmentDb}\n`);
+  run('db:migrate');
+  run('db:seed');
+  expect(hasTable(developmentDb, 'user'), 'Authentication migration missed the default development database');
+  expect(rowCount(developmentDb, 'listings') >= 2, 'Catalog migration or seed missed the default development database');
+  expect(!existsSync(defaultDb), 'Default development run created the default database');
 
   const manual = readFileSync(join(project, 'docs/operator-manual.md'), 'utf8');
   expect(manual.includes('.env.local') && manual.includes('DATABASE_URL') &&
