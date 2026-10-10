@@ -44,9 +44,10 @@ test('verified evidence matches immutable terms, survives failures, and fulfills
     assert.deepEqual(send('wrong-mode', effect, 'live'), { processed: false });
     assert.deepEqual(send('wrong-price', { ...effect, priceId: 'pri_other' }), { processed: false });
     assert.deepEqual(send('wrong-amount', { ...effect, amountMinor: 100 }), { processed: false });
+    assert.deepEqual(send('wrong-currency', { ...effect, currency: 'eur' }), { processed: false });
     assert.deepEqual(send('wrong-resource', { ...effect, resourceId: 'txn_other' }), { processed: false });
     assert.equal(database.prepare('SELECT COUNT(*) AS n FROM entitlements').get().n, 0);
-    assert.equal(database.prepare("SELECT COUNT(*) AS n FROM payment_evidence WHERE state = 'unresolved'").get().n, 4);
+    assert.equal(database.prepare("SELECT COUNT(*) AS n FROM payment_evidence WHERE state = 'unresolved'").get().n, 5);
 
     assert.deepEqual(send('paid-first'), { processed: true });
     assert.deepEqual(send('paid-first'), { processed: true });
