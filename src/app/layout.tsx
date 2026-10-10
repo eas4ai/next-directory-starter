@@ -6,6 +6,8 @@ import { PresetExternalLinkIcon } from "@/components/preset-icon";
 import { connection } from "next/server";
 import { getSiteConfig } from "@/lib/site-config";
 import { getSeoSettings } from "@/lib/seo-settings";
+import { cookies } from "next/headers";
+import { AppearanceSwitch } from "@/components/appearance-switch";
 
 export async function generateMetadata(): Promise<Metadata> {
   await connection();
@@ -28,11 +30,14 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   await connection();
   const preset = getThemePreset();
   const site = getSiteConfig();
+  const savedMode = (await cookies()).get("site_appearance")?.value;
+  const presetMode = preset.mode === "light" || preset.mode === "dark" ? preset.mode : "system";
+  const mode = savedMode === "light" || savedMode === "dark" ? savedMode : presetMode;
   const presetCode = (Object.keys(themeOptions) as (keyof typeof themeOptions)[])
     .map((field) => preset[field]).join(".");
 
   return (
-    <html lang="en" className={preset.mode === "dark" ? "dark" : ""} data-mode={preset.mode} data-site-preset={presetCode}>
+    <html lang="en" className={mode === "dark" ? "dark" : ""} data-mode={mode} data-site-preset={presetCode}>
       <head><style id="site-preset">{presetCss(preset, ":root")}</style></head>
       <body>
         <header className="border-b" style={{ background: "var(--sidebar)", color: "var(--sidebar-foreground)", borderColor: "var(--sidebar-border)" }}>
@@ -47,6 +52,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               <Link href="/owner/listings" className="rounded-md px-3 py-2 text-sm">Submit a link</Link>
               <Link href="/articles" className="rounded-md px-3 py-2 text-sm">Articles</Link>
               <Link href="/listings" className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm" style={{ background: "var(--sidebar-accent)", color: "var(--sidebar-accent-foreground)" }}>Listings <PresetExternalLinkIcon library={preset.iconLibrary} /></Link>
+              <AppearanceSwitch initialMode={mode} />
             </div>
           </nav>
         </header>

@@ -38,6 +38,8 @@ The provisioning command prompts for a password. Open [the administrator sign-in
 
 The sample seed is repeatable and leaves existing listings unchanged. The public directory supports `q`, `category`, and `page` URL parameters and shows at most 12 listings per page. Draft and suspended listings are absent from public pages.
 
+Visitors can use the **Appearance** button in the header to choose light or dark mode. That choice is saved in their own browser cookie and applied to the initial page response on later visits. Without a valid choice, the administrator's theme mode applies; the selected colors, fonts, and other preset controls stay the same.
+
 ## Owner submissions and review
 
 Owners create an account or sign in at `/owner/sign-in`. Their private workspace at `/owner/listings` lets them save a draft, submit it, and propose changes to an approved listing. A submitted snapshot stays in review while the approved version remains public. Owners cannot read or edit another owner's private work.

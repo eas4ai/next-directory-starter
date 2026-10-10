@@ -4,6 +4,10 @@
 
 @custom-variant dark (&:is(.dark *));
 
+:root[data-mode="light"] { color-scheme: light; }
+:root[data-mode="dark"] { color-scheme: dark; }
+:root[data-mode="system"] { color-scheme: light dark; }
+
 @theme inline {
     --font-heading: var(--preset-heading-font);
     --font-sans: var(--preset-body-font);
