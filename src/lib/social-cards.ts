@@ -1,7 +1,5 @@
 import { lookup } from "node:dns/promises";
 import { readFile } from "node:fs/promises";
-import { request as httpRequest } from "node:http";
-import { request as httpsRequest } from "node:https";
 import { isIP } from "node:net";
 import { resolve, sep } from "node:path";
 import sharp from "sharp";
@@ -15,10 +13,10 @@ import { getSeoSettings, publicSeoOverrides } from "@/lib/seo-settings";
 import { getThemePreset } from "@/lib/theme";
 import { getThemeSelection } from "@/lib/theme-selection";
 import { socialPaletteForSelection } from "@/lib/theme-sdk";
+import { MAX_SOURCE_BYTES, requestPinnedImage } from "@/lib/pinned-image-request";
 
 const WIDTH = 1200;
 const HEIGHT = 630;
-const MAX_SOURCE_BYTES = 5 * 1024 * 1024;
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 type CardContent = { title: string; description: string; category: string; source?: string };
@@ -56,32 +54,7 @@ async function externalImage(value: string): Promise<Buffer | null> {
   catch { return null; }
   finally { clearTimeout(dnsDeadline); }
   if (!addresses.length || addresses.some((entry) => !publicAddress(entry.address))) return null;
-  const pinned = addresses[0];
-  return new Promise((resolveImage) => {
-    const request = (url.protocol === "https:" ? httpsRequest : httpRequest)(url, {
-      method: "GET", headers: { Accept: "image/png,image/jpeg,image/webp,image/avif" },
-      lookup: (_hostname, _options, callback) => callback(null, pinned.address, pinned.family),
-    }, (response) => {
-      if (response.statusCode !== 200 ||
-          !/^image\/(?:png|jpeg|webp|avif)(?:;|$)/i.test(response.headers["content-type"] ?? "") ||
-          Number(response.headers["content-length"] ?? 0) > MAX_SOURCE_BYTES) {
-        response.destroy(); resolveImage(null); return;
-      }
-      const chunks: Buffer[] = [];
-      let size = 0;
-      response.on("data", (chunk: Buffer) => {
-        size += chunk.length;
-        if (size > MAX_SOURCE_BYTES) { response.destroy(); resolveImage(null); }
-        else chunks.push(chunk);
-      });
-      response.on("end", () => resolveImage(Buffer.concat(chunks)));
-      response.on("error", () => resolveImage(null));
-    });
-    const deadline = setTimeout(() => request.destroy(), 5000);
-    request.on("close", () => clearTimeout(deadline));
-    request.on("error", () => resolveImage(null));
-    request.end();
-  });
+  return requestPinnedImage(url, addresses[0]);
 }
 
 async function sourceImage(source?: string): Promise<Buffer | null> {
