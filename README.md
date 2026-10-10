@@ -42,6 +42,11 @@ Visitors can use the **Appearance** button in the header to choose light or dark
 
 ### Custom theme SDK
 
+For an agent-led design change, use the repository skill at
+`.agents/skills/create-directory-theme/SKILL.md`. It covers a registered theme,
+public template, brand assets, previews, and the checks to run before applying
+the design.
+
 The pinned shadcn/ui preset remains the default. To add a theme, follow the
 `ThemeDefinition` shape in `src/themes/studio.ts`, choose a unique lowercase ID,
 and register the definition in `src/themes/index.ts`. The type and the runtime
