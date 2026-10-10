@@ -3,7 +3,7 @@ import { createMcpHandler, hostHeaderValidationResponse,
 import * as z from "zod/v4";
 import { agentPrincipal } from "@/lib/agent-keys";
 import { directoryCategories } from "@/lib/listings";
-import { attachImportScreenshot, importCardPreview,
+import { AgentImportInputError, attachImportScreenshot, importCardPreview,
   listAgentImports, publishAgentImport, stageAgentImports } from "@/lib/agent-imports";
 
 const result = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value) }] });
@@ -21,7 +21,11 @@ const handler = createMcpHandler(({ authInfo }) => {
     inputSchema: z.object({ items: z.array(z.unknown()).min(1).max(20) }),
   }, async ({ items }) => {
     try { return result({ items: stageAgentImports(userId!, items) }); }
-    catch (error) { return failed(error); }
+    catch (error) {
+      if (error instanceof AgentImportInputError) return failed(error);
+      console.error("Agent import staging failed", error);
+      return failed(new Error("Import storage failed"));
+    }
   });
   server.registerTool("list_imports", {
     description: "List recent private agent imports with source provenance and publication state.",

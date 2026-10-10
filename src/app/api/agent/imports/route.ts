@@ -1,5 +1,5 @@
 import { canManageCatalog, sameOrigin, sessionUser } from "@/lib/admin";
-import { listAgentImports, stageAgentImports } from "@/lib/agent-imports";
+import { AgentImportInputError, listAgentImports, stageAgentImports } from "@/lib/agent-imports";
 
 export async function GET(request: Request) {
   const user = await sessionUser(request.headers);
@@ -11,14 +11,20 @@ export async function POST(request: Request) {
   const user = await sessionUser(request.headers);
   if (!user || !canManageCatalog(user.role)) return Response.json({ error: "Forbidden" }, { status: 403 });
   if (!sameOrigin(request)) return Response.json({ error: "Invalid origin" }, { status: 403 });
+  const body = await request.text();
+  if (body.length > 240_000) return Response.json({ error: "Request is too large" }, { status: 413 });
+  let input: unknown;
+  try { input = JSON.parse(body); }
+  catch { return Response.json({ error: "Invalid import batch" }, { status: 400 }); }
+  const items = typeof input === "object" && input !== null && "items" in input
+    ? (input as { items: unknown }).items : null;
   try {
-    const body = await request.text();
-    if (body.length > 240_000) throw new Error("Request is too large");
-    const input: unknown = JSON.parse(body);
-    const items = typeof input === "object" && input !== null && "items" in input
-      ? (input as { items: unknown }).items : null;
     return Response.json({ items: stageAgentImports(user.id, items) }, { status: 201 });
-  } catch {
-    return Response.json({ error: "Invalid import batch" }, { status: 400 });
+  } catch (error) {
+    if (error instanceof AgentImportInputError) {
+      return Response.json({ error: error.message }, { status: 400 });
+    }
+    console.error("Agent import staging failed", error);
+    return Response.json({ error: "Import storage failed" }, { status: 500 });
   }
 }
