@@ -4,7 +4,8 @@
   "results": "per-requirement",
   "inputs": [
     "mechanisms/check-font-loading.mjs", "mechanisms/font-loading.def.json",
-    "package.json", "package-lock.json", "public", "src"
+    "package.json", "package-lock.json", "public", "src",
+    "tests/admin-theme.test.mjs"
   ],
   "identity": {
     "env": [],
