@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync,
+  symlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -493,6 +494,20 @@ try {
     { env, encoding: 'utf8', timeout: 30_000 });
     if (rejected.status === 0 || existsSync(join(workspace, 'damaged-restore'))) {
       throw new Error('Restore accepted missing media');
+    }
+    const nestedTarget = join(mediaDir, 'restore-inside-live-media');
+    const nested = spawnSync('npm', ['run', 'ops:restore', '--', '--backup', backup,
+      '--target', nestedTarget], { env, encoding: 'utf8', timeout: 30_000 });
+    if (nested.status === 0 || existsSync(nestedTarget)) {
+      throw new Error('Restore wrote inside live media storage');
+    }
+    const alias = join(workspace, 'media-alias');
+    symlinkSync(mediaDir, alias, 'dir');
+    const linkedTarget = join(alias, 'restore-through-link');
+    const linked = spawnSync('npm', ['run', 'ops:restore', '--', '--backup', backup,
+      '--target', linkedTarget], { env, encoding: 'utf8', timeout: 30_000 });
+    if (linked.status === 0 || existsSync(linkedTarget)) {
+      throw new Error('Restore wrote inside live media storage through a symlink');
     }
   });
 
