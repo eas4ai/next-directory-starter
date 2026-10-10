@@ -15,7 +15,13 @@ Each section links to the application code or executable script that supports it
 
 2. Set a new `BETTER_AUTH_SECRET` in `.env.local`. Set `BETTER_AUTH_URL` and `SITE_URL` to the origin where you will open the site; the example uses `http://localhost:3000`. Keep `DATABASE_URL=file:./.runtime/directory.db` for the first run, or choose a persistent SQLite file. The database reader creates its parent directory. Uploaded images default to a `media` directory beside that database unless `MEDIA_DIR` is set. See [the configuration reader](../src/lib/database.ts), [media storage](../src/lib/media.ts), and [public-origin validation](../src/lib/page-metadata.ts).
 
-3. For a custom SQLite path, set `DATABASE_URL=file:/absolute/path/to/directory.db` in `.env.local` and run the repository commands from its root. The application, Better Auth migration, catalog migration, seed, and maintenance entry points then select that same file without a separate shell export. An explicit `DATABASE_URL` in the process environment takes precedence when you intentionally target another database, such as an isolated restore. Set the working directory for scheduled jobs to the repository root, or provide their environment explicitly. See [CLI environment loading](../scripts/load-env.mjs), [package scripts](../package.json), and [database connection](../src/lib/database.ts).
+3. For a custom SQLite path, set `DATABASE_URL=file:/absolute/path/to/directory.db` in `.env.local` and run the repository commands from its root. The application, Better Auth migration, catalog migration, seed, and `tsx` or `node` maintenance entry points then select that same file without a separate shell export. An explicit process environment value takes precedence when you intentionally target another database, such as an isolated restore. For example, in the shell running a one-off command:
+
+   ```sh
+   export DATABASE_URL='file:/absolute/path/to/other.db'
+   ```
+
+   Set the working directory for scheduled jobs to the repository root, or provide their environment explicitly. See [CLI environment loading](../scripts/load-env.mjs), [package scripts](../package.json), and [database connection](../src/lib/database.ts).
 
 4. Create the authentication and catalog tables, add repeatable sample listings, and create the first administrator:
 
