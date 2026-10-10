@@ -87,7 +87,11 @@ try {
         throw new Error(`Unsigned ${provider} event returned ${response.status}, not an authentication rejection.`);
       }
     }
-    nodeTests(['tests/payment-evidence.test.mjs', 'tests/payment-webhooks.test.mjs']);
+    nodeTests([
+      'tests/payment-evidence.test.mjs',
+      'tests/payment-webhooks.test.mjs',
+      'tests/stripe-hosted-lifecycle.test.mjs',
+    ]);
   });
 
   await check('COM-008', async () => {
@@ -102,7 +106,10 @@ try {
     if (!existsSync('tests/payment-lifecycle-state.test.mjs')) {
       throw new Error('Renewal, cancellation, refund, dispute, and expiry state checks are absent.');
     }
-    nodeTests(['tests/payment-lifecycle-state.test.mjs']);
+    nodeTests([
+      'tests/payment-lifecycle-state.test.mjs',
+      'tests/stripe-hosted-lifecycle.test.mjs',
+    ]);
   });
 
   await check('COM-009', async () => {
