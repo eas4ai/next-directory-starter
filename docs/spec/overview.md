@@ -37,6 +37,8 @@ adapted to a subject other than developer resources.
 | Public discovery, search, categories, and listing pages | directory.md | DIR |
 | Accounts, ownership, submission, and moderation | publishing.md | PUB |
 | Editorial articles and taxonomy | editorial.md | EDIT |
+| Private uploads and public media eligibility | media.md | MED |
+| Durable owner notices and Resend delivery | notifications.md | NOTIFY |
 | Paid publication and featured placement | commerce.md | COM |
 | Server rendering, metadata, and crawl controls | seo.md | SEO |
 | Administrative controls, theme editor, and audit history | administration.md | ADM |

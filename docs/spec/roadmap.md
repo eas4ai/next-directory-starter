@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: payment-lifecycle
+Current: content-and-notifications
 
 ## public-starter-and-theme
 
@@ -188,3 +188,26 @@ or unsettled events grant nothing while a matching settled event grants once;
 verified renewal, cancellation, full refund, partial refund, dispute, and
 expiry produce the specified access state; and owners and operators can inspect
 and recover pending purchases without creating another payment.
+
+## content-and-notifications
+
+Requirements: MED-001, MED-002, EDIT-004, EDIT-005, NOTIFY-001, NOTIFY-002
+
+Delivery: add a private local image store with bounded decoding, re-encoding,
+alt text, and authorization for listing drafts and editorial articles. Serve
+images publicly only with the approved listing or published article that owns
+them. Render safe Markdown for listing descriptions and article bodies, with a
+private editorial preview and explicit publication of saved revisions. Add
+published-only article search, pagination, article categories, and tag
+navigation. Record moderation and verified payment notices atomically and show
+an owner's latest 20 in their workspace. Deliver retained notices through
+Resend in bounded batches with retries and visible failures.
+
+Done-when: a wrong owner or guest cannot upload or read private media; unsafe or
+oversized images are rejected; pending revisions keep their prior approved
+image, and suspension or unpublication removes public media immediately;
+Markdown cannot run active content; a saved article revision stays private
+until explicit publication and stale saves are refused; public article filters
+exclude drafts and stay bounded; each named state change produces one private
+notice despite replay; and a failed Resend delivery remains retryable after
+restart without repeating the underlying domain action.
