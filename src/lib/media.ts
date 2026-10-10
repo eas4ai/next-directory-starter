@@ -181,7 +181,12 @@ export function privateMediaAsset(id: string, actorId: string,
   if (row.target_kind === "listing") {
     const listing = database.prepare("SELECT owner_user_id FROM listings WHERE slug = ?")
       .get(row.target_slug) as { owner_user_id: string | null } | undefined;
-    if (!listing || (listing.owner_user_id !== actorId && !canModerate(actorRole))) {
+    const pendingReviewImage = canModerate(actorRole) && Boolean(database.prepare(`
+      SELECT 1 FROM submissions s JOIN media_assignments m
+        ON m.target_kind = 'listing' AND m.target_slug = s.slug
+       AND m.slot = 'draft' AND m.asset_id = ?
+      WHERE s.slug = ? AND s.status = 'pending'`).get(row.id, row.target_slug));
+    if (!listing || (listing.owner_user_id !== actorId && !pendingReviewImage)) {
       throw new MediaError(404, "Image not found");
     }
   } else if (!canEditArticles(actorRole) ||
