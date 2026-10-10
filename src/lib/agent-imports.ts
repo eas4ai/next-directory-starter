@@ -23,6 +23,8 @@ export type AgentImport = { slug: string; sourceUrl: string; sourceExcerpt: stri
   name: string; summary: string; description: string; category: string;
   url: string; status: string };
 
+export class AgentImportInputError extends Error {}
+
 function publicUrl(value: string): string | null {
   try {
     if (value.length > 2048) return null;
@@ -108,12 +110,9 @@ function stageOne(actorUserId: string, value: unknown): ItemResult {
 
 export function stageAgentImports(actorUserId: string, items: unknown): ItemResult[] {
   if (!Array.isArray(items) || items.length < 1 || items.length > 20) {
-    throw new Error("Provide 1 to 20 observed links.");
+    throw new AgentImportInputError("Provide 1 to 20 observed links.");
   }
-  return items.map((item) => {
-    try { return stageOne(actorUserId, item); }
-    catch { return { status: "invalid", error: "Could not stage item" }; }
-  });
+  return items.map((item) => stageOne(actorUserId, item));
 }
 
 export function listAgentImports(): AgentImport[] {

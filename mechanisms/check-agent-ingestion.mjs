@@ -339,6 +339,28 @@ try {
     assert(imports.items?.some((item) => item.slug === staged.first &&
       item.sourceUrl === first.sourceUrl && item.sourceExcerpt === first.sourceExcerpt),
     'Import provenance is absent from the private listing.');
+    const storage = new Database(databasePath);
+    try {
+      storage.exec(`CREATE TRIGGER agent_import_storage_probe BEFORE INSERT ON agent_imports
+        WHEN NEW.idempotency_key LIKE 'force-db-failure-%'
+        BEGIN SELECT RAISE(ABORT, 'injected storage failure'); END`);
+      const failedItem = { ...first, idempotencyKey: 'force-db-failure-rest',
+        url: 'https://example.org/storage-rest', name: 'Storage Failure REST' };
+      const failedRest = await request('/api/agent/imports',
+        json({ items: [failedItem] }, adminCookie));
+      assert(failedRest.status === 500, 'Database failure was reported as invalid input or success by REST.');
+      const failedMcp = await mcp('tools/call', { name: 'stage_links', arguments: {
+        items: [{ ...failedItem, idempotencyKey: 'force-db-failure-mcp',
+          url: 'https://example.org/storage-mcp', name: 'Storage Failure MCP' }],
+      } });
+      assert(failedMcp.isError && failedMcp.content?.[0]?.text === 'Import storage failed',
+        'MCP hid a database failure as a per-link validation result.');
+      const partial = storage.prepare("SELECT COUNT(*) AS count FROM listings WHERE name LIKE 'Storage Failure %'").get();
+      assert(partial.count === 0, 'Failed storage transaction left a partial listing.');
+    } finally {
+      storage.exec('DROP TRIGGER IF EXISTS agent_import_storage_probe');
+      storage.close();
+    }
   });
 
   await check('ING-003', async () => {
