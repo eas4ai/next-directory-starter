@@ -139,6 +139,7 @@ try {
     RESEND_API_KEY: 'test-resend-key', RESEND_FROM: 'Directory test <mail@test.local>',
     RESEND_API_BASE_URL: `http://127.0.0.1:${resendPort}`,
     ACCOUNT_VERIFY_TTL_SECONDS: '3',
+    ACCOUNT_MAGIC_TTL_SECONDS: '3',
   };
   requireCommand(['run', 'db:migrate']);
   requireCommand(['run', 'db:seed']);
@@ -238,6 +239,28 @@ try {
     if (!cookieFrom(verified)) throw new Error('Valid magic link did not establish a session.');
     const replay = await request(link);
     if (cookieFrom(replay)) throw new Error('Reused magic link established another session.');
+    const beforeExpired = messages.length;
+    const sendExpired = await request('/api/auth/sign-in/magic-link',
+      json({ email, callbackURL: '/owner/listings' }));
+    if (!sendExpired.ok) throw new Error('Second magic-link request failed.');
+    const expiredLink = await mailLink(email, beforeExpired);
+    await new Promise((resolve) => setTimeout(resolve, 4_000));
+    const expired = await request(expiredLink);
+    if (cookieFrom(expired)) throw new Error('Expired unused magic link established a session.');
+    const unverifiedEmail = 'unverified-magic@example.invalid';
+    const beforeSignup = messages.length;
+    const unverifiedSignup = await request('/api/auth/sign-up/email',
+      json({ name: 'Unverified Magic', email: unverifiedEmail, password }));
+    if (!unverifiedSignup.ok) throw new Error('Unverified magic-link fixture could not sign up.');
+    await mailLink(unverifiedEmail, beforeSignup);
+    const beforeUnverifiedMagic = messages.length;
+    const unverifiedRequest = await request('/api/auth/sign-in/magic-link',
+      json({ email: unverifiedEmail, callbackURL: '/owner/listings' }));
+    if (cookieFrom(unverifiedRequest)) throw new Error('Unverified magic-link request established a session.');
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    if (messages.slice(beforeUnverifiedMagic).some((message) => message.to === unverifiedEmail)) {
+      throw new Error('Unverified account received a usable magic sign-in link.');
+    }
     const unknown = 'unknown-magic@example.invalid';
     await request('/api/auth/sign-in/magic-link', json({ email: unknown }));
     const count = withDb((db) => db.prepare('SELECT COUNT(*) AS count FROM "user" WHERE email = ?')
