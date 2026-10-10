@@ -133,7 +133,7 @@ export function editableArticleBySlug(slug: string): Article | undefined {
 }
 
 export function publishedArticleBySlug(slug: string): Article | undefined {
-  const article = editableArticleBySlug(slug);
+  const article = articleBySlug(slug);
   return article?.status === "published" ? article : undefined;
 }
 
@@ -158,7 +158,7 @@ export function searchPublishedArticles(filters: ArticleSearch): {
   const query = (filters.query ?? "").trim().slice(0, 120);
   const category = (filters.category ?? "").trim().slice(0, 80);
   const tag = (filters.tag ?? "").trim().slice(0, 80);
-  const where = ["1 = 1"];
+  const where = ["a.status = 'published'"];
   const values: string[] = [];
   if (query) {
     where.push("(instr(lower(a.title), lower(?)) > 0 OR instr(lower(a.summary), lower(?)) > 0 OR instr(lower(a.body), lower(?)) > 0)");
