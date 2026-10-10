@@ -192,7 +192,6 @@ function refundPeriod(evidence: VerifiedEvidence,
       effect.currency.toLowerCase() !== period.currency) {
     throw new PaymentLifecycleError(409, "Refund terms do not match the paid period");
   }
-  if (effect.full) return;
   if (!effect.full) return;
   database.prepare("UPDATE payment_periods SET refunded_at = COALESCE(refunded_at, ?) WHERE id = ?")
     .run(new Date().toISOString(), period.id);
