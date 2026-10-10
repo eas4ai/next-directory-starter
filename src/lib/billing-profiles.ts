@@ -195,7 +195,7 @@ export function stripeCheckoutConfiguration(): { apiKey: string; webhookSecret: 
   const billingMode = checkoutMode();
   const profile = stored("stripe", billingMode);
   if (!profile) return legacyStripe();
-  if (!profile.api_key_cipher || !profile.webhook_secret_cipher) return null;
+  if (!profile.enabled || !profile.api_key_cipher || !profile.webhook_secret_cipher) return null;
   const key = encryptionKey();
   return {
     apiKey: open(profile.api_key_cipher, "stripe", billingMode, "apiKey", key),
