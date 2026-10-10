@@ -88,14 +88,16 @@ function stageOne(actorUserId: string, value: unknown): ItemResult {
       WHERE actor_user_id = ? AND idempotency_key = ?`)
       .get(actorUserId, item.idempotencyKey) as { slug: string } | undefined;
     if (priorKey) return { status: "existing", slug: priorKey.slug };
-    const duplicate = (database.prepare("SELECT slug, url FROM listings")
-      .all() as { slug: string; url: string }[]).find((row) => {
-        try {
-          const existing = new URL(row.url);
-          existing.hash = "";
-          return existing.href === item.url;
-        } catch { return false; }
-      });
+    let duplicate: { slug: string } | undefined;
+    for (const row of database.prepare("SELECT slug, url FROM listings")
+      .iterate() as Iterable<{ slug: string; url: string }>) {
+      const existing = new URL(row.url);
+      existing.hash = "";
+      if (existing.href === item.url) {
+        duplicate = row;
+        break;
+      }
+    }
     if (duplicate) return { status: "duplicate", slug: duplicate.slug };
     const slug = availableSlug(item.name);
     const listing = parseListing({ ...item, slug, status: "draft" });
