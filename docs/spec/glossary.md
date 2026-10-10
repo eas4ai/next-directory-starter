@@ -26,3 +26,9 @@
   directory's public and administrative pages.
 - **Theme editor:** the authenticated administrator's control for previewing
   and saving a theme preset.
+- **Agent import:** an operator-managed listing drafted from a URL inspected
+  by an external agent and kept private until an authorized catalog user publishes it.
+- **WebMCP:** browser-page tools registered for an agent through
+  `document.modelContext` when the browser supports that API.
+- **Remote MCP:** an HTTP endpoint that exposes directory tools to a client
+  such as Claude Code without requiring an open browser tab.

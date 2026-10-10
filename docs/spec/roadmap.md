@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: operator-adoption
+Current: agent-ingestion
 
 ## public-starter-and-theme
 
@@ -254,3 +254,27 @@ administrator; two visitors can keep different readable appearances across
 reload and initial HTML; the distribution carries the correct MIT notice;
 and a disposable installation can follow the documented backup, restore, and
 upgrade path without losing content, media, or encrypted settings.
+
+## agent-ingestion
+
+Requirements: ING-001, ING-002, ING-003, ING-004
+
+Delivery: add account-bound remote MCP access for Claude Code and WebMCP tools
+on the authenticated catalog import page. Reuse catalog permissions and
+operator-managed draft and publication behavior. Accept bounded crawl evidence
+for a single URL, directory page, or link list from agent-browser rather than
+fetching submitted URLs on the server. Stage idempotent per-link results with
+provenance and preview; publish only by an explicit authorized action. Generate
+branded social cards from the staged content and optional validated screenshots.
+Expose public cards only for eligible published listings and connect them to
+Open Graph and Twitter metadata while preserving custom overrides.
+Document Claude Code and agent-browser workflows for single URLs, directory
+pages, and an awesome list.
+
+Done-when: a verified administrator and a catalog staff member can connect and
+stage multiple observed links; ordinary owners, guests, revoked credentials,
+and suspended accounts cannot; invalid and duplicate links return bounded
+individual results; a retry creates no extra record; staging leaves public
+pages unchanged until explicit publication; a published import is visible with
+the reviewed text and an audited actor; and its valid social card appears in
+public metadata while draft or suspended cards do not.

@@ -44,3 +44,4 @@ adapted to a subject other than developer resources.
 | Paid publication and featured placement | commerce.md | COM |
 | Server rendering, metadata, and crawl controls | seo.md | SEO |
 | Administrative controls, theme editor, and audit history | administration.md | ADM |
+| Agent-assisted link imports and social cards | agent-ingestion.md | ING |
