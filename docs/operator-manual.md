@@ -44,9 +44,9 @@ Each section links to the application code or executable script that supports it
 
 ## 3. Build the catalog
 
-1. Open `/admin/taxonomy` to add listing categories before asking owners or agents to use them. Rename a category to update its existing references. A category still used by a listing or pending draft cannot be deleted. The same workspace manages article categories and tags. See [taxonomy controls](../src/app/admin/taxonomy/taxonomy-editor.tsx) and [taxonomy rules](../src/lib/taxonomy.ts).
+1. An administrator or staff member with the taxonomy capability opens `/admin/taxonomy` to add listing categories before asking owners or agents to use them. Rename a category to update its existing references. A category still used by a listing or pending draft cannot be deleted. The same workspace manages article categories and tags. See [taxonomy page access](../src/app/admin/taxonomy/page.tsx), [taxonomy controls](../src/app/admin/taxonomy/taxonomy-editor.tsx), and [taxonomy rules](../src/lib/taxonomy.ts).
 
-2. Open `/admin/catalog` to create an operator listing. Enter a lowercase hyphenated slug, name, category, public HTTP(S) destination, summary, and description. Choose **Draft** or **Published**, then save. The UI can publish, unpublish, or suspend an existing operator listing. Slugs must be at most 80 characters; name 120, summary 280, description 5000, category 80, and URL 2048. URLs with credentials are rejected. See [catalog form](../src/app/admin/catalog/catalog-editor.tsx), [listing validation](../src/lib/catalog-input.ts), and [catalog API](../src/app/api/admin/listings/route.ts).
+2. An administrator or staff member with the catalog capability opens `/admin/catalog` to create an operator listing. Enter a lowercase hyphenated slug, name, category, public HTTP(S) destination, summary, and description. Choose **Draft** or **Published**, then save. Catalog staff can publish or unpublish an existing operator listing; **Suspend** appears only for an administrator or someone who also has the moderator capability. Slugs must be at most 80 characters; name 120, summary 280, description 5000, category 80, and URL 2048. URLs with credentials are rejected. See [catalog page access](../src/app/admin/catalog/page.tsx), [catalog form](../src/app/admin/catalog/catalog-editor.tsx), [listing validation](../src/lib/catalog-input.ts), and [catalog API](../src/app/api/admin/listings/route.ts).
 
 3. Open `/listings` in a private browser session. Search names, summaries, and descriptions; choose a category and move between pages. Only eligible published listings appear. A listing detail page links to its destination. See [public query and featured eligibility](../src/lib/listings.ts), [index](../src/app/listings/page.tsx), and [detail page](../src/app/listings/[slug]/page.tsx).
 
@@ -64,7 +64,7 @@ The sample seed inserts only missing slugs. To replace samples, create your own 
 
 ## 5. Publish articles, terms, and images
 
-1. In `/admin/taxonomy`, create article categories and tags before using them in an article. A term in use cannot be removed until references are changed. See [taxonomy rules](../src/lib/taxonomy.ts).
+1. An administrator or staff member with the taxonomy capability creates article categories and tags in `/admin/taxonomy` before an editor uses them in an article. A term in use cannot be removed until references are changed. See [taxonomy page access](../src/app/admin/taxonomy/page.tsx) and [taxonomy rules](../src/lib/taxonomy.ts).
 
 2. An editor opens `/admin/articles`, creates an article with a slug, title, summary, body, optional category, and existing tags. The body renders Markdown. Create a draft first when you need an image: the upload control appears after the article exists. Edit a saved article, use **Private preview**, then **Publish saved revision**. Changes to an already published article remain staged until publication. If a version conflict appears, reload the latest article before saving again. See [article controls](../src/app/admin/articles/article-editor.tsx), [revision rules](../src/lib/articles.ts), and [private preview](../src/app/admin/articles/[slug]/preview/page.tsx).
 
@@ -74,7 +74,7 @@ The sample seed inserts only missing slugs. To replace samples, create your own 
 
 ## 6. Configure search and sharing
 
-1. Set `SITE_URL` to the public HTTP(S) origin before production use. It must have no path, query, fragment, or credentials. Open `/admin/seo` to set a title format containing `%s` once, default description, optional social image, and Google or Bing verification value. The workspace also displays publication-aware previews and findings; it does not predict search rank. See [origin validation](../src/lib/page-metadata.ts), [SEO settings](../src/lib/seo-settings.ts), and [findings and previews](../src/lib/seo-findings.ts).
+1. Set `SITE_URL` to the public HTTP(S) origin before production use. It must have no path, query, fragment, or credentials. An administrator opens `/admin/seo` to set a title format containing `%s` once, default description, optional social image, and Google or Bing verification value. The workspace also displays publication-aware previews and findings; it does not predict search rank. See [origin validation](../src/lib/page-metadata.ts), [SEO page access](../src/app/admin/seo/page.tsx), [SEO settings](../src/lib/seo-settings.ts), and [findings and previews](../src/lib/seo-findings.ts).
 
 2. Listing owners and article editors may set a search title, description, social image, and indexing preference while editing their content. Those changes remain private until the listing proposal is approved or the article revision is published. Check the published page after approval. See [draft/public overrides](../src/lib/seo-settings.ts), [listing approval](../src/lib/moderation.ts), and [article publication](../src/lib/articles.ts).
 
@@ -92,7 +92,7 @@ The sample seed inserts only missing slugs. To replace samples, create your own 
 
 ## 8. Set plans and payment providers
 
-1. Open `/admin/plans`. Create a free, one-time, monthly, or annual plan for either test or live mode. Enter price in minor currency units; one-time plans need a 1–3650 day duration. Choose whether the plan is enabled and whether a paid plan gets featured placement. Set `BILLING_CHECKOUT_MODE` to the mode owners should see. See [plan form](../src/app/admin/plans/plan-editor.tsx) and [plan validation and mode selection](../src/lib/plans.ts).
+1. An administrator or staff member with the billing capability opens `/admin/plans`. Create a free, one-time, monthly, or annual plan for either test or live mode. Enter price in minor currency units; one-time plans need a 1–3650 day duration. Choose whether the plan is enabled and whether a paid plan gets featured placement. Set `BILLING_CHECKOUT_MODE` to the mode owners should see. The same capability is required for `/admin/billing` in step 2. See [plan page access](../src/app/admin/plans/page.tsx), [billing page access](../src/app/admin/billing/page.tsx), [plan form](../src/app/admin/plans/plan-editor.tsx), and [plan validation and mode selection](../src/lib/plans.ts).
 
 2. For paid checkout, create a 32-byte base64url billing key **once** and store it outside the repository in a private file. Choose a real absolute path for `KEY_FILE`; the creation command refuses to overwrite an existing key. Put the same value in the app's `BILLING_ENCRYPTION_KEY` secret and export it for maintenance commands. Keep this file for backups and restores; regenerating it would make saved provider secrets unreadable. See [key validation and encryption](../src/lib/billing-profiles.ts) and [backup key checks](../scripts/ops-common.mjs).
 
