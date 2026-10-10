@@ -16,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
     description: search.description,
     icons: site.iconUrl ? { icon: site.iconUrl } : undefined,
     verification: {
-      google: undefined,
+      google: search.googleVerification ?? undefined,
       other: search.bingVerification ? { "msvalidate.01": search.bingVerification } : undefined,
     },
   };
