@@ -140,7 +140,6 @@ export function publishAgentImport(actorUserId: string, slug: string) {
     database.prepare("UPDATE listings SET status = 'published' WHERE slug = ?").run(slug);
     database.prepare(`UPDATE agent_imports SET published_at = ?, published_by = ?
       WHERE slug = ?`).run(now, actorUserId, slug);
-    recordAudit("catalog.publish", actorUserId, slug);
     return { slug, status: "published" };
   }).immediate();
 }
