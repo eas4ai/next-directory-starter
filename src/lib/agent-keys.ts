@@ -51,6 +51,6 @@ export function agentPrincipal(header: string | null) {
   if (!key) return null;
   const account = database.prepare(`SELECT role, emailVerified, banned FROM "user" WHERE id = ?`)
     .get(key.user_id) as AccountRow | undefined;
-  if (!account?.emailVerified || account.banned || !canManageCatalog(account.role)) return null;
+  if (!account?.emailVerified) return null;
   return { userId: key.user_id, keyId: key.id, expiresAt: key.expires_at };
 }
