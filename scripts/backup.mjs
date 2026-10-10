@@ -1,3 +1,4 @@
+import './load-env.mjs';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, renameSync, rmSync,
   writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
