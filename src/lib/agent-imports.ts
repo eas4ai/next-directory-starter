@@ -88,8 +88,14 @@ function stageOne(actorUserId: string, value: unknown): ItemResult {
       WHERE actor_user_id = ? AND idempotency_key = ?`)
       .get(actorUserId, item.idempotencyKey) as { slug: string } | undefined;
     if (priorKey) return { status: "existing", slug: priorKey.slug };
-    const duplicate = database.prepare("SELECT slug FROM listings WHERE url = ? COLLATE NOCASE")
-      .get(item.url) as { slug: string } | undefined;
+    const duplicate = (database.prepare("SELECT slug, url FROM listings")
+      .all() as { slug: string; url: string }[]).find((row) => {
+        try {
+          const existing = new URL(row.url);
+          existing.hash = "";
+          return existing.href === item.url;
+        } catch { return false; }
+      });
     if (duplicate) return { status: "duplicate", slug: duplicate.slug };
     const slug = availableSlug(item.name);
     const listing = parseListing({ ...item, slug, status: "draft" });
