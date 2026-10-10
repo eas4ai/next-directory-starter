@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: social-cards
+Current: readme-overview
 
 ## public-starter-and-theme
 
@@ -347,3 +347,18 @@ crawlers, fetches each advertised image, verifies a 1200-by-630 PNG and matching
 tags, and proves current public overrides, withdrawal, fallback, and private
 network boundaries. Live platform checks follow once the starter has a public
 domain.
+
+## readme-overview
+
+Requirements: DOC-001
+
+Delivery: replace the procedure-heavy README with a source-verified feature
+overview, a short first-run path, and realistic site ideas grounded in the
+listing and article model. Save a source-linked brief for the separate operator
+manual requested next.
+
+Done-when: the README covers each implemented product area and its conditional
+dependencies accurately, gives only source-supported site examples, and keeps
+long operating procedures in the future manual's scope. A check compares the
+README and manual brief with implementation paths and package scripts; the
+builder's review audits every material claim against source.

@@ -33,6 +33,7 @@ adapted to a subject other than developer resources.
 | Domain | File | Prefix |
 | --- | --- | --- |
 | Starter configuration, setup, and deployment | foundation.md | FOUND |
+| Source-verified product overview and future manual scope | documentation.md | DOC |
 | Visitor light and dark appearance | appearance.md | UI |
 | Custom themes, templates, branding, and the creation skill | theming.md | THM |
 | Backup, restore, and upgrade operations | operations.md | OPS |
