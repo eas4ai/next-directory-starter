@@ -38,7 +38,9 @@ function hostedPurchase(event: Stripe.Event): boolean {
       ? metadata.purchaseId : typeof subscriptionMetadata?.purchaseId === "string"
         ? subscriptionMetadata.purchaseId : null;
   const subscriptionId = typeof data?.subscription === "string"
-    ? data.subscription : null;
+    ? data.subscription : typeof data?.id === "string" &&
+      (event.type === "customer.subscription.updated" ||
+        event.type === "customer.subscription.deleted") ? data.id : null;
   if (purchaseId) {
     return Boolean(database.prepare(`SELECT id FROM purchases WHERE id = ?
       AND provider = 'stripe' AND provider_resource_id IS NOT NULL`).get(purchaseId));
@@ -46,6 +48,15 @@ function hostedPurchase(event: Stripe.Event): boolean {
   if (subscriptionId) {
     return Boolean(database.prepare(`SELECT id FROM purchases WHERE provider = 'stripe'
       AND provider_subscription_id = ?`).get(subscriptionId));
+  }
+  const paymentId = typeof data?.payment_intent === "string" ? data.payment_intent :
+    typeof data?.charge === "string" ? data.charge : null;
+  if (paymentId) {
+    return Boolean(database.prepare(`SELECT pp.id FROM payment_periods pp
+      JOIN purchases p ON p.id = pp.purchase_id AND p.provider = 'stripe'
+      WHERE pp.provider = 'stripe' AND
+        (pp.provider_payment_id = ? OR pp.provider_charge_id = ?)`)
+      .get(paymentId, paymentId));
   }
   return false;
 }

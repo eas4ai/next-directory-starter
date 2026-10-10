@@ -16,6 +16,35 @@ const date = (value: unknown): string | undefined => {
 export function stripeEffect(event: Stripe.Event): PaymentEffect {
   const data = object(event.data?.object);
   if (!data) return { kind: "noop" };
+  if (event.type === "charge.refunded" && data.object === "charge") {
+    const paymentId = string(data.payment_intent);
+    const amountMinor = number(data.amount_refunded);
+    const original = number(data.amount);
+    const currency = string(data.currency);
+    return paymentId && amountMinor !== null && original !== null && currency
+      ? { kind: "refund", paymentId, full: data.refunded === true && amountMinor >= original,
+        amountMinor, currency } : { kind: "noop" };
+  }
+  if (event.type === "charge.dispute.created" || event.type === "charge.dispute.closed") {
+    const paymentId = string(data.payment_intent) ?? string(data.charge);
+    return paymentId ? { kind: "dispute", paymentId,
+      open: event.type === "charge.dispute.created" || data.status !== "won" } : { kind: "noop" };
+  }
+  if (event.type === "customer.subscription.updated" ||
+      event.type === "customer.subscription.deleted") {
+    const subscriptionId = string(data.id);
+    const metadata = object(data.metadata);
+    const linked = subscriptionId ? database.prepare(`SELECT id FROM purchases
+      WHERE provider = 'stripe' AND provider_subscription_id = ?`)
+      .get(subscriptionId) as { id: string } | undefined : undefined;
+    const purchaseId = string(metadata?.purchaseId) ?? linked?.id;
+    const state = event.type === "customer.subscription.deleted" || data.status === "canceled"
+      ? "canceled" : data.cancel_at_period_end === true ? "cancel-scheduled" :
+        data.status === "active" ? "active" : null;
+    return purchaseId && subscriptionId && state
+      ? { kind: "subscription-state", purchaseId, subscriptionId, state,
+        occurredAt: new Date(event.created * 1000).toISOString() } : { kind: "noop" };
+  }
   if (event.type === "checkout.session.completed" ||
       event.type === "checkout.session.async_payment_succeeded") {
     const purchaseId = string(data.client_reference_id);
@@ -47,26 +76,69 @@ export function stripeEffect(event: Stripe.Event): PaymentEffect {
       { id: string } | undefined : undefined;
   const purchaseId = string(metadata?.purchaseId) ?? string(subscriptionMetadata?.purchaseId) ?? previous?.id;
   const lines = object(data.lines);
-  const first = Array.isArray(lines?.data) ? object(lines.data[0]) : null;
+  const first = Array.isArray(lines?.data) && lines.data.length === 1
+    ? object(lines.data[0]) : null;
   const price = object(first?.price);
   const pricing = object(first?.pricing);
   const priceDetails = object(pricing?.price_details);
   const period = object(first?.period);
   const amountMinor = number(price?.unit_amount) ?? number(first?.amount);
+  const paidAmount = number(data.amount_paid);
   const priceId = string(price?.id) ?? string(priceDetails?.price);
   const currency = string(first?.currency) ?? string(data.currency);
   const paymentId = string(data.id);
+  const payments = object(data.payments);
+  const firstPayment = Array.isArray(payments?.data) ? object(payments.data[0]) : null;
+  const payment = object(firstPayment?.payment);
+  const chargeId = string(data.payment_intent) ?? string(payment?.payment_intent);
   if (!purchaseId || !subscriptionId || !paymentId || !priceId ||
-      amountMinor === null || !currency) return { kind: "noop" };
+      amountMinor === null || paidAmount === null || paidAmount < amountMinor ||
+      !currency || !first ||
+      (first.quantity !== undefined && first.quantity !== 1) ||
+      amountMinor <= 0) return { kind: "noop" };
   return { kind: "paid", purchaseId, resourceId: paymentId, paymentId,
-    subscriptionId, priceId, amountMinor, currency,
+    subscriptionId, priceId, amountMinor, currency, chargeId: chargeId ?? undefined,
     periodStart: date(period?.start), periodEnd: date(period?.end) };
 }
 
 export function paddleEffect(payload: unknown): PaymentEffect {
   const envelope = object(payload);
-  if (envelope?.event_type !== "transaction.completed") return { kind: "noop" };
-  const data = object(envelope.data);
+  const eventType = string(envelope?.event_type);
+  if (eventType === "adjustment.created" || eventType === "adjustment.updated") {
+    const data = object(envelope?.data);
+    const paymentId = string(data?.transaction_id);
+    if (!paymentId) return { kind: "noop" };
+    if (data?.action === "chargeback" || data?.action === "chargeback_warning") {
+      return { kind: "dispute", paymentId, open: data.status !== "reversed" };
+    }
+    if (data?.action === "chargeback_reverse") return { kind: "dispute", paymentId, open: false };
+    const totals = object(data?.totals);
+    const amount = string(totals?.total);
+    const amountMinor = amount && /^\d+$/.test(amount) ? Number(amount) : null;
+    const currency = string(data?.currency_code);
+    return data?.action === "refund" && data.status === "approved" &&
+      amountMinor !== null && Number.isSafeInteger(amountMinor) && currency
+      ? { kind: "refund", paymentId, full: data.type === "full", amountMinor, currency }
+      : { kind: "noop" };
+  }
+  if (eventType === "subscription.updated" || eventType === "subscription.canceled") {
+    const data = object(envelope?.data);
+    const subscriptionId = string(data?.id);
+    const scheduled = object(data?.scheduled_change);
+    const metadata = object(data?.custom_data);
+    const linked = subscriptionId ? database.prepare(`SELECT id FROM purchases
+      WHERE provider = 'paddle' AND provider_subscription_id = ?`)
+      .get(subscriptionId) as { id: string } | undefined : undefined;
+    const purchaseId = string(metadata?.purchaseId) ?? linked?.id;
+    const state = eventType === "subscription.canceled" || data?.status === "canceled"
+      ? "canceled" : scheduled?.action === "cancel" ? "cancel-scheduled" :
+        data?.status === "active" ? "active" : null;
+    return purchaseId && subscriptionId && state && string(envelope?.occurred_at)
+      ? { kind: "subscription-state", purchaseId, subscriptionId, state,
+        occurredAt: string(envelope?.occurred_at)! } : { kind: "noop" };
+  }
+  if (eventType !== "transaction.completed") return { kind: "noop" };
+  const data = object(envelope?.data);
   if (!data || data.status !== "completed") return { kind: "noop" };
   const metadata = object(data.custom_data);
   const items = Array.isArray(data.items) ? data.items : [];
@@ -80,15 +152,20 @@ export function paddleEffect(payload: unknown): PaymentEffect {
     ? Number(unitPrice.amount) : null;
   const paidTotal = typeof totals?.grand_total === "string" && /^\d+$/.test(totals.grand_total)
     ? Number(totals.grand_total) : null;
-  const purchaseId = string(metadata?.purchaseId);
+  const subscriptionId = string(data.subscription_id);
+  const linked = subscriptionId ? database.prepare(`SELECT id FROM purchases
+    WHERE provider = 'paddle' AND provider_subscription_id = ?`)
+    .get(subscriptionId) as { id: string } | undefined : undefined;
+  const purchaseId = string(metadata?.purchaseId) ?? linked?.id;
   const resourceId = string(data.id);
   const priceId = string(price?.id);
   const currency = string(data.currency_code);
   if (!purchaseId || !resourceId || !priceId || !currency ||
-      !Number.isSafeInteger(amountMinor) || !Number.isSafeInteger(paidTotal) || paidTotal! <= 0 ||
+      !Number.isSafeInteger(amountMinor) || !Number.isSafeInteger(paidTotal) ||
+      paidTotal! < amountMinor! ||
       item?.quantity !== 1) return { kind: "noop" };
   return { kind: "paid", purchaseId, resourceId, paymentId: resourceId,
-    subscriptionId: string(data.subscription_id) ?? undefined,
+    subscriptionId: subscriptionId ?? undefined,
     priceId, amountMinor: amountMinor!, currency,
     periodStart: string(billingPeriod?.starts_at) ?? undefined,
     periodEnd: string(billingPeriod?.ends_at) ?? undefined };
@@ -96,7 +173,9 @@ export function paddleEffect(payload: unknown): PaymentEffect {
 
 export function nowPaymentsEffect(payment: unknown): PaymentEffect {
   const data = object(payment);
-  if (!data || data.payment_status !== "finished") return { kind: "noop" };
+  if (!data || (data.payment_status !== "finished" && data.payment_status !== "refunded")) {
+    return { kind: "noop" };
+  }
   const purchaseId = string(data.order_id);
   const resourceId = string(data.invoice_id);
   const paymentId = string(data.payment_id);
@@ -106,6 +185,9 @@ export function nowPaymentsEffect(payment: unknown): PaymentEffect {
       typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0 ||
       !Number.isSafeInteger(Math.round(amount * 100)) ||
       Math.abs(amount * 100 - Math.round(amount * 100)) > 0.00001) return { kind: "noop" };
-  return { kind: "paid", purchaseId, resourceId, paymentId,
-    amountMinor: Math.round(amount * 100), currency };
+  return data.payment_status === "refunded"
+    ? { kind: "refund", paymentId, full: true,
+      amountMinor: Math.round(amount * 100), currency }
+    : { kind: "paid", purchaseId, resourceId, paymentId,
+      amountMinor: Math.round(amount * 100), currency };
 }

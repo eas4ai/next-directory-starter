@@ -15,6 +15,7 @@ export type PaidEffect = {
   resourceId: string;
   paymentId: string;
   subscriptionId?: string;
+  chargeId?: string;
   priceId?: string;
   amountMinor: number;
   currency: string;
@@ -26,6 +27,22 @@ export type PaymentEffect = PaidEffect | { kind: "noop" } | {
   purchaseId: string;
   resourceId: string;
   subscriptionId: string;
+} | {
+  kind: "refund";
+  paymentId: string;
+  full: boolean;
+  amountMinor: number;
+  currency: string;
+} | {
+  kind: "dispute";
+  paymentId: string;
+  open: boolean;
+} | {
+  kind: "subscription-state";
+  purchaseId: string;
+  subscriptionId: string;
+  state: "active" | "cancel-scheduled" | "canceled";
+  occurredAt: string;
 };
 
 export type VerifiedEvidence = {
@@ -68,6 +85,14 @@ function paidPeriod(evidence: VerifiedEvidence, effect: PaidEffect): void {
       effect.subscriptionId !== purchase.provider_subscription_id) {
     throw new PaymentLifecycleError(409, "Payment subscription does not match the purchase");
   }
+  if (purchase.billing_mode === "one-time") {
+    const existing = database.prepare(`SELECT provider_payment_id FROM payment_periods
+      WHERE purchase_id = ? LIMIT 1`).get(purchase.id) as
+      { provider_payment_id: string } | undefined;
+    if (existing && existing.provider_payment_id !== effect.paymentId) {
+      throw new PaymentLifecycleError(409, "One-time purchase already has a paid period");
+    }
+  }
   const now = new Date();
   let startsAt = now.toISOString();
   let endsAt: string;
@@ -102,6 +127,10 @@ function paidPeriod(evidence: VerifiedEvidence, effect: PaidEffect): void {
     }
     return;
   }
+  if (effect.chargeId && effect.chargeId.length <= 200) {
+    database.prepare(`UPDATE payment_periods SET provider_charge_id = ? WHERE provider = ?
+      AND provider_payment_id = ?`).run(effect.chargeId, evidence.provider, effect.paymentId);
+  }
   database.prepare("UPDATE purchases SET status = 'paid', provider_subscription_id = COALESCE(provider_subscription_id, ?) WHERE id = ?")
     .run(effect.subscriptionId ?? null, purchase.id);
   database.prepare(`INSERT INTO entitlements
@@ -119,15 +148,100 @@ function paidPeriod(evidence: VerifiedEvidence, effect: PaidEffect): void {
       ON CONFLICT(purchase_id) DO UPDATE SET
         provider_subscription_id = COALESCE(subscription_states.provider_subscription_id,
           excluded.provider_subscription_id),
-        state = 'active', current_period_end = MAX(subscription_states.current_period_end,
+        state = CASE WHEN subscription_states.state IN ('cancel-scheduled', 'canceled')
+          THEN subscription_states.state ELSE 'active' END,
+        current_period_end = MAX(subscription_states.current_period_end,
           excluded.current_period_end), updated_at = excluded.updated_at`).run(
       purchase.id, effect.subscriptionId ?? null, endsAt, now.toISOString(),
     );
   }
 }
 
+function refreshEntitlement(purchaseId: string): void {
+  const active = database.prepare(`SELECT MIN(starts_at) AS starts_at, MAX(ends_at) AS ends_at
+    FROM payment_periods WHERE purchase_id = ? AND refunded_at IS NULL AND disputed_at IS NULL`)
+    .get(purchaseId) as { starts_at: string | null; ends_at: string | null };
+  if (active.ends_at) {
+    database.prepare(`UPDATE entitlements SET starts_at = ?, ends_at = ?, revoked_at = NULL
+      WHERE purchase_id = ?`).run(active.starts_at, active.ends_at, purchaseId);
+  } else {
+    database.prepare(`UPDATE entitlements SET revoked_at = ? WHERE purchase_id = ?
+      AND revoked_at IS NULL`).run(new Date().toISOString(), purchaseId);
+  }
+}
+
+function matchingPeriod(evidence: VerifiedEvidence, paymentId: string): {
+  id: string; purchase_id: string; amount_minor: number; currency: string;
+  billing_mode: string;
+} {
+  if (!paymentId || paymentId.length > 200) throw new PaymentLifecycleError(400, "Invalid payment reference");
+  const rows = database.prepare(`SELECT pp.id, pp.purchase_id, pp.amount_minor, pp.currency,
+      p.billing_mode FROM payment_periods pp JOIN purchases p ON p.id = pp.purchase_id
+    WHERE pp.provider = ? AND p.provider = ? AND p.plan_mode = ?
+      AND (pp.provider_payment_id = ? OR pp.provider_charge_id = ?)`)
+    .all(evidence.provider, evidence.provider, evidence.mode, paymentId, paymentId) as
+      { id: string; purchase_id: string; amount_minor: number; currency: string; billing_mode: string }[];
+  if (rows.length !== 1) throw new PaymentLifecycleError(409, "Payment outcome has no unique paid period");
+  return rows[0];
+}
+
+function refundPeriod(evidence: VerifiedEvidence,
+  effect: Extract<PaymentEffect, { kind: "refund" }>): void {
+  const period = matchingPeriod(evidence, effect.paymentId);
+  if (!Number.isSafeInteger(effect.amountMinor) || effect.amountMinor <= 0 ||
+      effect.currency.toLowerCase() !== period.currency) {
+    throw new PaymentLifecycleError(409, "Refund terms do not match the paid period");
+  }
+  if (!effect.full) return;
+  database.prepare("UPDATE payment_periods SET refunded_at = COALESCE(refunded_at, ?) WHERE id = ?")
+    .run(new Date().toISOString(), period.id);
+  if (period.billing_mode === "one-time") {
+    database.prepare("UPDATE purchases SET status = 'refunded' WHERE id = ?")
+      .run(period.purchase_id);
+  }
+  refreshEntitlement(period.purchase_id);
+}
+
+function disputePeriod(evidence: VerifiedEvidence,
+  effect: Extract<PaymentEffect, { kind: "dispute" }>): void {
+  const period = matchingPeriod(evidence, effect.paymentId);
+  database.prepare(`UPDATE payment_periods SET disputed_at = ? WHERE id = ?`).run(
+    effect.open ? new Date().toISOString() : null, period.id,
+  );
+  refreshEntitlement(period.purchase_id);
+}
+
+function subscriptionState(evidence: VerifiedEvidence,
+  effect: Extract<PaymentEffect, { kind: "subscription-state" }>): void {
+  const occurred = Date.parse(effect.occurredAt);
+  if (!Number.isFinite(occurred) || !effect.subscriptionId || effect.subscriptionId.length > 200) {
+    throw new PaymentLifecycleError(400, "Invalid subscription state evidence");
+  }
+  const purchase = database.prepare(`SELECT id FROM purchases WHERE id = ? AND provider = ?
+    AND plan_mode = ? AND provider_subscription_id = ?
+    AND billing_mode IN ('monthly', 'annual')`).get(
+    effect.purchaseId, evidence.provider, evidence.mode, effect.subscriptionId,
+  ) as { id: string } | undefined;
+  if (!purchase) throw new PaymentLifecycleError(409, "Subscription does not match the purchase");
+  const now = new Date().toISOString();
+  database.prepare(`INSERT INTO subscription_states
+    (purchase_id, provider_subscription_id, state, current_period_end, updated_at, provider_event_at)
+    VALUES (?, ?, ?, NULL, ?, ?)
+    ON CONFLICT(purchase_id) DO UPDATE SET
+      state = excluded.state, updated_at = excluded.updated_at,
+      provider_event_at = excluded.provider_event_at
+    WHERE subscription_states.provider_event_at IS NULL
+      OR subscription_states.provider_event_at <= excluded.provider_event_at`).run(
+    purchase.id, effect.subscriptionId, effect.state, now,
+    new Date(occurred).toISOString(),
+  );
+}
+
 function applyEffect(evidence: VerifiedEvidence): void {
   if (evidence.effect.kind === "paid") paidPeriod(evidence, evidence.effect);
+  if (evidence.effect.kind === "refund") refundPeriod(evidence, evidence.effect);
+  if (evidence.effect.kind === "dispute") disputePeriod(evidence, evidence.effect);
+  if (evidence.effect.kind === "subscription-state") subscriptionState(evidence, evidence.effect);
   if (evidence.effect.kind === "subscription-linked") {
     const { purchaseId, resourceId, subscriptionId } = evidence.effect;
     if (!subscriptionId || subscriptionId.length > 200) {

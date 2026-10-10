@@ -292,11 +292,25 @@ function migratePaymentLifecycle(): void {
   }).immediate();
 }
 
+function migratePaymentOutcomes(): void {
+  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 10").get()) return;
+  database.transaction(() => {
+    database.exec(`ALTER TABLE payment_periods ADD COLUMN provider_charge_id TEXT;
+      ALTER TABLE subscription_states ADD COLUMN provider_event_at TEXT;
+      CREATE UNIQUE INDEX payment_periods_charge ON payment_periods(provider, provider_charge_id)
+        WHERE provider_charge_id IS NOT NULL;
+      CREATE UNIQUE INDEX purchases_provider_subscription ON purchases(provider, plan_mode, provider_subscription_id)
+        WHERE provider_subscription_id IS NOT NULL;`);
+    database.prepare("INSERT INTO catalog_migrations (version) VALUES (10)").run();
+  }).immediate();
+}
+
 export function migrateCatalog(): void {
   migrate.immediate();
   migratePlanModes();
   migrateBillingProfiles();
   migratePaymentLifecycle();
+  migratePaymentOutcomes();
 }
 
 export function seedCatalog(): void {
