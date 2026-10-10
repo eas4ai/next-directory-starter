@@ -48,7 +48,7 @@ try {
   expect(brief.includes('# Operator manual brief') &&
     brief.includes('Verify against source') && brief.includes('## Chapters'),
   'Manual brief lacks source-verification scope');
-  const paths = [...brief.matchAll(/\]\((src\/[^)]+|scripts\/[^)]+)\)/g)].map((match) => match[1]);
+  const paths = [...brief.matchAll(/\]\(\.\.\/(src\/[^)]+|scripts\/[^)]+)\)/g)].map((match) => match[1]);
   expect(new Set(paths).size >= 12 && paths.every((path) => existsSync(path)),
     'Manual brief needs at least 12 valid implementation links');
   passed = true;
