@@ -13,8 +13,6 @@ export function AppearanceSwitch({ initialMode }: { initialMode: Mode }) {
     const next = currentlyDark ? "light" : "dark";
     document.documentElement.dataset.mode = next;
     document.documentElement.classList.toggle("dark", next === "dark");
-    document.cookie = `site_appearance=${next}; Path=/; Max-Age=31536000; SameSite=Lax${
-      location.protocol === "https:" ? "; Secure" : ""}`;
     setMode(next);
   }
 
