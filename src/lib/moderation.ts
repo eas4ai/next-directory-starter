@@ -7,6 +7,7 @@ import { HttpError, httpErrorResponse } from "@/lib/http-error";
 import { recordAudit } from "@/lib/audit";
 import { promoteDraftMedia } from "@/lib/media";
 import { recordOwnerNotification } from "@/lib/notifications";
+import { redirectForPath } from "@/lib/seo-redirects";
 import { editableSeoOverrides, hasDraftSeo, publishDraftSeo, saveDraftSeo,
   type SeoOverrides } from "@/lib/seo-settings";
 
@@ -128,6 +129,9 @@ export function createOwnerListing(userId: string, input: unknown): Listing {
   if (!listing) throw new ModerationError(400, "Invalid listing");
   try {
     database.transaction(() => {
+      if (redirectForPath(`/listings/${listing.slug}`)) {
+        throw new ModerationError(409, "Listing slug is reserved by a redirect");
+      }
       listing.category = existingCategory(listing.category);
       database.prepare(`INSERT INTO listings
         (slug, name, summary, description, category, url, status, owner_user_id)

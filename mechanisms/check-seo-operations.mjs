@@ -263,6 +263,14 @@ try {
         articleCollision.status !== 409) {
       throw new Error(`Content claimed a reserved redirect source: ${adminListing.status}/${ownerListing.status}/${articleCollision.status}`);
     }
+    for (const source of ['/listings/future-seo-listing', '/listings/future-owner-seo',
+      '/articles/future-seo-article']) {
+      const response = await request(source);
+      if (response.status !== 301 ||
+          new URL(response.headers.get('location') || '/', origin).toString() !== `${origin}/articles`) {
+        throw new Error(`Reserved redirect was lost after rejected content creation: ${source}`);
+      }
+    }
     const shadow = await request('/api/admin/seo/redirects',
       json({ source: '/listings/example-tool', destination: '/articles' }, adminCookie));
     if (shadow.status < 400 || shadow.status >= 500) throw new Error('A live listing route was shadowed');
