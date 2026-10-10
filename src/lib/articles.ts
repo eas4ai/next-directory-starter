@@ -3,6 +3,8 @@ import { migrateCatalog } from "@/lib/catalog-migrations";
 import { HttpError, httpErrorResponse } from "@/lib/http-error";
 import { recordAudit } from "@/lib/audit";
 import { promoteDraftMedia } from "@/lib/media";
+import { editableSeoOverrides, publicSeoOverrides, publishDraftSeo, saveDraftSeo,
+  type SeoOverrides } from "@/lib/seo-settings";
 
 migrateCatalog();
 
@@ -21,6 +23,7 @@ export type Article = {
   publishedAt: string | null;
   version: number;
   staged: boolean;
+  seo: SeoOverrides;
 };
 
 type ArticleRow = {
@@ -70,6 +73,7 @@ function fromRow(row: ArticleRow, tags: string[]): Article {
     publishedAt: row.published_at,
     version: row.revision,
     staged: false,
+    seo: publicSeoOverrides("article", row.slug),
   };
 }
 
@@ -121,15 +125,17 @@ export function articleBySlug(slug: string): Article | undefined {
 
 export function editableArticleBySlug(slug: string): Article | undefined {
   const current = articleBySlug(slug);
-  if (!current || current.status !== "published") return current;
+  if (!current) return current;
+  const seo = editableSeoOverrides("article", slug);
+  if (current.status !== "published") return { ...current, seo };
   const staged = database.prepare(`SELECT title, summary, body, tags_json, category FROM article_revisions
     WHERE slug = ?`).get(slug) as {
     title: string; summary: string; body: string; tags_json: string; category: string | null;
   } | undefined;
-  if (!staged) return current;
+  if (!staged) return { ...current, seo };
   return { ...current, title: staged.title, summary: staged.summary, body: staged.body,
     category: staged.category,
-    tags: JSON.parse(staged.tags_json) as string[], staged: true };
+    tags: JSON.parse(staged.tags_json) as string[], staged: true, seo };
 }
 
 export function publishedArticleBySlug(slug: string): Article | undefined {
@@ -213,6 +219,10 @@ export function createArticle(input: unknown, actorId: string): Article {
         actorId, now, now, article.status === "published" ? now : null, category,
       );
       setTags(article.slug, article.tags);
+      if (input && typeof input === "object" && "seo" in input) {
+        saveDraftSeo("article", article.slug, (input as { seo: unknown }).seo);
+        if (article.status === "published") publishDraftSeo("article", article.slug);
+      }
       recordAudit(article.status === "published" ? "article.publish" : "article.create", actorId, article.slug);
     }).immediate();
   } catch (error) {
@@ -256,6 +266,7 @@ export function saveArticleRevision(slug: string, changes: unknown,
         WHERE slug = ?`).run(article.title, article.summary, article.body, category, now, slug);
       setTags(slug, canonicalTags);
     }
+    if ("seo" in changes) saveDraftSeo("article", slug, changes.seo);
     database.prepare("UPDATE articles SET revision = revision + 1 WHERE slug = ?").run(slug);
     recordAudit("article.save", actorId, slug);
     return editableArticleBySlug(slug)!;
@@ -290,6 +301,7 @@ export function publishArticleRevision(slug: string, expectedVersion: number,
         published_at = ?, revision = revision + 1 WHERE slug = ?`).run(now, now, slug);
     }
     promoteDraftMedia("article", slug);
+    publishDraftSeo("article", slug);
     recordAudit("article.publish", actorId, slug);
     return articleBySlug(slug)!;
   }).immediate();
@@ -314,6 +326,7 @@ export function updateArticle(slug: string, changes: unknown, actorId: string): 
     if (article.status === "draft") database.prepare("DELETE FROM article_revisions WHERE slug = ?").run(slug);
     if (article.status === "published" && current.status !== "published") {
       promoteDraftMedia("article", slug);
+      publishDraftSeo("article", slug);
     }
     setTags(slug, article.tags);
     recordAudit(article.status === "published" ? "article.publish" :

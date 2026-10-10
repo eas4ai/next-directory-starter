@@ -17,6 +17,8 @@ Set `RESEND_API_KEY` and `RESEND_FROM` using a verified Resend sending domain. P
 
 Set `SITE_NAME` and `SITE_DESCRIPTION` to identify your directory. Set `SITE_LOGO_URL` and `SITE_ICON_URL` to site-relative paths or HTTP(S) asset URLs. Put site-relative assets in `public/` and refer to them with paths such as `/brand/logo.svg`. These settings change the public header and page metadata without editing application code.
 
+Administrators can set a search title format, default description and social image, and Google/Bing verification values at `/admin/seo`. Listing owners can save optional search and social overrides in their private listing editor; the submitted values appear publicly only after moderator approval. Article editors can save the same overrides with an article revision; publishing that revision applies them. Choosing noindex on a public item keeps its page available to visitors while requesting that crawlers not index it.
+
 Initialize the database, seed sample listings, and create the first administrator:
 
 ```sh

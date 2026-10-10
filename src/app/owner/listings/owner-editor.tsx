@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import type { Listing } from "@/lib/listings";
 import { ImageUploader } from "@/components/image-uploader";
+import type { SeoOverrides } from "@/lib/seo-settings";
 
 type OwnerItem = Listing & { hasDraft: boolean; pending: boolean };
 
-function ListingFields({ value, includeSlug }: { value?: Listing; includeSlug?: boolean }) {
+function ListingFields({ value, seo, includeSlug }: { value?: Listing; seo?: SeoOverrides; includeSlug?: boolean }) {
   return (
     <div className="grid gap-4">
       <div className="grid gap-4 sm:grid-cols-2">
@@ -23,6 +24,26 @@ function ListingFields({ value, includeSlug }: { value?: Listing; includeSlug?: 
       <label className="grid gap-2 text-sm font-medium">Description
         <textarea name="description" defaultValue={value?.description} required maxLength={5000} className="min-h-28 rounded-md border border-input bg-background px-3 py-2 text-sm" />
       </label>
+      <fieldset className="grid gap-4 rounded-md border p-4">
+        <legend className="px-1 text-sm font-semibold">Search and social preview</legend>
+        <p className="text-xs text-muted-foreground">Changes appear publicly after a moderator approves this submission.</p>
+        <label className="grid gap-2 text-sm font-medium">Search title
+          <Input name="seoTitle" defaultValue={seo?.title ?? ""} maxLength={160} />
+        </label>
+        <label className="grid gap-2 text-sm font-medium">Search description
+          <Input name="seoDescription" defaultValue={seo?.description ?? ""} maxLength={320} />
+        </label>
+        <label className="grid gap-2 text-sm font-medium">Social image URL or path
+          <Input name="seoImage" defaultValue={seo?.socialImage ?? ""} maxLength={2048} />
+        </label>
+        <label className="grid gap-2 text-sm font-medium">Search indexing
+          <select name="seoIndexable" defaultValue={seo?.indexable === null || seo?.indexable === undefined ? "inherit" : seo.indexable ? "index" : "noindex"}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+            <option value="inherit">Use site default</option><option value="index">Allow indexing</option>
+            <option value="noindex">Noindex</option>
+          </select>
+        </label>
+      </fieldset>
     </div>
   );
 }
@@ -30,6 +51,7 @@ function ListingFields({ value, includeSlug }: { value?: Listing; includeSlug?: 
 export function OwnerEditor({ initialListings }: { initialListings: OwnerItem[] }) {
   const router = useRouter();
   const [editing, setEditing] = useState<Listing | null>(null);
+  const [editingSeo, setEditingSeo] = useState<SeoOverrides | undefined>();
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -65,8 +87,9 @@ export function OwnerEditor({ initialListings }: { initialListings: OwnerItem[] 
         setMessage("Could not open this listing.");
         return;
       }
-      const data = await response.json() as { listing: Listing; proposal: Listing | null };
+      const data = await response.json() as { listing: Listing; proposal: Listing | null; seo: SeoOverrides };
       setEditing(data.proposal ?? data.listing);
+      setEditingSeo(data.seo);
     } catch {
       setMessage("Could not connect to the server. Try again.");
     }
@@ -148,7 +171,7 @@ export function OwnerEditor({ initialListings }: { initialListings: OwnerItem[] 
             <h2 className="text-xl font-semibold">Edit {editing.slug}</h2>
             <Button type="button" variant="ghost" onClick={() => setEditing(null)}>Close</Button>
           </div>
-          <ListingFields value={editing} />
+          <ListingFields value={editing} seo={editingSeo} />
           <ImageUploader kind="listing" slug={editing.slug} onUploaded={() => router.refresh()} />
           <Button type="submit" disabled={pending}>Save changes</Button>
         </form>

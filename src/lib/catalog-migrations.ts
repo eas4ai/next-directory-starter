@@ -394,6 +394,31 @@ function migrateNotificationClaims(): void {
   }).immediate();
 }
 
+function migrateSeoSettings(): void {
+  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 16").get()) return;
+  database.transaction(() => {
+    database.exec(`CREATE TABLE seo_settings (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        title_format TEXT NOT NULL,
+        description TEXT NOT NULL,
+        social_image TEXT,
+        google_verification TEXT,
+        bing_verification TEXT,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE seo_overrides (
+        kind TEXT NOT NULL CHECK (kind IN ('listing', 'article')),
+        slug TEXT NOT NULL,
+        public_json TEXT,
+        draft_json TEXT,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (kind, slug)
+      );
+      ALTER TABLE submissions ADD COLUMN seo_json TEXT;`);
+    database.prepare("INSERT INTO catalog_migrations (version) VALUES (16)").run();
+  }).immediate();
+}
+
 export function migrateCatalog(): void {
   migrate.immediate();
   migratePlanModes();
@@ -405,6 +430,7 @@ export function migrateCatalog(): void {
   migrateMedia();
   migrateNotifications();
   migrateNotificationClaims();
+  migrateSeoSettings();
 }
 
 export function seedCatalog(): void {

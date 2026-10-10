@@ -16,7 +16,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   await connection();
   const article = publishedArticleBySlug((await params).slug);
   if (!article) notFound();
-  return pageMetadata(`/articles/${article.slug}`, `${article.title} | ${getSiteConfig().name}`, article.summary);
+  return pageMetadata(`/articles/${article.slug}`, `${article.title} | ${getSiteConfig().name}`,
+    article.summary, article.seo);
 }
 
 export default async function ArticlePage({ params }: Params) {
