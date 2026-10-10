@@ -22,6 +22,14 @@ type Reservation = { id: string; created: false; existingUrl: string | null } |
 
 type CheckoutInput = { planKey: string; offerToken: string; provider: BillingProvider; requestId: string };
 
+function acceptedOffer(row: PurchaseRow): string {
+  return planOfferToken({ key: row.plan_key, name: row.plan_name,
+    description: row.plan_description, mode: row.plan_mode,
+    billingMode: row.billing_mode, amountMinor: row.amount_minor,
+    currency: row.currency, durationDays: row.accepted_duration_days,
+    featured: Boolean(row.featured) });
+}
+
 function reserve(ownerUserId: string, listingSlug: string, input: CheckoutInput): Reservation {
   const { planKey, offerToken, provider, requestId } = input;
   return database.transaction(() => {
@@ -33,16 +41,22 @@ function reserve(ownerUserId: string, listingSlug: string, input: CheckoutInput)
       WHERE owner_user_id = ? AND checkout_request_id = ?`)
       .get(ownerUserId, requestId) as PurchaseRow | undefined;
     if (existing) {
-      const priorOffer = planOfferToken({ key: existing.plan_key, name: existing.plan_name,
-        description: existing.plan_description, mode: existing.plan_mode,
-        billingMode: existing.billing_mode, amountMinor: existing.amount_minor,
-        currency: existing.currency, durationDays: existing.accepted_duration_days,
-        featured: Boolean(existing.featured) });
       if (existing.listing_slug !== listingSlug || existing.plan_key !== planKey ||
-          existing.provider !== provider || priorOffer !== offerToken) {
+          existing.provider !== provider || acceptedOffer(existing) !== offerToken) {
         throw new CheckoutError(409, "Checkout request was already used for different terms");
       }
       return { id: existing.id, created: false, existingUrl: existing.checkout_url } as const;
+    }
+    const pending = database.prepare(`SELECT * FROM purchases
+      WHERE owner_user_id = ? AND listing_slug = ? AND provider = ? AND status = 'pending'
+        AND billing_mode != 'free' ORDER BY created_at, id LIMIT 2`)
+      .all(ownerUserId, listingSlug, provider) as PurchaseRow[];
+    if (pending.length > 1 || (pending[0] &&
+        (pending[0].plan_key !== planKey || acceptedOffer(pending[0]) !== offerToken))) {
+      throw new CheckoutError(409, "Another checkout is pending for this listing and provider");
+    }
+    if (pending[0]) {
+      return { id: pending[0].id, created: false, existingUrl: pending[0].checkout_url } as const;
     }
     const plan = planByKey(planKey);
     if (!plan || !plan.enabled || plan.mode !== checkoutMode() || plan.billingMode === "free" ||

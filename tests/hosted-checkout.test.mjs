@@ -84,6 +84,9 @@ test('hosted checkout reserves one immutable purchase and never retries an ambig
     assert.equal(row.provider_price_id, 'pri_monthly');
     assert.equal(row.plan_mode, 'test');
     assert.equal(await createHostedCheckout('owner', 'mine', monthly, fake).then((value) => value.url), first.url);
+    assert.equal(await createHostedCheckout('owner', 'mine', {
+      ...monthly, requestId: randomUUID(),
+    }, fake).then((value) => value.purchaseId), first.purchaseId);
     assert.equal(calls.length, 1);
     updatePlan('monthly-featured', { amountMinor: 2400, enabled: false }, 'admin');
     assert.equal(await createHostedCheckout('owner', 'mine', monthly, fake).then((value) => value.url), first.url);
