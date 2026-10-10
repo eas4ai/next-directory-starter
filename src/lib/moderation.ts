@@ -6,6 +6,7 @@ import type { Listing } from "@/lib/listings";
 import { HttpError, httpErrorResponse } from "@/lib/http-error";
 import { recordAudit } from "@/lib/audit";
 import { promoteDraftMedia } from "@/lib/media";
+import { recordOwnerNotification } from "@/lib/notifications";
 
 migrateCatalog();
 
@@ -203,12 +204,20 @@ export function decideSubmission(id: string, actorId: string, decision: "approve
     database.prepare(`UPDATE submissions SET status = ?, reason = ?, decided_at = ?, decided_by = ?
       WHERE id = ? AND status = 'pending'`).run(decision === "approve" ? "approved" : "rejected",
       reason, new Date().toISOString(), actorId, id);
+    recordOwnerNotification(row.owner_user_id, `moderation.${decision}`,
+      `moderation:${row.id}:${decision}`,
+      decision === "approve" ? "Listing approved" : "Listing needs changes",
+      decision === "approve"
+        ? `Your listing ${row.slug} was approved. ${reason}`
+        : `Your listing ${row.slug} was not approved. ${reason}`);
     recordAudit(decision === "approve" ? "moderation.approve" : "moderation.reject", actorId, row.slug);
   }).immediate();
 }
 
 export function suspendPublishedListing(slug: string, actorId: string, reason: string): void {
   database.transaction(() => {
+    const owner = database.prepare("SELECT owner_user_id FROM listings WHERE slug = ? AND status = 'published'")
+      .get(slug) as { owner_user_id: string | null } | undefined;
     const changed = database.prepare("UPDATE listings SET status = 'suspended' WHERE slug = ? AND status = 'published'")
       .run(slug);
     if (changed.changes !== 1) throw new ModerationError(404, "Published listing not found");
@@ -217,6 +226,11 @@ export function suspendPublishedListing(slug: string, actorId: string, reason: s
       `Suspended: ${reason}`, new Date().toISOString(), actorId, slug,
     );
     database.prepare("DELETE FROM owner_drafts WHERE slug = ?").run(slug);
+    if (owner?.owner_user_id) {
+      recordOwnerNotification(owner.owner_user_id, "moderation.suspend",
+        `moderation:suspend:${slug}:${randomUUID()}`, "Listing suspended",
+        `Your listing ${slug} was suspended. ${reason}`);
+    }
     recordAudit("moderation.suspend", actorId, slug);
   }).immediate();
 }
