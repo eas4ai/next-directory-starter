@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: next-geo-cache-policy
+Current: social-cards
 
 ## public-starter-and-theme
 
@@ -330,3 +330,20 @@ Retain all publication, revision, private-route, and explicit Markdown rules.
 Done-when: the production HTTP check passes all SEO-011 request signals and
 withdrawal cases; HTML detail responses remain noncached and Markdown has the
 required variation, crawl, and cache headers.
+
+## social-cards
+
+Requirements: SEO-012
+
+Delivery: serve one 1200-by-630 PNG card for each shareable public home, index,
+listing, and article page. Generate a branded card on a fresh installation,
+fit current published image sources without distortion, safely normalize
+external image URLs, and expose the same card through Open Graph and X metadata
+with real dimensions. Preserve the existing publication, override, and preview
+rules.
+
+Done-when: a production HTTP check reads the initial HTML as Facebook and X
+crawlers, fetches each advertised image, verifies a 1200-by-630 PNG and matching
+tags, and proves current public overrides, withdrawal, fallback, and private
+network boundaries. Live platform checks follow once the starter has a public
+domain.

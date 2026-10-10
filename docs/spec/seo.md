@@ -56,3 +56,8 @@ Status: Agreed 2026-10-10
 Falsifier: A Markdown request for an eligible detail page returns HTML, a normal browser or non-suffixed `text/markdown;q=0` request receives Markdown, a private or ineligible page is converted or exposed, a pending revision appears, an explicit Markdown route changes, a negotiated response lacks `text/markdown`, `noindex`, `no-store`, or `Vary: Accept, User-Agent`, or an HTML detail response is cacheable.
 Mechanism: geo-negotiation
 Status: Agreed 2026-10-10
+
+[SEO-012] The public home, listing and article indexes, and each eligible listing and article detail page emit Open Graph and X large-image metadata in initial HTML. Both image tags identify the same public image from the configured site origin, declare 1200-by-630 dimensions, and return an actual 1200-by-630 PNG. A fresh installation generates a branded image for each page without administrator setup. Published image overrides and public media retain their existing priority and are fitted into the card without distortion; accepted external image URLs are fetched only through bounded, private-network-safe requests, with a generated card if the source fails. Images and metadata use only the current public revision, and an ineligible detail page has no public card. The administrator's social preview identifies the image the page emits.
+Falsifier: A fresh public page has no Open Graph or X image, the tags disagree or claim dimensions different from the returned pixels, a normal published override is ignored, a draft or suspended record has a public card or changes one, a private-network image URL is fetched, a failed source prevents a generated fallback, or the preview names a different image from initial HTML.
+Mechanism: social-cards
+Status: Agreed 2026-10-10
