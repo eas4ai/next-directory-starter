@@ -124,7 +124,11 @@ try {
         !scripts['billing:reconcile']) {
       throw new Error('The owner payment status route or bounded reconciliation command is unavailable.');
     }
-    nodeTests(['tests/owner-billing.test.mjs', 'tests/payment-reconciliation.test.mjs']);
+    nodeTests([
+      'tests/owner-billing.test.mjs',
+      'tests/payment-reconciliation.test.mjs',
+      'tests/payment-provider-adapters.test.mjs',
+    ]);
   });
 } catch (error) {
   process.stderr.write(`payment-lifecycle setup: ${error.message}\n`);

@@ -49,7 +49,8 @@ function evidence(purchase: Purchase, source: string, resource: string,
 async function inspectStripe(purchase: Purchase, limit: number): Promise<VerifiedEvidence[]> {
   const config = providerRecoveryConfiguration("stripe", purchase.plan_mode);
   if (!config) throw new Error("Stripe recovery credentials are unavailable");
-  const stripe = new Stripe(config.apiKey, { timeout: 15_000, maxNetworkRetries: 1 });
+  const stripe = new Stripe(config.apiKey, { timeout: 15_000, maxNetworkRetries: 1,
+    httpClient: Stripe.createFetchHttpClient() });
   const session = await stripe.checkout.sessions.retrieve(purchase.provider_resource_id!,
     { expand: ["line_items"] });
   if (session.id !== purchase.provider_resource_id || session.client_reference_id !== purchase.id) {

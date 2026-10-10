@@ -86,7 +86,9 @@ const cancelAtPeriodEnd: CancelProvider = async (provider, mode, subscriptionId)
   const config = providerRecoveryConfiguration(provider, mode);
   if (!config) throw new OwnerBillingError(503, "Provider recovery credentials are unavailable");
   if (provider === "stripe") {
-    const subscription = await new Stripe(config.apiKey).subscriptions.update(
+    const subscription = await new Stripe(config.apiKey, {
+      httpClient: Stripe.createFetchHttpClient(),
+    }).subscriptions.update(
       subscriptionId, { cancel_at_period_end: true },
       { idempotencyKey: `directory-cancel:${subscriptionId}` },
     );
