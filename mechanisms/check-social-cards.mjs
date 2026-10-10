@@ -99,10 +99,14 @@ try {
   }
   expect(started, 'Production server did not start');
 
-  await card('/', 'Fresh home');
-  await card('/listings', 'Fresh listing index');
-  await card('/articles', 'Fresh article index');
+  const homeCard = await card('/', 'Fresh home');
+  const listingIndexCard = await card('/listings', 'Fresh listing index');
+  const articleIndexCard = await card('/articles', 'Fresh article index');
   const listingBefore = await card('/listings/example-tool', 'Fresh listing');
+  expect(!homeCard.bytes.equals(listingIndexCard.bytes) &&
+    !listingIndexCard.bytes.equals(articleIndexCard.bytes) &&
+    !articleIndexCard.bytes.equals(listingBefore.bytes),
+  'Fresh cards did not identify their own public pages');
 
   const signIn = await request('/api/auth/sign-in/email',
     { Origin: origin, 'Content-Type': 'application/json' },
@@ -131,17 +135,21 @@ try {
   expect(!listingBefore.bytes.equals(listingWithOverride.bytes),
     'A published custom image did not change the card');
 
+  const articleBefore = await card('/articles/social-article', 'Article before draft');
   const saved = await write('/api/admin/articles/social-article', {
     action: 'save', version: articleVersion, title: 'Private staged title',
   }, cookie, 'PATCH');
   expect(saved.ok, 'Private revision fixture failed: HTTP ' + saved.status);
   const stagedCard = await card('/articles/social-article', 'Article before publication');
+  expect(articleBefore.bytes.equals(stagedCard.bytes), 'Private revision changed the public card');
   const published = await write('/api/admin/articles/social-article', {
     action: 'publish', version: (await saved.json()).article.version,
   }, cookie, 'PATCH');
   expect(published.ok, 'Article publication failed: HTTP ' + published.status);
   const publishedCard = await card('/articles/social-article', 'Article after publication');
-  expect(stagedCard.url === publishedCard.url, 'Article image URL changed across revision');
+  expect(stagedCard.url === publishedCard.url &&
+    !stagedCard.bytes.equals(publishedCard.bytes),
+  'Publishing the revision did not update the current public card');
 
   let privateHits = 0;
   spy = createServer((_request, response) => {
