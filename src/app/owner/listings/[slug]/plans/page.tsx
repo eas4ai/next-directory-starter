@@ -5,7 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { connection } from "next/server";
 import { sessionUser } from "@/lib/admin";
 import { ownerListing } from "@/lib/moderation";
-import { listPlans, planOfferToken, planPrice } from "@/lib/plans";
+import { checkoutMode, listPlans, planOfferToken, planPrice } from "@/lib/plans";
 import { getSiteConfig } from "@/lib/site-config";
 import { CheckoutButton } from "./checkout-button";
 
@@ -30,13 +30,13 @@ export default async function ListingPlansPage({ params, searchParams }: {
   try { listing = ownerListing(user.id, slug).listing; }
   catch { notFound(); }
   if (listing.status !== "published") notFound();
-  const plans = listPlans(true);
+  const plans = listPlans(true, checkoutMode());
   const checkout = (await searchParams).checkout;
   return (
     <main className="mx-auto w-full max-w-[1400px] px-6 py-10">
       <Link href="/owner/listings" className="text-sm text-muted-foreground hover:text-foreground">← My listings</Link>
       <h1 className="mt-7 text-3xl font-semibold tracking-tight">Publishing plans for {listing.name}</h1>
-      <p className="mt-3 text-muted-foreground">Review the price, duration, and placement before continuing to Stripe Checkout.</p>
+      <p className="mt-3 text-muted-foreground">Review the price, billing interval, and placement for your {checkoutMode()} checkout mode.</p>
       {checkout === "return" && <p role="status" className="mt-4 rounded-md border p-3 text-sm">Checkout returned. Publication benefits begin after payment is confirmed.</p>}
       {checkout === "cancel" && <p role="status" className="mt-4 rounded-md border p-3 text-sm">Checkout was cancelled. No new benefit was started.</p>}
       <section className="mt-8 grid gap-4 md:grid-cols-2" aria-label="Available publishing plans">
@@ -44,9 +44,13 @@ export default async function ListingPlansPage({ params, searchParams }: {
           <article key={plan.key} className="flex flex-col gap-3 rounded-lg border p-6">
             <h2 className="text-xl font-semibold">{plan.name}</h2>
             {plan.description && <p className="text-sm text-muted-foreground">{plan.description}</p>}
-            <p className="text-2xl font-semibold">{planPrice(plan)}</p>
-            <p className="text-sm">{`${plan.durationDays} days · ${plan.featured ? "Featured placement" : "Standard placement"}`}</p>
-            <CheckoutButton slug={slug} planKey={plan.key} offerToken={planOfferToken(plan)} />
+            <p className="text-2xl font-semibold">{planPrice(plan)}{plan.billingMode === "monthly" ? " / month" : plan.billingMode === "annual" ? " / year" : ""}</p>
+            <p className="text-sm">{plan.billingMode === "one-time" ? `${plan.durationDays} days` :
+              plan.billingMode === "free" ? "Free, no fixed duration" :
+                plan.billingMode === "monthly" ? "Monthly renewal" : "Annual renewal"} · {plan.featured ? "Featured placement" : "Standard placement"}</p>
+            {plan.billingMode === "free" || plan.billingMode === "one-time" ?
+              <CheckoutButton slug={slug} planKey={plan.key} offerToken={planOfferToken(plan)} billingMode={plan.billingMode} /> :
+              <p className="mt-auto pt-3 text-sm text-muted-foreground">Recurring checkout is being prepared. This plan cannot be purchased yet.</p>}
           </article>
         ))}
       </section>

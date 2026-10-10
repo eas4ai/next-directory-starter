@@ -62,7 +62,9 @@ The article RSS feed is available at `/feed.xml`. It includes published articles
 
 ## Publishing plans and checkout
 
-Administrators configure price, currency, duration, featured placement, and availability at `/admin/plans`. Approved listing owners see current plans from **My listings → Publishing plans** before they leave for Stripe-hosted Checkout. Each checkout saves the selected terms with its pending purchase; later plan edits do not change that purchase. Set `STRIPE_SECRET_KEY` in the environment to enable checkout. A return to the site is only a receipt of the browser navigation; payment confirmation is handled by the signed webhook.
+Administrators configure test or live free, one-time, monthly, and annual plans at `/admin/plans`, including price, currency, placement, and availability. Set `BILLING_CHECKOUT_MODE=test` or `live` for the plans owners should see; existing paid plans migrate to the mode of the configured Stripe key. Moderator approval still publishes an ordinary listing for free. An owner can select a free plan without a payment provider. Monthly and annual terms are visible, with checkout held until recurring payments are connected.
+
+One-time plans continue through Stripe-hosted Checkout when `STRIPE_SECRET_KEY` is set. Each purchase saves the accepted plan name, description, mode, amount, currency, duration, and placement; later plan edits do not change those terms. A return to the site is only a receipt of browser navigation; payment confirmation comes from the signed webhook.
 
 If an administrator changes a plan while an owner has its page open, Checkout asks the owner to refresh and review the new terms. A retry after a connection or database error keeps the same pending purchase and Stripe idempotency key for that attempt.
 
