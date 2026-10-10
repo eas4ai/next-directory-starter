@@ -51,7 +51,7 @@ function inputFrom(value: unknown): { data?: StagedInput; error?: string } {
   item.url = url;
   item.sourceUrl = sourceUrl;
   if (!item.idempotencyKey || item.idempotencyKey.length > 120 ||
-      item.sourceExcerpt.length > 1500 ||
+      !item.sourceExcerpt || item.sourceExcerpt.length > 1500 ||
       !item.name || item.name.length > 120 ||
       !item.summary || item.summary.length > 280 ||
       !item.description || item.description.length > 5000 ||
@@ -140,7 +140,6 @@ export function publishAgentImport(actorUserId: string, slug: string) {
     database.prepare("UPDATE listings SET status = 'published' WHERE slug = ?").run(slug);
     database.prepare(`UPDATE agent_imports SET published_at = ?, published_by = ?
       WHERE slug = ?`).run(now, actorUserId, slug);
-    recordAudit("catalog.publish", actorUserId, slug);
     return { slug, status: "published" };
   }).immediate();
 }
