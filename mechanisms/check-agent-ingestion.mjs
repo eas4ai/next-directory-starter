@@ -11,6 +11,7 @@ import sharp from 'sharp';
 
 const ids = ['ING-001', 'ING-002', 'ING-003', 'ING-004'];
 const results = Object.fromEntries(ids.map((id) => [id, false]));
+const completed = new Set();
 const workspace = mkdtempSync(join(tmpdir(), 'directory-agent-check-'));
 const databasePath = join(workspace, 'directory.db');
 const password = randomBytes(20).toString('hex');
@@ -98,8 +99,16 @@ async function tool(name, args = {}) {
 }
 
 async function check(id, run) {
-  try { await run(); results[id] = true; }
-  catch (error) { process.stderr.write(`${id}: ${error.message}\n`); }
+  try {
+    await run();
+    results[id] = true;
+    process.stdout.write(`sudus: ${id}: pass\n`);
+  } catch (error) {
+    process.stderr.write(`${id}: ${error.message}\n`);
+    process.stdout.write(`sudus: ${id}: fail\n`);
+  } finally {
+    completed.add(id);
+  }
 }
 
 const first = {
@@ -372,6 +381,9 @@ try {
 } catch (error) {
   process.stderr.write(`agent-ingestion setup: ${error.message}\n`);
 } finally {
+  for (const [id, passed] of Object.entries(results)) {
+    if (!passed && !completed.has(id)) process.stdout.write(`sudus: ${id}: fail\n`);
+  }
   if (browser) await browser.close();
   if (app?.pid) {
     try { process.kill(-app.pid, 'SIGTERM'); } catch { /* already stopped */ }
