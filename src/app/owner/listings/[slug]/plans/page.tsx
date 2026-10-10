@@ -8,7 +8,7 @@ import { ownerListing } from "@/lib/moderation";
 import { checkoutMode, listPlans, planOfferToken, planPrice } from "@/lib/plans";
 import { getSiteConfig } from "@/lib/site-config";
 import { CheckoutButton } from "./checkout-button";
-import { stripeCheckoutAvailable } from "@/lib/billing-profiles";
+import { checkoutProvidersForPlan } from "@/lib/billing-profiles";
 
 export async function generateMetadata(): Promise<Metadata> {
   await connection();
@@ -32,7 +32,7 @@ export default async function ListingPlansPage({ params, searchParams }: {
   catch { notFound(); }
   if (listing.status !== "published") notFound();
   const plans = listPlans(true, checkoutMode());
-  const stripeAvailable = stripeCheckoutAvailable();
+  const offers = plans.map((plan) => ({ plan, providers: checkoutProvidersForPlan(plan) }));
   const checkout = (await searchParams).checkout;
   return (
     <main className="mx-auto w-full max-w-[1400px] px-6 py-10">
@@ -42,7 +42,7 @@ export default async function ListingPlansPage({ params, searchParams }: {
       {checkout === "return" && <p role="status" className="mt-4 rounded-md border p-3 text-sm">Checkout returned. Publication benefits begin after payment is confirmed.</p>}
       {checkout === "cancel" && <p role="status" className="mt-4 rounded-md border p-3 text-sm">Checkout was cancelled. No new benefit was started.</p>}
       <section className="mt-8 grid gap-4 md:grid-cols-2" aria-label="Available publishing plans">
-        {plans.map((plan) => (
+        {offers.map(({ plan, providers }) => (
           <article key={plan.key} className="flex flex-col gap-3 rounded-lg border p-6">
             <h2 className="text-xl font-semibold">{plan.name}</h2>
             {plan.description && <p className="text-sm text-muted-foreground">{plan.description}</p>}
@@ -50,11 +50,14 @@ export default async function ListingPlansPage({ params, searchParams }: {
             <p className="text-sm">{plan.billingMode === "one-time" ? `${plan.durationDays} days` :
               plan.billingMode === "free" ? "Free, no fixed duration" :
                 plan.billingMode === "monthly" ? "Monthly renewal" : "Annual renewal"} · {plan.featured ? "Featured placement" : "Standard placement"}</p>
-            {plan.billingMode === "free" || (plan.billingMode === "one-time" && stripeAvailable) ?
-              <CheckoutButton slug={slug} planKey={plan.key} offerToken={planOfferToken(plan)} billingMode={plan.billingMode} /> :
-              <p className="mt-auto pt-3 text-sm text-muted-foreground">{plan.billingMode === "one-time" ?
-                "Checkout is unavailable for the selected mode." :
-                "Recurring checkout is being prepared. This plan cannot be purchased yet."}</p>}
+            {plan.billingMode === "free" ?
+              <CheckoutButton slug={slug} planKey={plan.key} offerToken={planOfferToken(plan)} billingMode="free" /> :
+              providers.length ? <div className="mt-auto flex flex-wrap gap-2 pt-3">
+                {providers.map((provider) => <CheckoutButton key={provider} slug={slug}
+                  planKey={plan.key} offerToken={planOfferToken(plan)}
+                  billingMode={plan.billingMode} provider={provider} />)}
+              </div> :
+                <p className="mt-auto pt-3 text-sm text-muted-foreground">Checkout is unavailable for the selected mode.</p>}
           </article>
         ))}
       </section>

@@ -3,7 +3,8 @@ import { database } from "@/lib/database";
 import { migrateCatalog } from "@/lib/catalog-migrations";
 import { recordAudit } from "@/lib/audit";
 import { HttpError, httpErrorResponse } from "@/lib/http-error";
-import { checkoutMode } from "@/lib/plans";
+import { checkoutMode, type PublishingPlan } from "@/lib/plans";
+import { publicUrl } from "@/lib/page-metadata";
 
 migrateCatalog();
 
@@ -20,6 +21,15 @@ export type BillingProfile = {
   hasWebhookSecret: boolean;
   priceMappings: PriceMapping[];
   updatedAt: string;
+};
+export type CheckoutConfiguration = {
+  provider: BillingProvider;
+  mode: BillingMode;
+  apiKey: string;
+  webhookSecret: string;
+  publicKey: string;
+  priceMappings: PriceMapping[];
+  legacy: boolean;
 };
 
 type StoredProfile = {
@@ -206,9 +216,45 @@ export function stripeCheckoutConfiguration(): { apiKey: string; webhookSecret: 
   };
 }
 
-export function stripeCheckoutAvailable(): boolean {
-  try { return Boolean(stripeCheckoutConfiguration()); }
-  catch { return false; }
+export function checkoutConfiguration(billingProvider: BillingProvider,
+  billingMode: BillingMode = checkoutMode()): CheckoutConfiguration | null {
+  const profile = stored(billingProvider, billingMode);
+  if (!profile) {
+    if (billingProvider !== "stripe") return null;
+    const legacy = legacyStripe();
+    return legacy?.mode === billingMode ? {
+      provider: "stripe", mode: billingMode, apiKey: legacy.apiKey,
+      webhookSecret: legacy.webhookSecret, publicKey: "", priceMappings: [], legacy: true,
+    } : null;
+  }
+  if (!profile.enabled || !profile.api_key_cipher || !profile.webhook_secret_cipher) return null;
+  const key = encryptionKey();
+  return {
+    provider: billingProvider, mode: billingMode,
+    apiKey: open(profile.api_key_cipher, billingProvider, billingMode, "apiKey", key),
+    webhookSecret: open(profile.webhook_secret_cipher, billingProvider, billingMode, "webhookSecret", key),
+    publicKey: profile.public_key,
+    priceMappings: JSON.parse(profile.price_mappings) as PriceMapping[], legacy: false,
+  };
+}
+
+export function checkoutProvidersForPlan(plan: PublishingPlan): BillingProvider[] {
+  if (!plan.enabled || plan.mode !== checkoutMode() || plan.billingMode === "free") return [];
+  const providers: BillingProvider[] = ["stripe", "paddle", "nowpayments"];
+  return providers.filter((billingProvider) => {
+    if (billingProvider === "nowpayments") {
+      if (plan.billingMode !== "one-time") return false;
+      try { if (new URL(publicUrl("/")).protocol !== "https:") return false; }
+      catch { return false; }
+    }
+    try {
+      const configuration = checkoutConfiguration(billingProvider, plan.mode);
+      if (!configuration) return false;
+      return billingProvider === "nowpayments" ||
+        configuration.priceMappings.some((entry) => entry.planKey === plan.key) ||
+        (billingProvider === "stripe" && configuration.legacy && plan.billingMode === "one-time");
+    } catch { return false; }
+  });
 }
 
 export function stripeWebhookCandidates(): { mode: BillingMode; secret: string; profile: boolean }[] {

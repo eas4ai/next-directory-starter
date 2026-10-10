@@ -3,8 +3,38 @@
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
-export function CheckoutButton({ slug, planKey, offerToken, billingMode }: {
-  slug: string; planKey: string; offerToken: string; billingMode: "free" | "one-time";
+type BillingMode = "free" | "one-time" | "monthly" | "annual";
+type Provider = "stripe" | "paddle" | "nowpayments";
+
+function providerName(provider: Provider | undefined): string {
+  if (provider === "nowpayments") return "NOWPayments";
+  if (provider === "paddle") return "Paddle";
+  return "Stripe";
+}
+
+type CheckoutRequest = { slug: string; planKey: string; offerToken: string;
+  billingMode: BillingMode; provider?: Provider; requestId: string | null };
+
+async function submitCheckout({ slug, planKey, offerToken, billingMode, provider, requestId }:
+  CheckoutRequest): Promise<{ url?: string }> {
+  const free = billingMode === "free";
+  const response = await fetch(`/api/owner/listings/${encodeURIComponent(slug)}/${free ? "plans/free" : "hosted-checkout"}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(free ? { planKey, offerToken } :
+      { planKey, offerToken, provider, requestId }),
+  });
+  const result = await response.json();
+  if (!response.ok || (free ? typeof result.purchaseId !== "string" : typeof result.url !== "string")) {
+    throw new Error(result.error ?? "Could not start checkout.");
+  }
+  return result;
+}
+
+export function CheckoutButton({ slug, planKey, offerToken, billingMode, provider }: {
+  slug: string; planKey: string; offerToken: string;
+  billingMode: BillingMode;
+  provider?: Provider;
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -15,26 +45,15 @@ export function CheckoutButton({ slug, planKey, offerToken, billingMode }: {
     setPending(true);
     setError("");
     try {
-      if (billingMode === "one-time") requestId.current ??= crypto.randomUUID();
-      const response = await fetch(`/api/owner/listings/${encodeURIComponent(slug)}/${billingMode === "free" ? "plans/free" : "checkout"}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(billingMode === "free" ? { planKey, offerToken } :
-          { planKey, offerToken, requestId: requestId.current }),
-      });
-      const result = await response.json();
+      if (billingMode !== "free") requestId.current ??= crypto.randomUUID();
+      const result = await submitCheckout({ slug, planKey, offerToken,
+        billingMode, provider, requestId: requestId.current });
       if (billingMode === "free") {
-        if (!response.ok || typeof result.purchaseId !== "string") {
-          throw new Error(result.error ?? "Could not select the free plan.");
-        }
         setSuccess("Free plan selected. Your approved listing remains public.");
         setPending(false);
         return;
       }
-      if (!response.ok || typeof result.url !== "string") {
-        throw new Error(result.error ?? "Could not start checkout.");
-      }
-      window.location.assign(result.url);
+      window.location.assign(result.url!);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not start checkout.");
       setPending(false);
@@ -44,7 +63,8 @@ export function CheckoutButton({ slug, planKey, offerToken, billingMode }: {
   return (
     <div className="mt-auto pt-3">
       <Button type="button" disabled={pending} onClick={() => { void checkout(); }}>
-        {pending ? "Please wait…" : billingMode === "free" ? "Select free plan" : "Continue to Stripe Checkout"}
+        {pending ? "Please wait…" : billingMode === "free" ? "Select free plan" :
+          `Continue to ${providerName(provider)}`}
       </Button>
       {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
       {success && <p role="status" className="mt-2 text-sm text-muted-foreground">{success}</p>}
