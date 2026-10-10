@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: account-access
+Current: payment-foundation
 
 ## public-starter-and-theme
 
@@ -141,3 +141,26 @@ use one magic link exactly once; an unknown address cannot sign up through
 magic link; and suspending an account immediately blocks its sessions and
 hides its listings until reinstatement, without suspending the final active
 administrator.
+
+## payment-foundation
+
+Requirements: COM-004, COM-005
+
+Delivery: extend migrated plans to free, one-time, monthly, and annual terms
+without changing existing paid purchases. Keep approval's current free ordinary
+publication path. Let an administrator configure separate disabled-by-default
+test and live profiles for Stripe, Paddle, and NOWPayments, with protected
+write-only secrets encrypted under an operator key and mode-specific price
+mappings for Stripe and Paddle. Show owners the applicable plan terms; keep
+new recurring and provider checkout unavailable until the later payment
+lifecycle commitment connects them. Preserve current Stripe one-time checkout
+for previously configured installations.
+
+Done-when: the operator can create and edit each plan mode through protected
+controls; a new approved listing remains ordinarily public without payment;
+free selection creates no provider charge; existing purchases keep their
+original amount, currency, duration, and featured terms after plan edits; an
+unauthorized request cannot read or change provider settings; database rows and
+responses do not expose saved secrets; test and live credentials and mappings
+remain separate after restart; and a disabled or incomplete profile is not
+offered as a new provider checkout option.
