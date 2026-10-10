@@ -75,6 +75,12 @@ try {
   const owner = await login('http-owner@example.invalid');
   const editor = await login('http-editor@example.invalid');
   const moderator = await login('http-moderator@example.invalid');
+  await expectStatus(await request('/admin/taxonomy', { headers: { Cookie: editor } }), 200);
+  await expectStatus(await request('/api/admin/article-categories', { headers: { Cookie: editor } }), 200);
+  await expectStatus(await request('/api/admin/article-categories',
+    json({ name: 'Editor Topic' }, editor)), 201);
+  assert.equal((await request('/api/admin/categories',
+    json({ name: 'Editor Cannot Change Listings' }, editor))).status, 403);
 
   const created = await request('/api/owner/listings', json({ slug: 'http-media',
     name: 'HTTP Media', summary: 'A checked listing', description: 'HTTP media test',
