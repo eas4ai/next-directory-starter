@@ -334,6 +334,41 @@ try {
       idempotencyKey: 'different-key-same-url' }] });
     assert(duplicate.items?.[0]?.status === 'duplicate',
       'A different key created a duplicate destination.');
+    const upperPath = await tool('stage_links', { items: [{ ...first,
+      idempotencyKey: 'path-upper', url: 'https://EXAMPLE.ORG/CasePath?A=1',
+      name: 'Upper Path Resource' }] });
+    const lowerPath = await tool('stage_links', { items: [{ ...first,
+      idempotencyKey: 'path-lower', url: 'https://example.org/casepath?A=1',
+      name: 'Lower Path Resource' }] });
+    assert(upperPath.items?.[0]?.status === 'created' &&
+      lowerPath.items?.[0]?.status === 'created' &&
+      upperPath.items[0].slug !== lowerPath.items[0].slug,
+    'Case-sensitive destination paths collapsed into one duplicate.');
+    const sameCanonical = await tool('stage_links', { items: [{ ...first,
+      idempotencyKey: 'canonical-host', url: 'https://example.org/CasePath?A=1',
+      name: 'Canonical Host Duplicate' }] });
+    assert(sameCanonical.items?.[0]?.status === 'duplicate' &&
+      sameCanonical.items[0].slug === upperPath.items[0].slug,
+    'Equivalent host spelling avoided duplicate detection.');
+    const differentQuery = await tool('stage_links', { items: [{ ...first,
+      idempotencyKey: 'query-case', url: 'https://example.org/CasePath?a=1',
+      name: 'Query Case Resource' }] });
+    assert(differentQuery.items?.[0]?.status === 'created',
+      'Case-sensitive destination query collapsed into a duplicate.');
+    const legacy = new Database(databasePath);
+    try {
+      legacy.prepare(`INSERT INTO listings
+        (slug, name, summary, description, category, url, status)
+        VALUES (?, ?, ?, ?, ?, ?, 'draft')`).run('legacy-mixed-host', 'Legacy Mixed Host',
+        'Existing directory item', 'Stored without URL normalization', 'Tools',
+        'https://EXAMPLE.ORG/LegacyPath');
+    } finally { legacy.close(); }
+    const legacyDuplicate = await tool('stage_links', { items: [{ ...first,
+      idempotencyKey: 'legacy-host', url: 'https://example.org/LegacyPath',
+      name: 'Legacy Host Duplicate' }] });
+    assert(legacyDuplicate.items?.[0]?.status === 'duplicate' &&
+      legacyDuplicate.items[0].slug === 'legacy-mixed-host',
+    'Existing noncanonical host spelling escaped duplicate detection.');
     const missingSource = await tool('stage_links', { items: [{ ...first,
       idempotencyKey: 'missing-source', url: 'https://example.org/missing', sourceExcerpt: '' }] });
     assert(missingSource.items?.[0]?.status === 'invalid', 'Missing source evidence was accepted.');
