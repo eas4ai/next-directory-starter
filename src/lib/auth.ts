@@ -33,6 +33,7 @@ export const auth = betterAuth({
     admin({ ac: accessControl, roles }),
     magicLink({
       disableSignUp: true,
+      expiresIn: Number(process.env.ACCOUNT_MAGIC_TTL_SECONDS ?? "300"),
       storeToken: "hashed",
       sendMagicLink: async ({ email, url }) => {
         const account = database.prepare('SELECT emailVerified, banned FROM "user" WHERE email = ? COLLATE NOCASE')
