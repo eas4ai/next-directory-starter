@@ -6,6 +6,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
+import Database from 'better-sqlite3';
 
 const workspace = mkdtempSync(join(tmpdir(), 'directory-content-http-'));
 let app;
@@ -41,11 +42,18 @@ const json = (body, session, method = 'POST') => ({ method, body: JSON.stringify
     ...(session ? { Cookie: session } : {}) } });
 
 async function login(email) {
-  const response = await request('/api/auth/sign-in/email', json({ email, password }));
-  assert.equal(response.status, 200, `Sign-in failed for ${email}: ${response.status}`);
-  const session = cookie(response);
-  assert.ok(session);
-  return session;
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const response = await request('/api/auth/sign-in/email', json({ email, password }));
+    if (response.status === 429) {
+      await new Promise((resolve) => setTimeout(resolve, 2_500));
+      continue;
+    }
+    assert.equal(response.status, 200, `Sign-in failed for ${email}: ${response.status}`);
+    const session = cookie(response);
+    assert.ok(session);
+    return session;
+  }
+  throw new Error(`Sign-in rate limit persisted for ${email}`);
 }
 
 async function upload(slug, session, image, options = {}) {
@@ -59,9 +67,22 @@ try {
   command(['run', 'db:seed']);
   for (const [email, role] of [
     ['http-owner@example.invalid', 'user'], ['http-editor@example.invalid', 'editor'],
-    ['http-moderator@example.invalid', 'moderator'],
+    ['http-moderator@example.invalid', 'moderator'], ['http-admin@example.invalid', 'admin'],
   ]) command(['run', 'account:provision', '--', '--email', email, '--password', password,
     '--role', role, '--yes']);
+  const database = new Database(join(workspace, 'directory.db'));
+  const ownerId = database.prepare('SELECT id FROM "user" WHERE email = ?')
+    .get('http-owner@example.invalid').id;
+  const failedNotice = database.prepare(`INSERT INTO owner_notifications
+    (id, owner_user_id, kind, source_key, subject, body, created_at,
+     email_state, email_attempts, email_last_error)
+    VALUES (?, ?, 'qa', ?, ?, 'Retained failure', ?, 'failed', 5, 'Resend delivery failed')`);
+  for (let index = 0; index < 101; index += 1) {
+    const id = `qa-failed-${index}`;
+    failedNotice.run(id, ownerId, id, `Failed notice ${index}`,
+      new Date(Date.UTC(2025, 0, 1, 0, 0, index)).toISOString());
+  }
+  database.close();
   command(['run', 'build']);
   app = spawn('npm', ['run', 'start', '--', '-p', String(port)],
     { env, detached: true, stdio: 'ignore' });
@@ -75,6 +96,13 @@ try {
   const owner = await login('http-owner@example.invalid');
   const editor = await login('http-editor@example.invalid');
   const moderator = await login('http-moderator@example.invalid');
+  const admin = await login('http-admin@example.invalid');
+  const deliveryPage = await request('/admin/notifications?page=2', { headers: { Cookie: admin } });
+  await expectStatus(deliveryPage, 200);
+  const deliveryHtml = await deliveryPage.text();
+  assert.ok(deliveryHtml.includes('Failed notice 0'), 'Oldest exhausted notice is missing from page two');
+  assert.ok(deliveryHtml.includes('aria-label="Delivery pages"'));
+  assert.ok(deliveryHtml.includes('Retry delivery'));
   await expectStatus(await request('/admin/taxonomy', { headers: { Cookie: editor } }), 200);
   await expectStatus(await request('/api/admin/article-categories', { headers: { Cookie: editor } }), 200);
   await expectStatus(await request('/api/admin/article-categories',
