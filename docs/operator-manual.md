@@ -15,11 +15,7 @@ Each section links to the application code or executable script that supports it
 
 2. Set a new `BETTER_AUTH_SECRET` in `.env.local`. Set `BETTER_AUTH_URL` and `SITE_URL` to the origin where you will open the site; the example uses `http://localhost:3000`. Keep `DATABASE_URL=file:./.runtime/directory.db` for the first run, or choose a persistent SQLite file. The database reader creates its parent directory. Uploaded images default to a `media` directory beside that database unless `MEDIA_DIR` is set. See [the configuration reader](../src/lib/database.ts), [media storage](../src/lib/media.ts), and [public-origin validation](../src/lib/page-metadata.ts).
 
-3. If you choose a custom SQLite path, export **the same** `DATABASE_URL` in the shell that runs every migration, seed, maintenance, backup, and restore command. Repeat this in each new shell or supply it through your process manager. The Better Auth CLI loads `.env.local`, while the repository's `tsx` and `node` scripts read `process.env` directly; a path only in `.env.local` can split their work across databases. Example, with your actual absolute path:
-
-   ```sh
-   export DATABASE_URL='file:/absolute/path/to/directory.db'
-   ```
+3. For a custom SQLite path, set `DATABASE_URL=file:/absolute/path/to/directory.db` in `.env.local` and run the repository commands from its root. The application, Better Auth migration, catalog migration, seed, and maintenance entry points then select that same file without a separate shell export. An explicit `DATABASE_URL` in the process environment takes precedence when you intentionally target another database, such as an isolated restore. Set the working directory for scheduled jobs to the repository root, or provide their environment explicitly. See [CLI environment loading](../scripts/load-env.mjs), [package scripts](../package.json), and [database connection](../src/lib/database.ts).
 
 4. Create the authentication and catalog tables, add repeatable sample listings, and create the first administrator:
 
@@ -129,12 +125,12 @@ The limit must be 1–50. The command reports attempted, sent, and failed counts
 
 - Install the locked packages with `npm ci`; run `npm run build`, `npm run db:migrate`, and `npm run start` with the same database environment. The [package scripts](../package.json) define these commands.
 - Set `SITE_URL` and `BETTER_AUTH_URL` to the public origin. Set a unique `BETTER_AUTH_SECRET`. Use a persistent `file:` SQLite path and a persistent writable media directory. Both must survive builds and restarts. See [origin validation](../src/lib/page-metadata.ts), [database connection](../src/lib/database.ts), and [media directory](../src/lib/media.ts).
-- Export the same `DATABASE_URL` and `MEDIA_DIR` to shell jobs as the app uses. `.env.local` by itself is not loaded by the `tsx` and `node` maintenance scripts. Keep `BILLING_ENCRYPTION_KEY` stable if any provider profiles were saved; changing it makes those secrets unreadable. See [migration command](../package.json), [operations environment reader](../scripts/ops-common.mjs), and [secret decryption](../src/lib/billing-profiles.ts).
+- Keep the app and shell jobs on the same persistent `DATABASE_URL` and `MEDIA_DIR`. Repository commands run from the project root load `.env.local`; explicit process environment values take precedence. If a scheduler uses another working directory, configure its environment explicitly and check the selected storage path. Keep `BILLING_ENCRYPTION_KEY` stable if any provider profiles were saved; changing it makes those secrets unreadable. See [CLI environment loading](../scripts/load-env.mjs), [operations environment reader](../scripts/ops-common.mjs), and [secret decryption](../src/lib/billing-profiles.ts).
 - Configure Resend, paid providers, and their scheduled jobs only when those features are needed. Verify public pages, media, robots, sitemap, and a signed test-mode payment before taking live payments.
 
 ### Create a verified backup
 
-The backup command requires `DATABASE_URL`, optional `MEDIA_DIR`, and `BILLING_ENCRYPTION_KEY` in its process environment. It also requires a private regular file containing **that same** 32-byte base64url key. The destination must not already exist or overlap the live database or media. Keep the resulting directory private: it contains the database, media, and billing key.
+The backup command reads `DATABASE_URL`, optional `MEDIA_DIR`, and `BILLING_ENCRYPTION_KEY` from its process environment or the project's `.env.local`. It also requires a private regular file containing **that same** 32-byte base64url key. The destination must not already exist or overlap the live database or media. Keep the resulting directory private: it contains the database, media, and billing key.
 
 ```sh
 npm run ops:backup -- --output /private/backups/directory-YYYYMMDD --key-file /private/keys/directory-billing.key

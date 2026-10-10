@@ -1,3 +1,4 @@
+import "./load-env.mjs";
 import { migrateCatalog } from "../src/lib/catalog-migrations";
 
 migrateCatalog();

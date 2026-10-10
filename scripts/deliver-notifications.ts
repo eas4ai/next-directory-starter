@@ -1,3 +1,4 @@
+import "./load-env.mjs";
 import { deliverOwnerNotifications } from "../src/lib/notification-delivery";
 
 async function main(): Promise<void> {

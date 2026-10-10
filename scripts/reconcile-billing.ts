@@ -1,3 +1,4 @@
+import "./load-env.mjs";
 import { reconcilePurchase, retryRetainedEvidence } from "../src/lib/payment-reconciliation";
 
 function options(args: string[]): { limit: number; purchaseId: string | null; resourceId: string | null } {
