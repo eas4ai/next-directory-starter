@@ -46,4 +46,4 @@ export async function proxy(request: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/admin/theme/:path*", "/admin/catalog/:path*", "/admin/review/:path*", "/admin/articles/:path*", "/admin/taxonomy/:path*", "/admin/plans/:path*", "/admin/billing/:path*", "/admin/accounts/:path*", "/admin/audit/:path*", "/owner/listings/:path*", "/owner/billing/:path*", "/listings/:slug", "/articles/:slug"] };
+export const config = { matcher: ["/admin/theme/:path*", "/admin/catalog/:path*", "/admin/review/:path*", "/admin/articles/:path*", "/admin/taxonomy/:path*", "/admin/plans/:path*", "/admin/billing/:path*", "/admin/accounts/:path*", "/admin/audit/:path*", "/admin/notifications/:path*", "/owner/listings/:path*", "/owner/billing/:path*", "/listings/:slug", "/articles/:slug"] };

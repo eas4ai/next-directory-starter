@@ -382,6 +382,18 @@ function migrateNotifications(): void {
   }).immediate();
 }
 
+function migrateNotificationClaims(): void {
+  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 15").get()) return;
+  database.transaction(() => {
+    database.exec(`ALTER TABLE owner_notifications ADD COLUMN email_to TEXT;
+      ALTER TABLE owner_notifications ADD COLUMN email_from TEXT;
+      ALTER TABLE owner_notifications ADD COLUMN email_first_attempt_at TEXT;
+      ALTER TABLE owner_notifications ADD COLUMN email_claim_token TEXT;
+      ALTER TABLE owner_notifications ADD COLUMN email_provider_id TEXT;`);
+    database.prepare("INSERT INTO catalog_migrations (version) VALUES (15)").run();
+  }).immediate();
+}
+
 export function migrateCatalog(): void {
   migrate.immediate();
   migratePlanModes();
@@ -392,6 +404,7 @@ export function migrateCatalog(): void {
   migrateArticleCategories();
   migrateMedia();
   migrateNotifications();
+  migrateNotificationClaims();
 }
 
 export function seedCatalog(): void {
