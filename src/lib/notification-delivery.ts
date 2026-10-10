@@ -6,7 +6,7 @@ import { accountMailConfigured } from "@/lib/mail";
 
 migrateCatalog();
 
-const MAX_ATTEMPTS = 5;
+const MAX_ATTEMPTS = 6;
 const CLAIM_MS = 15 * 60_000;
 const IDEMPOTENCY_MS = 24 * 60 * 60_000;
 
