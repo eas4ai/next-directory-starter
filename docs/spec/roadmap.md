@@ -126,7 +126,7 @@ history identifies the actor and time of each named protected action.
 
 Requirements: ACC-001, ACC-002, ACC-003, ACC-004
 
-Delivery: connect Better Auth to a documented SMTP sender, require email
+Delivery: connect Better Auth to the documented Resend email service, require email
 verification for public accounts, add password recovery and passwordless
 magic-link sign-in for existing verified accounts, and preserve host
 administrator provisioning. Add audited account suspension and reinstatement
