@@ -55,6 +55,17 @@ async function publicDirectory(port) {
   throw new Error('Container did not serve the seeded public directory');
 }
 
+async function firstPageResponse(port) {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    try {
+      return await fetch(`http://127.0.0.1:${port}/listings`,
+        { signal: AbortSignal.timeout(1500) });
+    } catch { /* app is starting */ }
+    await new Promise((done) => setTimeout(done, 500));
+  }
+  throw new Error('Unmigrated container did not respond');
+}
+
 try {
   for (const file of ['Dockerfile', 'compose.yaml', '.dockerignore', '.env.docker.example']) {
     expect(existsSync(join(root, file)), `${file} is missing`);
@@ -86,12 +97,22 @@ try {
   expect(inspected.uid !== 0 && !inspected.secret && !inspected.database,
     'Image runs as root or contains a secret or operator database');
 
+  compose(['up', '-d', '--no-build']);
+  const coldResponse = await firstPageResponse(port);
+  expect(coldResponse.status >= 500,
+    `Unmigrated public page unexpectedly succeeded with HTTP ${coldResponse.status}`);
+  const schema = compose(['exec', '-T', 'web', 'node', '-e',
+    `const fs=require('node:fs');const Database=require('better-sqlite3');const path='/app/data/directory.db';if(!fs.existsSync(path)){process.stdout.write('absent')}else{const db=new Database(path,{readonly:true,fileMustExist:true});process.stdout.write(db.prepare("SELECT name FROM sqlite_master WHERE name='catalog_migrations'").get()?'present':'absent');db.close()}`]);
+  expect(schema.trim() === 'absent', 'Starting or probing the unmigrated app changed its schema');
+  compose(['stop', 'web']);
+
   expect(compose(['run', '--rm', '--no-deps', 'web', 'npm', 'run', 'db:migrate'], 180_000)
     .includes('Catalog migration complete.'), 'Container migration did not finish');
   expect(compose(['run', '--rm', '--no-deps', 'web', 'npm', 'run', 'db:seed'], 120_000)
     .includes('Sample catalog seeded.'), 'Container seed did not finish');
   compose(['up', '-d', '--no-build']);
   await publicDirectory(port);
+  compose(['exec', '-T', 'web', 'node', 'scripts/healthcheck.mjs']);
   const mediaPath = '/app/data/media/container-persistence-check';
   compose(['exec', '-T', 'web', 'node', '-e',
     `const fs=require('node:fs');fs.mkdirSync('/app/data/media',{recursive:true});fs.writeFileSync('${mediaPath}','kept')`]);
