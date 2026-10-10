@@ -278,6 +278,27 @@ try {
       ['taxonomy', '/api/admin/categories', '/api/admin/plans'],
       ['billing', '/api/admin/plans', '/api/admin/listings'],
     ];
+      const plan = (key) => ({ key, name: 'Forbidden plan probe', description: '',
+        mode: 'test', billingMode: 'one-time', amountMinor: 1200, currency: 'usd',
+        durationDays: 30, featured: false, enabled: false });
+      const forbiddenWrites = {
+        moderator: { path: '/api/admin/articles',
+          body: { slug: 'forbidden-moderator-article', title: 'Forbidden article',
+            summary: 'Permission boundary probe', body: 'No editor permission',
+            status: 'draft', tags: [] },
+          query: 'SELECT 1 FROM articles WHERE slug = ?', key: 'forbidden-moderator-article' },
+        editor: { path: '/api/admin/plans', body: plan('forbidden-editor-plan'),
+          query: 'SELECT 1 FROM publishing_plans WHERE key = ?', key: 'forbidden-editor-plan' },
+        catalog: { path: '/api/admin/categories', body: { name: 'Forbidden catalog category' },
+          query: 'SELECT 1 FROM categories WHERE name = ?', key: 'Forbidden catalog category' },
+        taxonomy: { path: '/api/admin/plans', body: plan('forbidden-taxonomy-plan'),
+          query: 'SELECT 1 FROM publishing_plans WHERE key = ?', key: 'forbidden-taxonomy-plan' },
+        billing: { path: '/api/admin/listings',
+          body: { slug: 'forbidden-billing-listing', name: 'Forbidden listing',
+            summary: 'Permission boundary probe', description: 'No catalog permission',
+            category: 'Tools', url: 'https://example.org/forbidden-billing', status: 'draft' },
+          query: 'SELECT 1 FROM listings WHERE slug = ?', key: 'forbidden-billing-listing' },
+      };
     for (const [role, permitted, forbidden] of roles) {
       const email = `adoption-${role}@example.invalid`;
       const id = accountId(email);
@@ -290,6 +311,14 @@ try {
       if (!allowed.ok || ![401, 403, 404].includes(denied.status)) {
         throw new Error(`${role} capability was missing or crossed into another area`);
       }
+        const probe = forbiddenWrites[role];
+        const write = await request(probe.path, json(probe.body, cookie));
+        const guard = new Database(databaseFile, { readonly: true });
+        const changed = guard.prepare(probe.query).get(probe.key);
+        guard.close();
+        if (![401, 403, 404].includes(write.status) || changed) {
+          throw new Error(`${role} capability wrote to a forbidden area`);
+        }
     }
     const selfDemotion = await request(`/api/admin/accounts/${accountId('adoption-admin@example.invalid')}/role`,
       json({ role: 'user' }, adminCookie, 'PATCH'));
