@@ -2,6 +2,8 @@
 
 ![Next Directory Starter social card showing a curated directory interface](assets/social-card.jpg)
 
+*Concept artwork: the star ratings and bookmark icons are illustrative. The starter's listing cards show category, name, and summary.*
+
 A Next.js starter for a curated directory of links, with articles, submissions, moderation, branding, search metadata, and optional paid placement. Listings point visitors to resources on other sites. Operators choose the subject, content, categories, and site identity.
 
 ## What you can build
