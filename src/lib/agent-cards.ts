@@ -47,7 +47,7 @@ export async function renderImportCard(slug: string, includeDraft: boolean): Pro
   const summary = lines(row.summary, withScreenshot ? 38 : 74, 3);
   const category = escapeXml(row.category.slice(0, 80));
   const textWidth = withScreenshot ? 620 : 1070;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1199" height="630" viewBox="0 0 1200 630">
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
     <defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
       <stop stop-color="#101a32"/><stop offset="1" stop-color="#263f56"/>
     </linearGradient></defs>
