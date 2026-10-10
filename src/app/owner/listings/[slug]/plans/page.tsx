@@ -8,6 +8,7 @@ import { ownerListing } from "@/lib/moderation";
 import { checkoutMode, listPlans, planOfferToken, planPrice } from "@/lib/plans";
 import { getSiteConfig } from "@/lib/site-config";
 import { CheckoutButton } from "./checkout-button";
+import { stripeCheckoutAvailable } from "@/lib/billing-profiles";
 
 export async function generateMetadata(): Promise<Metadata> {
   await connection();
@@ -31,6 +32,7 @@ export default async function ListingPlansPage({ params, searchParams }: {
   catch { notFound(); }
   if (listing.status !== "published") notFound();
   const plans = listPlans(true, checkoutMode());
+  const stripeAvailable = stripeCheckoutAvailable();
   const checkout = (await searchParams).checkout;
   return (
     <main className="mx-auto w-full max-w-[1400px] px-6 py-10">
@@ -48,9 +50,11 @@ export default async function ListingPlansPage({ params, searchParams }: {
             <p className="text-sm">{plan.billingMode === "one-time" ? `${plan.durationDays} days` :
               plan.billingMode === "free" ? "Free, no fixed duration" :
                 plan.billingMode === "monthly" ? "Monthly renewal" : "Annual renewal"} · {plan.featured ? "Featured placement" : "Standard placement"}</p>
-            {plan.billingMode === "free" || plan.billingMode === "one-time" ?
+            {plan.billingMode === "free" || (plan.billingMode === "one-time" && stripeAvailable) ?
               <CheckoutButton slug={slug} planKey={plan.key} offerToken={planOfferToken(plan)} billingMode={plan.billingMode} /> :
-              <p className="mt-auto pt-3 text-sm text-muted-foreground">Recurring checkout is being prepared. This plan cannot be purchased yet.</p>}
+              <p className="mt-auto pt-3 text-sm text-muted-foreground">{plan.billingMode === "one-time" ?
+                "Checkout is unavailable for the selected mode." :
+                "Recurring checkout is being prepared. This plan cannot be purchased yet."}</p>}
           </article>
         ))}
       </section>

@@ -164,13 +164,12 @@ const migrate = database.transaction(() => {
     );`);
     database.prepare("INSERT INTO catalog_migrations (version) VALUES (6)").run();
   }
+
 });
 
-export function migrateCatalog(): void {
-  migrate.immediate();
+function migratePlanModes(): void {
   const planModesInstalled = database.prepare("SELECT version FROM catalog_migrations WHERE version = 7").get();
   if (planModesInstalled) return;
-
   // SQLite cannot relax the existing plan CHECK constraints in place. Rebuild the
   // parent table with foreign keys paused, then validate every reference before
   // committing the migration.
@@ -220,6 +219,32 @@ export function migrateCatalog(): void {
   } finally {
     database.pragma("foreign_keys = ON");
   }
+}
+
+function migrateBillingProfiles(): void {
+  const billingProfilesInstalled = database.prepare("SELECT version FROM catalog_migrations WHERE version = 8").get();
+  if (billingProfilesInstalled) return;
+  database.transaction(() => {
+    database.exec(`CREATE TABLE billing_profiles (
+        provider TEXT NOT NULL CHECK (provider IN ('stripe', 'paddle', 'nowpayments')),
+        mode TEXT NOT NULL CHECK (mode IN ('test', 'live')),
+        version INTEGER NOT NULL CHECK (version > 0),
+        enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+        public_key TEXT NOT NULL,
+        api_key_cipher TEXT,
+        webhook_secret_cipher TEXT,
+        price_mappings TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (provider, mode)
+      );`);
+    database.prepare("INSERT INTO catalog_migrations (version) VALUES (8)").run();
+  }).immediate();
+}
+
+export function migrateCatalog(): void {
+  migrate.immediate();
+  migratePlanModes();
+  migrateBillingProfiles();
 }
 
 export function seedCatalog(): void {

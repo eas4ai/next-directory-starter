@@ -15,6 +15,7 @@ type PurchaseRow = {
   currency: string;
   duration_days: number;
   featured: number;
+  plan_mode: "test" | "live";
   stripe_session_id: string;
   stripe_payment_intent_id: string | null;
   status: "pending" | "paid" | "refunded";
@@ -32,7 +33,9 @@ function settle(event: Stripe.Event): void {
   if (typeof id !== "string") throw new PaymentEventError(400, "Missing purchase reference");
   const purchase = database.prepare("SELECT * FROM purchases WHERE id = ?")
     .get(id) as PurchaseRow | undefined;
-  if (!purchase || session.id !== purchase.stripe_session_id ||
+  if (!purchase || (typeof event.livemode === "boolean" &&
+      event.livemode !== (purchase.plan_mode === "live")) ||
+      session.id !== purchase.stripe_session_id ||
       session.object !== "checkout.session" || session.mode !== "payment" ||
       session.amount_total !== purchase.amount_minor || session.currency !== purchase.currency) {
     throw new PaymentEventError(409, "Checkout does not match the pending purchase");
@@ -64,6 +67,9 @@ function refund(event: Stripe.Event): void {
   const purchase = database.prepare("SELECT * FROM purchases WHERE stripe_payment_intent_id = ?")
     .get(charge.payment_intent) as PurchaseRow | undefined;
   if (!purchase) throw new PaymentEventError(409, "Refund has no matching purchase");
+  if (typeof event.livemode === "boolean" && event.livemode !== (purchase.plan_mode === "live")) {
+    throw new PaymentEventError(409, "Refund mode does not match the purchase");
+  }
   if (purchase.status === "refunded") return;
   const now = new Date().toISOString();
   database.prepare("UPDATE purchases SET status = 'refunded' WHERE id = ? AND status = 'paid'").run(purchase.id);
