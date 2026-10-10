@@ -1,4 +1,4 @@
-import { createDecipheriv, randomBytes } from 'node:crypto';
+import { createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
@@ -81,6 +81,10 @@ const json = (body, cookie, method = 'POST') => ({
     ...(cookie ? { Cookie: cookie } : {}) },
   body: JSON.stringify(body),
 });
+const offerToken = (plan) => createHash('sha256').update(JSON.stringify([
+  plan.key, plan.name, plan.description, plan.mode, plan.billingMode,
+  plan.amountMinor, plan.currency, plan.durationDays, plan.featured,
+])).digest('hex');
 
 async function signIn(email) {
   const response = await request('/api/auth/sign-in/email', json({ email, password }));
@@ -207,8 +211,20 @@ try {
         html.includes('Live Only')) {
       throw new Error('The owner cannot review eligible free and recurring terms by mode.');
     }
+    const displayedFreeToken = offerToken(terms('free-basic'));
+    const changedBeforeAcceptance = await request('/api/admin/plans/free-basic',
+      json({ name: 'Free Basic Unseen Edit' }, adminCookie, 'PATCH'));
+    if (!changedBeforeAcceptance.ok) throw new Error('Could not set up the stale free-offer probe.');
+    const staleAcceptance = await request('/api/owner/listings/payment-foundation-entry/plans/free',
+      json({ planKey: 'free-basic', offerToken: displayedFreeToken }, owner));
+    if (staleAcceptance.status !== 409) {
+      throw new Error(`A stale free offer was accepted (HTTP ${staleAcceptance.status}).`);
+    }
+    const restoredFreePlan = await request('/api/admin/plans/free-basic',
+      json({ name: 'Free Basic' }, adminCookie, 'PATCH'));
+    if (!restoredFreePlan.ok) throw new Error('Could not restore the free offer.');
     const accepted = await request('/api/owner/listings/payment-foundation-entry/plans/free',
-      json({ planKey: 'free-basic' }, owner));
+      json({ planKey: 'free-basic', offerToken: displayedFreeToken }, owner));
     if (!accepted.ok || (await accepted.text()).includes('checkout.stripe.com')) {
       throw new Error('Free selection failed or started a provider checkout.');
     }
