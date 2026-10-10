@@ -5,6 +5,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
+import { startAccountMail } from './account-test-mail.mjs';
 
 const ids = ['EDIT-001', 'EDIT-002', 'EDIT-003'];
 const results = Object.fromEntries(ids.map((id) => [id, false]));
@@ -15,6 +16,7 @@ let appEnv;
 let adminCookie;
 let editorCookie;
 let memberCookie;
+let mail;
 
 function command(args) {
   return spawnSync('npm', args, { env: appEnv, encoding: 'utf8', timeout: 120_000 });
@@ -91,10 +93,17 @@ function cookieFrom(response) {
 }
 
 async function signIn(email, password) {
-  const response = await request('/api/auth/sign-in/email', json({ email, password }));
-  const cookie = cookieFrom(response);
-  if (!response.ok || !cookie) throw new Error(`Sign-in failed for ${email}: ${response.status}.`);
-  return cookie;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const response = await request('/api/auth/sign-in/email', json({ email, password }));
+    if (response.status === 429) {
+      await new Promise((resolve) => setTimeout(resolve, 2_500));
+      continue;
+    }
+    const cookie = cookieFrom(response);
+    if (!response.ok || !cookie) throw new Error(`Sign-in failed for ${email}: ${response.status}.`);
+    return cookie;
+  }
+  throw new Error(`Sign-in rate limit persisted for ${email}.`);
 }
 
 async function identities() {
@@ -102,10 +111,13 @@ async function identities() {
   requireCommand(['run', 'account:provision', '--', '--email', 'editorial-admin@example.invalid',
     '--password', password, '--role', 'admin', '--yes']);
   adminCookie = await signIn('editorial-admin@example.invalid', password);
+  const before = mail.count();
   const member = await request('/api/auth/sign-up/email',
     json({ email: 'editorial-member@example.invalid', password, name: 'Member' }));
-  memberCookie = cookieFrom(member);
-  if (!member.ok || !memberCookie) throw new Error(`Member sign-up returned ${member.status}.`);
+  if (!member.ok || cookieFrom(member)) throw new Error(`Member sign-up failed or bypassed verification: ${member.status}.`);
+  const verified = await request(await mail.link('editorial-member@example.invalid', before));
+  if (verified.status >= 400) throw new Error(`Member verification returned ${verified.status}.`);
+  memberCookie = await signIn('editorial-member@example.invalid', password);
 }
 
 async function ensureEditor() {
@@ -149,9 +161,11 @@ async function check(id, run) {
 }
 
 try {
+  mail = await startAccountMail();
   origin = `http://127.0.0.1:${await freePort()}`;
   appEnv = {
     ...process.env,
+    ...mail.env,
     CI: '1',
     DATABASE_URL: `file:${join(workspace, 'directory.db')}`,
     BETTER_AUTH_SECRET: randomBytes(32).toString('hex'),
@@ -159,6 +173,7 @@ try {
     SITE_URL: origin,
   };
   requireCommand(['run', 'db:migrate']);
+  requireCommand(['run', 'db:seed']);
   requireCommand(['run', 'build']);
   await startApp();
   await identities();
@@ -310,6 +325,7 @@ try {
   process.stderr.write(`Editorial mechanism setup: ${error.message}\n`);
 } finally {
   await stopApp();
+  if (mail) await mail.close();
   rmSync(workspace, { recursive: true, force: true });
   for (const [id, ok] of Object.entries(results)) {
     process.stdout.write(`sudus: ${id}: ${ok ? 'pass' : 'fail'}\n`);
