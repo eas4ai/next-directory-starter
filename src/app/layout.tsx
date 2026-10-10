@@ -9,6 +9,7 @@ import { getSeoSettings } from "@/lib/seo-settings";
 import { cookies } from "next/headers";
 import { AppearanceSwitch } from "@/components/appearance-switch";
 import { getThemeSelection } from "@/lib/theme-selection";
+import { presetFontClasses } from "./preset-fonts";
 
 export async function generateMetadata(): Promise<Metadata> {
   await connection();
@@ -39,7 +40,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     .map((field) => preset[field]).join(".");
 
   return (
-    <html lang="en" className={mode === "dark" ? "dark" : ""} data-mode={mode} data-site-preset={presetCode}
+    <html lang="en" className={`${presetFontClasses} ${mode === "dark" ? "dark" : ""}`.trim()} data-mode={mode} data-site-preset={presetCode}
       data-theme={selection.themeId} data-template={selection.templateId}>
       <head><link rel="stylesheet" href="/theme.css" /></head>
       <body>

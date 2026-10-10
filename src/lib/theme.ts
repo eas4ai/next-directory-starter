@@ -60,19 +60,10 @@ function color(lightness: number, chroma: number, hue: number, alpha?: number): 
   return `oklch(${lightness} ${chroma} ${hue}${alpha === undefined ? "" : ` / ${alpha}`})`;
 }
 
-function fontName(slug: string): string {
-  const names: Record<string, string> = {
-    "dm-sans": "DM Sans",
-    "eb-garamond": "EB Garamond",
-    "ibm-plex-sans": "IBM Plex Sans",
-    "jetbrains-mono": "JetBrains Mono",
-  };
-  return names[slug] ?? slug.split("-").map((part) => part[0].toUpperCase() + part.slice(1)).join(" ");
-}
-
 function fontFamily(slug: string): string {
-  const name = fontName(slug);
-  return `"${name}", ${slug.includes("mono") ? "ui-monospace, monospace" : "ui-sans-serif, system-ui, sans-serif"}`;
+  const fallback = slug.includes("mono") ? "ui-monospace, monospace" :
+    "ui-sans-serif, system-ui, sans-serif";
+  return `var(--font-preset-${slug}), ${fallback}`;
 }
 
 function variables(preset: ThemePreset, dark: boolean): Record<string, string> {
@@ -139,10 +130,8 @@ export function declarationBlock(selector: string, values: Record<string, string
 }
 
 export function presetCss(preset: ThemePreset, selector: string): string {
-  const fonts = [...new Set([preset.font, preset.fontHeading === "inherit" ? preset.font : preset.fontHeading])];
-  const imports = fonts.map((font) => `@import url("https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontName(font))}&display=swap");`).join("\n");
   const light = declarationBlock(selector, variables(preset, false));
   const dark = declarationBlock(`${selector}[data-mode="dark"]`, variables(preset, true));
   const system = `@media (prefers-color-scheme: dark) { ${declarationBlock(`${selector}[data-mode="system"]`, variables(preset, true))} }`;
-  return `${imports}\n${light}\n${dark}\n${system}`;
+  return `${light}\n${dark}\n${system}`;
 }
