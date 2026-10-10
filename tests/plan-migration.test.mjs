@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -18,33 +18,17 @@ test('legacy paid purchases survive plan-mode migration with their accepted term
   delete process.env.BILLING_CHECKOUT_MODE;
   const legacy = new Database(filename);
   legacy.pragma('foreign_keys = ON');
-  legacy.exec(`CREATE TABLE catalog_migrations (version INTEGER PRIMARY KEY);
-    INSERT INTO catalog_migrations (version) VALUES (1),(2),(3),(4),(5),(6);
-    CREATE TABLE listings (slug TEXT PRIMARY KEY);
-    INSERT INTO listings VALUES ('existing-listing');
-    CREATE TABLE publishing_plans (
-      key TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, description TEXT NOT NULL,
-      amount_minor INTEGER NOT NULL CHECK (amount_minor > 0), currency TEXT NOT NULL,
-      duration_days INTEGER NOT NULL CHECK (duration_days BETWEEN 1 AND 3650),
-      featured INTEGER NOT NULL, enabled INTEGER NOT NULL, updated_at TEXT NOT NULL
-    );
+  legacy.exec(readFileSync(new URL('../fixtures/catalog-v6.sql', import.meta.url), 'utf8'));
+  legacy.exec(`INSERT INTO categories VALUES ('Tools');
+    INSERT INTO listings (slug, name, summary, description, category, url, status)
+      VALUES ('existing-listing', 'Existing listing', 'Summary', 'Description',
+        'Tools', 'https://example.org/existing', 'published');
     INSERT INTO publishing_plans VALUES
       ('existing-plan','Original plan','Original description',1200,'usd',30,1,1,'2026-01-01');
-    CREATE TABLE purchases (
-      id TEXT PRIMARY KEY NOT NULL,
-      listing_slug TEXT NOT NULL REFERENCES listings(slug),
-      owner_user_id TEXT NOT NULL,
-      plan_key TEXT NOT NULL REFERENCES publishing_plans(key),
-      amount_minor INTEGER NOT NULL, currency TEXT NOT NULL,
-      duration_days INTEGER NOT NULL, featured INTEGER NOT NULL,
-      stripe_session_id TEXT NOT NULL UNIQUE,
-      stripe_payment_intent_id TEXT UNIQUE,
-      status TEXT NOT NULL, created_at TEXT NOT NULL,
-      checkout_request_id TEXT, stripe_product_name TEXT
-    );
     INSERT INTO purchases VALUES
       ('purchase-1','existing-listing','owner','existing-plan',1200,'usd',30,1,
         'cs_existing',NULL,'paid','2026-01-01',NULL,'Original plan · Existing listing');`);
+  assert.deepEqual(legacy.pragma('foreign_key_check'), []);
   legacy.close();
 
   let database;

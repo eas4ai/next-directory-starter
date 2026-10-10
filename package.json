@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "node --import tsx --test --test-concurrency=1 --test-reporter=tap tests/*.test.mjs",
     "db:migrate": "node --import ./scripts/load-env.mjs ./node_modules/auth/dist/index.mjs migrate --yes --config ./src/lib/auth.ts && tsx scripts/migrate-catalog.ts",
     "db:seed": "tsx scripts/seed-catalog.ts",
     "billing:reconcile": "tsx scripts/reconcile-billing.ts",
