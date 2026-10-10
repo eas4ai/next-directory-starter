@@ -27,10 +27,10 @@
 **/storage/**
 **/data
 **/data/**
-**/media
-**/media/**
-!src/app/media
-!src/app/media/**
+media
+media/**
+src/media
+src/media/**
 **/*.key
 **/*.pem
 **/*.p12
