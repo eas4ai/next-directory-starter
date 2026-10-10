@@ -166,6 +166,7 @@ test('THM-001 typed tokens validate and render a custom theme', async () => {
     for (const [path, mode, background] of [
       ['/listings', 'light', 'rgb(247, 244, 237)'],
       ['/admin/theme', 'dark', 'rgb(16, 35, 33)'],
+      ['/admin/overview', 'light', 'rgb(247, 244, 237)'],
     ]) {
       const context = await browser.newContext({ colorScheme: mode });
       await context.addCookies([
@@ -179,6 +180,12 @@ test('THM-001 typed tokens validate and render a custom theme', async () => {
       await page.goto(`${origin}${path}`);
       assert.equal(await page.locator('body').evaluate((element) =>
         getComputedStyle(element).backgroundColor), background);
+      assert.equal(await page.locator('main').evaluate((element) =>
+        getComputedStyle(element).maxWidth), '1280px', `${path} ignores the page-width token`);
+      if (path !== '/admin/overview') {
+        assert.equal(await page.locator('[data-slot=card]').first().evaluate((element) =>
+          getComputedStyle(element).paddingTop), '28px', `${path} ignores the card-spacing token`);
+      }
       await context.close();
     }
   } finally { await browser.close(); }

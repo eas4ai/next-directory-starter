@@ -35,7 +35,7 @@ export default async function ListingPlansPage({ params, searchParams }: {
   const offers = plans.map((plan) => ({ plan, providers: checkoutProvidersForPlan(plan) }));
   const checkout = (await searchParams).checkout;
   return (
-    <main className="mx-auto w-full max-w-[1400px] px-6 py-10">
+    <main className="mx-auto w-full theme-page-width px-6 py-10">
       <Link href="/owner/listings" className="text-sm text-muted-foreground hover:text-foreground">← My listings</Link>
       <h1 className="mt-7 text-3xl font-semibold tracking-tight">Publishing plans for {listing.name}</h1>
       <p className="mt-3 text-muted-foreground">Review the price, billing interval, and placement for your {checkoutMode()} checkout mode.</p>

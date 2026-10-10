@@ -21,7 +21,7 @@ export default async function PlansPage() {
   await connection();
   if (!canManageBilling((await sessionUser(await headers()))?.role)) notFound();
   return (
-    <main className="mx-auto w-full max-w-[1400px] px-6 py-10">
+    <main className="mx-auto w-full theme-page-width px-6 py-10">
       <Link href="/admin/overview" className="text-sm text-muted-foreground hover:text-foreground">← Overview</Link>
       <h1 className="mt-7 text-3xl font-semibold tracking-tight">Publishing plans</h1>
       <p className="mt-3 text-muted-foreground">Set prices, durations, and featured placement for approved listing owners.</p>

@@ -14,7 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default function SignInPage() {
   return (
-    <main className="mx-auto flex min-h-[70vh] w-full max-w-[1400px] items-center justify-center px-6 py-12">
+    <main className="mx-auto flex min-h-[70vh] w-full theme-page-width items-center justify-center px-6 py-12">
       <SignInForm />
     </main>
   );

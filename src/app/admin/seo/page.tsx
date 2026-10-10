@@ -32,7 +32,7 @@ export default async function SeoAdminPage({ searchParams }: {
     return `/admin/seo?${values}`;
   };
   return (
-    <main className="mx-auto w-full max-w-[1400px] px-6 py-10">
+    <main className="mx-auto w-full theme-page-width px-6 py-10">
       <h1 className="text-3xl font-semibold tracking-tight">Search settings</h1>
       <p className="mt-3 max-w-3xl text-muted-foreground">Set public search defaults and verify site ownership.</p>
       <SeoSettingsEditor initial={getSeoSettings()} />

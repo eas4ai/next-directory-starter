@@ -25,7 +25,7 @@ export default async function AdminArticlesPage({ searchParams }: { searchParams
   const requestedPage = Number((await searchParams).page ?? "1");
   const { articles, page, pages } = listArticles(requestedPage);
   return (
-    <main className="mx-auto w-full max-w-[1400px] px-6 py-10">
+    <main className="mx-auto w-full theme-page-width px-6 py-10">
       <Link href="/articles" className="text-sm text-muted-foreground hover:text-foreground">← Public articles</Link>
       {canManageTaxonomy(user?.role) && <Link href="/admin/taxonomy" className="ml-4 text-sm underline">Categories and tags</Link>}
       <h1 className="mt-7 text-3xl font-semibold tracking-tight">Articles</h1>

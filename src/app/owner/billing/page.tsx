@@ -20,7 +20,7 @@ export default async function OwnerBillingPage() {
   const user = await sessionUser(await headers());
   if (!user) redirect("/owner/sign-in");
   const purchases = listOwnerBilling(user.id);
-  return <main className="mx-auto w-full max-w-[1400px] px-6 py-10">
+  return <main className="mx-auto w-full theme-page-width px-6 py-10">
     <Link href="/owner/listings" className="text-sm text-muted-foreground hover:text-foreground">
       ← My listings
     </Link>
