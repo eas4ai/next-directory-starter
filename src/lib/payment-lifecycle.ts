@@ -76,7 +76,6 @@ function paidPeriod(evidence: VerifiedEvidence, effect: PaidEffect): void {
     throw new PaymentLifecycleError(409, "Payment resource does not match the purchase");
   }
   if (purchase.provider_price_id !== (effect.priceId ?? null) ||
-      effect.amountMinor !== purchase.amount_minor ||
       effect.currency.toLowerCase() !== purchase.currency ||
       !effect.paymentId || effect.paymentId.length > 200) {
     throw new PaymentLifecycleError(409, "Payment terms do not match the accepted purchase");
