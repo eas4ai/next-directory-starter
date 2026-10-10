@@ -31,7 +31,7 @@ export default async function ListingPlansPage({ params, searchParams }: {
   try { listing = ownerListing(user.id, slug).listing; }
   catch { notFound(); }
   if (listing.status !== "published") notFound();
-  const plans = listPlans(true);
+  const plans = listPlans(true, checkoutMode());
   const stripeAvailable = stripeCheckoutAvailable();
   const checkout = (await searchParams).checkout;
   return (
