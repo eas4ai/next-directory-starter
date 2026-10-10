@@ -60,7 +60,8 @@ try {
   function assertHtml(result, label) {
     expect(result.response.status === 200 &&
       result.response.headers.get('content-type')?.includes('text/html'), `${label} was not HTML`);
-    expect(hasVary(result.response), `${label} lacked Vary: Accept, User-Agent`);
+    expect(result.response.headers.get('cache-control')?.includes('no-store'),
+      `${label} was cacheable`);
   }
 
   command(['run', 'db:migrate']);

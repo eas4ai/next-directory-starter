@@ -317,3 +317,16 @@ Done-when: each supported request signal returns the same current Markdown as
 the linked route; HTML requests remain HTML; private and ineligible content
 cannot be converted or exposed; staged revisions stay private; and responses
 carry the specified content type, crawl, cache, and variation headers.
+
+## next-geo-cache-policy
+
+Requirements: SEO-011
+
+Delivery: finish the eligible-detail Markdown negotiation from next-geo. Keep
+both representations noncached. Require `Vary: Accept, User-Agent` on Markdown;
+Next.js 16 currently replaces the corresponding HTML header after rendering.
+Retain all publication, revision, private-route, and explicit Markdown rules.
+
+Done-when: the production HTTP check passes all SEO-011 request signals and
+withdrawal cases; HTML detail responses remain noncached and Markdown has the
+required variation, crawl, and cache headers.
