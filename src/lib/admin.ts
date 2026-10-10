@@ -25,6 +25,10 @@ export function canEditArticles(role: string | null | undefined): boolean {
   return hasAnyRole(role, ["admin", "editor"]);
 }
 
+export function canOpenOverview(role: string | null | undefined): boolean {
+  return hasAnyRole(role, ["admin", "moderator", "editor"]);
+}
+
 export function sameOrigin(request: Request): boolean {
   const origin = new URL(process.env.BETTER_AUTH_URL ?? request.url).origin;
   return request.headers.get("origin") === origin;

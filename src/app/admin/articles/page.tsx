@@ -30,6 +30,7 @@ export default async function AdminArticlesPage({ searchParams }: { searchParams
       <Link href="/admin/taxonomy" className="ml-4 text-sm underline">Article categories</Link>
       <h1 className="mt-7 text-3xl font-semibold tracking-tight">Articles</h1>
       <p className="mt-3 text-muted-foreground">Save drafts and control which articles appear publicly.</p>
+      <Link href="/admin/overview" className="mt-3 inline-block text-sm underline">Administration overview</Link>
       <ArticleEditor initialArticles={articles}
         categories={listTaxa("article-category").map((category) => category.name)} />
       {pages > 1 && (
