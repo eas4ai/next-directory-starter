@@ -8,6 +8,8 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { chromium } from 'playwright-core';
 import sharp from 'sharp';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
 const ids = ['ING-001', 'ING-002', 'ING-003', 'ING-004'];
 const results = Object.fromEntries(ids.map((id) => [id, false]));
@@ -164,6 +166,19 @@ try {
       'publish_import', 'attach_screenshot', 'preview_card']) {
       assert(listed.tools?.some((entry) => entry.name === name), `MCP omitted ${name}.`);
     }
+    const client = new Client({ name: 'directory-acceptance', version: '1.0.0' });
+    const transport = new StreamableHTTPClientTransport(new URL('/api/mcp', origin), {
+      requestInit: { headers: { Authorization: `Bearer ${token}` } },
+    });
+    try {
+      await client.connect(transport);
+      const initializedTools = await client.listTools();
+      assert(initializedTools.tools.some((entry) => entry.name === 'stage_links'),
+        'Initialized MCP client cannot list import tools.');
+      const called = await client.callTool({ name: 'list_categories', arguments: {} });
+      assert(called.content?.some((part) => part.type === 'text' && part.text.includes('Tools')),
+        'Initialized MCP client cannot invoke a directory tool.');
+    } finally { await client.close(); }
     const staffCreated = await request('/api/agent/keys',
       json({ name: 'staff-check', expiresInDays: 7 }, staffCookie));
     assert(staffCreated.status === 201, 'Catalog staff could not create a credential.');
@@ -223,8 +238,15 @@ try {
       }));
       await context.addInitScript(() => {
         window.__agentTools = [];
+        window.__agentToolMap = {};
         Object.defineProperty(document, 'modelContext', { configurable: true, value: {
-          registerTool: async (definition) => { window.__agentTools.push(definition.name); },
+          registerTool: async (definition, options) => {
+            window.__agentTools.push(definition.name);
+            window.__agentToolMap[definition.name] = definition;
+            options?.signal?.addEventListener('abort', () => {
+              delete window.__agentToolMap[definition.name];
+            });
+          },
         } });
       });
       const page = await context.newPage();
@@ -233,6 +255,29 @@ try {
       const names = await page.evaluate(() => window.__agentTools);
       assert(names.includes('publish_import') && names.includes('attach_screenshot'),
         'Supported browser did not register its import tools.');
+      const browserCategories = await page.evaluate(() => window.__agentToolMap.list_categories.execute({}));
+      assert(browserCategories.categories?.includes('Tools'), 'Browser tool invocation did not return categories.');
+      const browserPreview = await page.evaluate(() => window.__agentToolMap.preview_card.execute({ slug: 'probe' }));
+      assert(browserPreview.previewUrl?.endsWith('/probe/card'), 'Browser preview tool could not be invoked.');
+      const db = new Database(databasePath);
+      try {
+        db.prepare('UPDATE "user" SET role = ? WHERE email = ?')
+          .run('user', 'agent-admin@example.invalid');
+        const afterRemoval = await page.evaluate(async () => {
+          const category = window.__agentToolMap.list_categories;
+          const preview = window.__agentToolMap.preview_card;
+          const deniedCategory = await category.execute({}).then(() => false, () => true);
+          const deniedPreview = await preview.execute({ slug: 'probe' }).then(() => false, () => true);
+          return { deniedCategory, deniedPreview, remaining: Object.keys(window.__agentToolMap) };
+        });
+        assert(afterRemoval.deniedCategory && afterRemoval.deniedPreview &&
+          afterRemoval.remaining.length === 0,
+        'Browser tools stayed callable after the account lost catalog access.');
+      } finally {
+        db.prepare('UPDATE "user" SET role = ? WHERE email = ?')
+          .run('admin', 'agent-admin@example.invalid');
+        db.close();
+      }
     } finally { await context.close(); }
   });
 

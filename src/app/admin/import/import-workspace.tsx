@@ -39,40 +39,59 @@ export function ImportWorkspace({ initialKeys, initialImports, categories }: {
     const context = (document as Document & { modelContext?: ModelContext }).modelContext;
     if (!context) return;
     const controller = new AbortController();
+    const access = async () => {
+      if (controller.signal.aborted) throw new Error("Import tools are unavailable");
+      try {
+        return await responseJson(await fetch("/api/agent/access", { cache: "no-store" }));
+      } catch (error) {
+        controller.abort();
+        throw error;
+      }
+    };
+    const checkAccess = () => { void access().catch(() => undefined); };
+    const interval = window.setInterval(checkAccess, 15_000);
+    document.addEventListener("visibilitychange", checkAccess);
+    window.addEventListener("focus", checkAccess);
     const object = (properties: Record<string, unknown>, required: string[] = []) =>
       ({ type: "object", properties, required });
     const string = { type: "string" };
     const definitions: BrowserTool[] = [
       { name: "list_categories", description: "List existing directory categories for observed links.",
-        execute: async () => ({ categories }) },
+        execute: async () => access() },
       { name: "stage_links", description: "Stage up to 20 observed public URLs with source evidence as private drafts.",
         inputSchema: object({ items: { type: "array", minItems: 1, maxItems: 20,
           items: object({ idempotencyKey: string, url: string, sourceUrl: string,
             sourceExcerpt: string, name: string, summary: string, description: string,
             category: string }, ["idempotencyKey", "url", "sourceUrl", "sourceExcerpt",
             "name", "summary", "description", "category"]) } }, ["items"]),
-        execute: async ({ items }) => { const result = await post("/api/agent/imports", { items });
+        execute: async ({ items }) => { await access(); const result = await post("/api/agent/imports", { items });
           await refresh(); return result; } },
       { name: "list_imports", description: "List private staged imports and their source evidence.",
-        execute: async () => responseJson(await fetch("/api/agent/imports", { cache: "no-store" })) },
+        execute: async () => { await access(); return responseJson(await fetch("/api/agent/imports", { cache: "no-store" })); } },
       { name: "publish_import", description: "Publish a reviewed import explicitly.",
         inputSchema: object({ slug: string }, ["slug"]),
-        execute: async ({ slug }) => { const result = await post(
+        execute: async ({ slug }) => { await access(); const result = await post(
           `/api/agent/imports/${encodeURIComponent(String(slug))}/publish`, {});
           await refresh(); return result; } },
       { name: "attach_screenshot", description: "Attach an agent-browser screenshot to a private import.",
         inputSchema: object({ slug: string, mimeType: string, base64: string },
           ["slug", "mimeType", "base64"]),
-        execute: async ({ slug, mimeType, base64 }) => post(
-          `/api/agent/imports/${encodeURIComponent(String(slug))}/screenshot`, { mimeType, base64 }) },
+        execute: async ({ slug, mimeType, base64 }) => { await access(); return post(
+          `/api/agent/imports/${encodeURIComponent(String(slug))}/screenshot`, { mimeType, base64 }); } },
       { name: "preview_card", description: "Get the private social-card preview for a staged import.",
         inputSchema: object({ slug: string }, ["slug"]),
-        execute: async ({ slug }) => ({ previewUrl:
-          `/api/agent/imports/${encodeURIComponent(String(slug))}/card` }) },
+        execute: async ({ slug }) => { await access(); return { previewUrl:
+          `/api/agent/imports/${encodeURIComponent(String(slug))}/card` }; } },
     ];
     void Promise.all(definitions.map((definition) =>
       context.registerTool(definition, { signal: controller.signal }).catch(() => undefined)));
-    return () => controller.abort();
+    checkAccess();
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", checkAccess);
+      window.removeEventListener("focus", checkAccess);
+      controller.abort();
+    };
   }, [categories]);
 
   async function createKey() {
