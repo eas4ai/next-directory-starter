@@ -49,7 +49,7 @@ export function ImportWorkspace({ initialKeys, initialImports, categories }: {
       }
     };
     const checkAccess = () => { void access().catch(() => undefined); };
-    const interval = window.setInterval(checkAccess, 15_000);
+    const interval = window.setInterval(checkAccess, 5_000);
     document.addEventListener("visibilitychange", checkAccess);
     window.addEventListener("focus", checkAccess);
     const object = (properties: Record<string, unknown>, required: string[] = []) =>

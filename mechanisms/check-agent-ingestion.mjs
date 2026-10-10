@@ -278,6 +278,30 @@ try {
           .run('admin', 'agent-admin@example.invalid');
         db.close();
       }
+      const suspensionPage = await context.newPage();
+      await suspensionPage.goto(`${origin}/admin/import`, { waitUntil: 'networkidle' });
+      await suspensionPage.waitForFunction(() => window.__agentToolMap?.preview_card);
+      await suspensionPage.evaluate(() => {
+        window.__heldCategory = window.__agentToolMap.list_categories;
+        window.__heldPreview = window.__agentToolMap.preview_card;
+      });
+      const suspensionDb = new Database(databasePath);
+      try {
+        suspensionDb.prepare('UPDATE "user" SET banned = 1 WHERE email = ?')
+          .run('agent-admin@example.invalid');
+        await suspensionPage.waitForFunction(() => Object.keys(window.__agentToolMap).length === 0,
+          null, { timeout: 9_000 });
+        const afterBan = await suspensionPage.evaluate(async () => ({
+          categoriesDenied: await window.__heldCategory.execute({}).then(() => false, () => true),
+          previewDenied: await window.__heldPreview.execute({ slug: 'probe' }).then(() => false, () => true),
+        }));
+        assert(afterBan.categoriesDenied && afterBan.previewDenied,
+          'Suspended account retained callable browser tools after registration was aborted.');
+      } finally {
+        suspensionDb.prepare('UPDATE "user" SET banned = 0 WHERE email = ?')
+          .run('agent-admin@example.invalid');
+        suspensionDb.close();
+      }
     } finally { await context.close(); }
   });
 
