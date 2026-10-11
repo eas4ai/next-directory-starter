@@ -20,6 +20,13 @@ function accountRow(id: string): AccountRow {
   return row;
 }
 
+function requireAdministratorActor(id: string): void {
+  const actor = accountRow(id);
+  if (!actor.emailVerified || actor.banned || !hasRole(actor.role, "admin")) {
+    throw new AccountError(403, "Forbidden");
+  }
+}
+
 function activeAdminCount(): number {
   return (database.prepare(`SELECT COUNT(*) AS count FROM "user"
     WHERE (',' || COALESCE(role, '') || ',') LIKE '%,admin,%'
@@ -42,6 +49,7 @@ export function changeAccountRole(actorUserId: string, targetUserId: string, rol
     throw new AccountError(400, "Choose a supported role");
   }
   return database.transaction(() => {
+    requireAdministratorActor(actorUserId);
     const current = accountRow(targetUserId);
     if (selectedRole !== "user" && (!current.emailVerified || current.banned)) {
       throw new AccountError(409, "Verify and reinstate the account before granting staff access");
@@ -65,6 +73,7 @@ export function changeAccountSuspension(
     throw new AccountError(400, "Give a reason of at most 280 characters");
   }
   return database.transaction(() => {
+    requireAdministratorActor(actorUserId);
     const current = accountRow(targetUserId);
     if (Boolean(current.banned) === suspended) return managed(current);
     if (suspended && hasRole(current.role, "admin")) {
