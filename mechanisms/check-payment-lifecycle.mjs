@@ -95,6 +95,14 @@ try {
   });
 
   await check('COM-008', async () => {
+    const legacyCheckout = await fetch(`${origin}/api/owner/listings/retired/checkout`, {
+      method: 'POST',
+      headers: { Origin: origin, 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    if (legacyCheckout.status !== 404) {
+      throw new Error(`The retired Stripe checkout route returned ${legacyCheckout.status}, not 404.`);
+    }
     const database = new Database(databasePath, { readonly: true });
     try {
       const tables = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
