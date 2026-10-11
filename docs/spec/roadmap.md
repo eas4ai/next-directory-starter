@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: listing-edit-reverses-suspension
+Current: admin-actor-not-rechecked
 
 ## public-starter-and-theme
 
@@ -471,3 +471,9 @@ Delivers backlog item legacy-stripe-checkout-path: Audit 2026-10-11 (H1, OPS-6).
 Requirements: PUB-005
 
 Delivers backlog item listing-edit-reverses-suspension: Audit 2026-10-11 (H2, verified). PATCH /api/admin/listings/[slug] reads the listing at line 13, then awaits the body, then checks the moderation rule against that stale status at line 28. updateListing (src/lib/listings.ts) overwrites status without rechecking, and the body is merged as {...existing, ...changes}, so a body without status writes the old status back. A catalog-only user's routine edit that overlaps a moderator's suspension republishes the listing; a slow body widens the window. Recheck current status and the actor's moderation permission inside the immediate transaction and reject stale writes with an expected revision.
+
+## admin-actor-not-rechecked
+
+Requirements: ADM-001
+
+Delivers backlog item admin-actor-not-rechecked: Audit 2026-10-11 (M2, verified code path). Account role and suspension routes check canAdmin before awaiting the body and params; changeAccountRole and changeAccountSuspension (src/lib/accounts.ts) recheck the target and last-admin rule but not the actor. An admin who is demoted or suspended while holding a request open can still restore their own role or reinstate themselves. Re-read the actor inside the same immediate transaction and require a verified, unbanned administrator.
