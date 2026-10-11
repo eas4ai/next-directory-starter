@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: intermittent-turbopack-build-crash
+Current: legacy-stripe-checkout-path
 
 ## public-starter-and-theme
 
@@ -459,3 +459,9 @@ without losing the current Tailwind CSS output or public routes.
 Done-when: repeated clean default builds succeed, the produced CSS and route
 set match the expected application, and the documented build command uses the
 verified stable path.
+
+## legacy-stripe-checkout-path
+
+Requirements: COM-008
+
+Delivers backlog item legacy-stripe-checkout-path: Audit 2026-10-11 (H1, OPS-6). POST /api/owner/listings/[slug]/checkout is still live although the UI uses hosted-checkout. Its purchases have no provider_resource_id or payment_periods row, so Stripe events go to processStripeEvent (src/lib/payment-events.ts:88), which handles only checkout success and charge.refunded and records charge.dispute.* as processed without effect. An owner can pay through the legacy route, file a chargeback, and keep featured placement for the paid period. Migrated legacy purchases also cannot be reconciled: version 9 added provider_resource_id without a backfill, and recovery rejects resource-less paid purchases even with --resource cs_... (src/lib/payment-reconciliation.ts:233). Disable the legacy route and move legacy purchases onto the payment lifecycle without granting a second period, or add dispute handling and a legacy recovery path.
