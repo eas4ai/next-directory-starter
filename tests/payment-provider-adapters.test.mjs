@@ -53,6 +53,19 @@ test('provider SDK recovery reads existing payments and cancellation schedules o
       VALUES ('stripe-early', 'mine', 'owner', 'once', 'test', 'one-time', 'Once', '',
         1200, 'usd', 30, 30, 1, 'pending:stripe-early', 'early-request',
         'pending', ?, 'stripe', 'price_once')`).run(new Date().toISOString());
+    const legacyStartsAt = new Date(Date.now() - 86_400_000).toISOString();
+    const legacyEndsAt = new Date(Date.now() + 29 * 86_400_000).toISOString();
+    database.prepare(`INSERT INTO purchases
+      (id, listing_slug, owner_user_id, plan_key, plan_mode, billing_mode, plan_name,
+        plan_description, amount_minor, currency, duration_days, accepted_duration_days,
+        featured, stripe_session_id, stripe_payment_intent_id, checkout_request_id,
+        status, created_at, provider)
+      VALUES ('stripe-legacy', 'mine', 'owner', 'once', 'test', 'one-time', 'Once', '',
+        1200, 'usd', 30, 30, 1, 'cs_legacy', 'pi_legacy', 'legacy-request',
+        'paid', ?, 'stripe')`).run(legacyStartsAt);
+    database.prepare(`INSERT INTO entitlements
+      (purchase_id, listing_slug, starts_at, ends_at, featured, revoked_at)
+      VALUES ('stripe-legacy', 'mine', ?, ?, 1, NULL)`).run(legacyStartsAt, legacyEndsAt);
     for (const provider of ['stripe', 'paddle', 'nowpayments']) {
       saveBillingProfile({ provider, mode: 'test', version: 0, enabled: false,
         apiKey: provider === 'stripe' ? 'sk_test_fixture' : `test_${provider}_key`,
@@ -67,19 +80,26 @@ test('provider SDK recovery reads existing payments and cancellation schedules o
       const method = init.method ?? 'GET';
       requested.push(`${method} ${url.pathname}`);
       if (url.pathname === '/v1/checkout/sessions/cs_stripe' ||
-          url.pathname === '/v1/checkout/sessions/cs_early') {
+          url.pathname === '/v1/checkout/sessions/cs_early' ||
+          url.pathname === '/v1/checkout/sessions/cs_legacy') {
         const early = url.pathname.endsWith('cs_early');
+        const legacy = url.pathname.endsWith('cs_legacy');
         return reply({
-        id: early ? 'cs_early' : 'cs_stripe', object: 'checkout.session',
-        client_reference_id: early ? 'stripe-early' : 'stripe-purchase',
-        payment_status: 'paid', payment_intent: early ? 'pi_early' : 'pi_stripe', amount_total: 1200,
+        id: early ? 'cs_early' : legacy ? 'cs_legacy' : 'cs_stripe', object: 'checkout.session',
+        client_reference_id: early ? 'stripe-early' : legacy ? 'stripe-legacy' : 'stripe-purchase',
+        payment_status: 'paid',
+        payment_intent: early ? 'pi_early' : legacy ? 'pi_legacy' : 'pi_stripe', amount_total: 1200,
         currency: 'usd', line_items: { object: 'list', data: [{ quantity: 1,
           price: { id: 'price_once' } }] },
         });
       }
-      if (url.pathname === '/v1/charges' || url.pathname === '/v1/disputes') {
+      if (url.pathname === '/v1/charges') {
         return reply({ object: 'list', data: [], has_more: false });
       }
+      if (url.pathname === '/v1/disputes') return reply({ object: 'list', data:
+        url.searchParams.get('payment_intent') === 'pi_legacy'
+          ? [{ id: 'dp_legacy', status: 'needs_response', created: 1 }]
+          : [], has_more: false });
       if (url.pathname === '/transactions/txn_paddle') return reply({ data: {
         id: 'txn_paddle', status: 'completed', currency_code: 'USD',
         created_at: new Date().toISOString(), items: [{ quantity: 1,
@@ -103,9 +123,28 @@ test('provider SDK recovery reads existing payments and cancellation schedules o
     assert.deepEqual(await reconcilePurchase('stripe-early', 5, undefined, 'cs_early'), {
       purchaseId: 'stripe-early', found: 1, processed: 1, unresolved: 0,
     });
+    database.prepare(`UPDATE purchases SET stripe_payment_intent_id = 'pi_other'
+      WHERE id = 'stripe-legacy'`).run();
+    await assert.rejects(reconcilePurchase('stripe-legacy', 5, undefined, 'cs_legacy'),
+      /does not match the paid purchase/);
+    assert.equal(database.prepare(`SELECT COUNT(*) AS n FROM payment_periods
+      WHERE purchase_id = 'stripe-legacy'`).get().n, 0);
+    database.prepare(`UPDATE purchases SET stripe_payment_intent_id = 'pi_legacy'
+      WHERE id = 'stripe-legacy'`).run();
+    assert.deepEqual(await reconcilePurchase('stripe-legacy', 5, undefined, 'cs_legacy'), {
+      purchaseId: 'stripe-legacy', found: 2, processed: 2, unresolved: 0,
+    });
     assert.equal(database.prepare("SELECT provider_resource_id FROM purchases WHERE id = 'stripe-early'")
       .get().provider_resource_id, 'cs_early');
-    assert.equal(database.prepare('SELECT COUNT(*) AS n FROM payment_periods').get().n, 4);
+    assert.equal(database.prepare("SELECT provider_resource_id FROM purchases WHERE id = 'stripe-legacy'")
+      .get().provider_resource_id, 'cs_legacy');
+    assert.deepEqual(database.prepare(`SELECT starts_at, ends_at, disputed_at IS NOT NULL AS disputed
+      FROM payment_periods WHERE purchase_id = 'stripe-legacy'`).get(),
+    { starts_at: legacyStartsAt, ends_at: legacyEndsAt, disputed: 1 });
+    assert.deepEqual(database.prepare(`SELECT starts_at, ends_at, revoked_at IS NOT NULL AS revoked
+      FROM entitlements WHERE purchase_id = 'stripe-legacy'`).get(),
+    { starts_at: legacyStartsAt, ends_at: legacyEndsAt, revoked: 1 });
+    assert.equal(database.prepare('SELECT COUNT(*) AS n FROM payment_periods').get().n, 5);
     assert.equal(requested.includes('GET /v1/checkout/sessions/cs_stripe'), true);
     assert.equal(requested.includes('GET /transactions/txn_paddle'), true);
     assert.equal(requested.includes('GET /v1/payment/'), true);
