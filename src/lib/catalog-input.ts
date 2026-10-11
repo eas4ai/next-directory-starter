@@ -5,7 +5,10 @@ export function parseListing(value: unknown): Listing | null {
   const input = value as Record<string, unknown>;
   const fields = ["slug", "name", "summary", "description", "category", "url", "status"] as const;
   if (fields.some((field) => typeof input[field] !== "string")) return null;
-  const listing = Object.fromEntries(fields.map((field) => [field, input[field]])) as Listing;
+  const listing = {
+    ...Object.fromEntries(fields.map((field) => [field, input[field]])),
+    revision: Number.isSafeInteger(input.revision) && Number(input.revision) > 0 ? Number(input.revision) : 1,
+  } as Listing;
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(listing.slug) || listing.slug.length > 80 ||
       !listing.name.trim() || listing.name.length > 120 ||
       !listing.summary.trim() || listing.summary.length > 280 ||

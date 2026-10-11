@@ -165,9 +165,11 @@ export function updateOwnerListing(userId: string, slug: string, changes: unknow
     if (!listing) throw new ModerationError(400, "Invalid listing changes");
     listing.category = existingCategory(listing.category);
     if (current.status === "draft") {
-      database.prepare(`UPDATE listings SET name = ?, summary = ?, description = ?, category = ?, url = ?
+        database.prepare(`UPDATE listings SET name = ?, summary = ?, description = ?, category = ?, url = ?,
+          revision = revision + 1
         WHERE slug = ? AND owner_user_id = ?`).run(listing.name, listing.summary,
         listing.description, listing.category, listing.url, slug, userId);
+        listing.revision = current.revision + 1;
     } else {
       database.prepare(`INSERT INTO owner_drafts (slug, owner_user_id, payload, updated_at)
         VALUES (?, ?, ?, ?) ON CONFLICT(slug) DO UPDATE SET payload = excluded.payload,
@@ -233,7 +235,7 @@ export function decideSubmission(id: string, actorId: string, decision: "approve
       const proposed = JSON.parse(row.payload) as Listing;
       proposed.category = existingCategory(proposed.category, 409);
       database.prepare(`UPDATE listings SET name = ?, summary = ?, description = ?, category = ?,
-        url = ?, status = 'published' WHERE slug = ? AND owner_user_id = ?`).run(
+          url = ?, status = 'published', revision = revision + 1 WHERE slug = ? AND owner_user_id = ?`).run(
         proposed.name, proposed.summary, proposed.description, proposed.category,
         proposed.url, row.slug, row.owner_user_id,
       );
@@ -261,7 +263,8 @@ export function suspendPublishedListing(slug: string, actorId: string, reason: s
   database.transaction(() => {
     const owner = database.prepare("SELECT owner_user_id FROM listings WHERE slug = ? AND status = 'published'")
       .get(slug) as { owner_user_id: string | null } | undefined;
-    const changed = database.prepare("UPDATE listings SET status = 'suspended' WHERE slug = ? AND status = 'published'")
+    const changed = database.prepare(`UPDATE listings SET status = 'suspended', revision = revision + 1
+      WHERE slug = ? AND status = 'published'`)
       .run(slug);
     if (changed.changes !== 1) throw new ModerationError(404, "Published listing not found");
     database.prepare(`UPDATE submissions SET status = 'rejected', reason = ?, decided_at = ?, decided_by = ?

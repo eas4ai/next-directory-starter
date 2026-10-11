@@ -31,7 +31,8 @@ export async function POST(request: Request) {
   }
   if (listingBySlug(listing.slug)) return Response.json({ error: "Slug already exists" }, { status: 409 });
   try {
-    createListing(listing, user.id);
+    const created = createListing(listing, user.id);
+    return Response.json({ listing: created }, { status: 201 });
   } catch (error) {
     if (error instanceof HttpError) return httpErrorResponse(error);
     if (error instanceof Error && error.message.includes("UNIQUE constraint")) {
@@ -39,5 +40,4 @@ export async function POST(request: Request) {
     }
     throw error;
   }
-  return Response.json({ listing }, { status: 201 });
 }

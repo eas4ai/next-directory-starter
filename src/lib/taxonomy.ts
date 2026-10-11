@@ -68,7 +68,8 @@ export function renameTaxon(kind: TaxonKind, original: string, input: unknown): 
     if (storedName(kind, next)) throw new TaxonomyError(409, "Name already exists");
     database.prepare(`INSERT INTO ${table[kind]} (name) VALUES (?)`).run(next);
     if (kind === "category") {
-      database.prepare("UPDATE listings SET category = ? WHERE category = ?").run(next, prior);
+      database.prepare(`UPDATE listings SET category = ?, revision = revision + 1
+        WHERE category = ?`).run(next, prior);
       database.prepare(`UPDATE owner_drafts SET payload = json_set(payload, '$.category', ?)
         WHERE json_extract(payload, '$.category') = ?`).run(next, prior);
       database.prepare(`UPDATE submissions SET payload = json_set(payload, '$.category', ?)
