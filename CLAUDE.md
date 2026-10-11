@@ -90,7 +90,7 @@ There are two layers: the saved shadcn/ui preset, and a registered custom theme 
 ### Tests
 
 - Tests use the Node test runner (`tests/*.test.mjs`) and import TypeScript sources directly through `tsx`.
-- `database.ts` reads `DATABASE_URL` when it is imported. So each test sets `process.env.DATABASE_URL` to a file in a temporary directory first, then loads modules with dynamic `await import('../src/lib/...ts')`. It closes the database and restores the variable in `finally`. Follow this pattern; a static import would open the shared `.runtime` database.
+- `database.ts` reads `DATABASE_URL` when it is imported. Most tests set `process.env.DATABASE_URL` to a file in a temporary directory first, then load modules with dynamic `await import('../src/lib/...ts')`. They close the database and restore the variable in `finally`. Follow this pattern. A static import opens the shared `.runtime` database; `tests/page-metadata.test.mjs` and `tests/theme-sdk.test.mjs` still do this.
 
 ## Docs
 
