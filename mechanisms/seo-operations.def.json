@@ -1,0 +1,14 @@
+{
+  "command": "node mechanisms/check-seo-operations.mjs",
+  "requirements": ["SEO-006", "SEO-007", "SEO-008", "SEO-009", "SEO-010"],
+  "results": "per-requirement",
+  "inputs": [
+    ".env.example", "README.md", "fixtures", "mechanisms/seo-operations.def.json",
+    "mechanisms/check-seo-operations.mjs", "package.json", "package-lock.json",
+    "scripts", "src", "tests"
+  ],
+  "identity": {
+    "env": [],
+    "tools": { "node": "node --version", "npm": "npm --version" }
+  }
+}
