@@ -116,6 +116,7 @@ try {
     }
     nodeTests([
       'tests/payment-lifecycle-state.test.mjs',
+      'tests/payment-provider-adapters.test.mjs',
       'tests/stripe-hosted-lifecycle.test.mjs',
     ]);
   });
