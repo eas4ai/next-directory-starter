@@ -165,11 +165,11 @@ export function updateOwnerListing(userId: string, slug: string, changes: unknow
     if (!listing) throw new ModerationError(400, "Invalid listing changes");
     listing.category = existingCategory(listing.category);
     if (current.status === "draft") {
-        database.prepare(`UPDATE listings SET name = ?, summary = ?, description = ?, category = ?, url = ?,
-          revision = revision + 1
+      database.prepare(`UPDATE listings SET name = ?, summary = ?, description = ?, category = ?, url = ?,
+        revision = revision + 1
         WHERE slug = ? AND owner_user_id = ?`).run(listing.name, listing.summary,
         listing.description, listing.category, listing.url, slug, userId);
-        listing.revision = current.revision + 1;
+      listing.revision = current.revision + 1;
     } else {
       database.prepare(`INSERT INTO owner_drafts (slug, owner_user_id, payload, updated_at)
         VALUES (?, ?, ?, ?) ON CONFLICT(slug) DO UPDATE SET payload = excluded.payload,
