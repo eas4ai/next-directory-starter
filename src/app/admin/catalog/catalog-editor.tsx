@@ -37,13 +37,14 @@ export function CatalogEditor({ initialListings, canSuspend }: { initialListings
       const response = await fetch(`/api/admin/listings/${encodeURIComponent(listing.slug)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, expectedRevision: listing.revision }),
       });
       if (!response.ok) {
         setMessage((await response.json()).error ?? "Could not change publication state.");
         return;
       }
-      setListings((current) => current.map((item) => item.slug === listing.slug ? { ...item, status } : item));
+      const updated = (await response.json() as { listing: Listing }).listing;
+      setListings((current) => current.map((item) => item.slug === listing.slug ? updated : item));
       setMessage(`${listing.name} is now ${status}.`);
     } catch {
       setMessage("Could not connect to the server. Try again.");

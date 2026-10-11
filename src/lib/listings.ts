@@ -4,6 +4,7 @@ import { recordAudit } from "@/lib/audit";
 import { checkoutMode } from "@/lib/plans";
 import { redirectForPath } from "@/lib/seo-redirects";
 import { HttpError } from "@/lib/http-error";
+import { canAdmin, canManageCatalog, canModerate } from "@/lib/admin";
 
 export type Listing = {
   slug: string;
@@ -13,7 +14,10 @@ export type Listing = {
   category: string;
   url: string;
   status: "published" | "draft" | "suspended";
+  revision: number;
 };
+
+type StoredListing = Listing & { owner_user_id: string | null };
 
 export const LISTINGS_PER_PAGE = 12;
 export const PUBLIC_LISTING_PREDICATE = `l.status = 'published' AND NOT EXISTS (
@@ -105,8 +109,8 @@ export function activeFeaturedSlugs(slugs: string[]): Set<string> {
   return new Set(rows.map((row) => row.listing_slug));
 }
 
-export function createListing(listing: Listing, actorUserId: string): void {
-  database.transaction(() => {
+export function createListing(listing: Listing, actorUserId: string): Listing {
+  return database.transaction(() => {
     if (redirectForPath(`/listings/${listing.slug}`)) {
       throw new HttpError(409, "Listing slug is reserved by a redirect");
     }
@@ -118,17 +122,37 @@ export function createListing(listing: Listing, actorUserId: string): void {
       listing.category, listing.url, listing.status,
     );
     recordAudit(listing.status === "published" ? "catalog.publish" : "catalog.create", actorUserId, listing.slug);
+    return listingBySlug(listing.slug)!;
   }).immediate();
 }
 
-export function updateListing(listing: Listing, actorUserId: string): void {
-  database.transaction(() => {
-    const current = database.prepare("SELECT status FROM listings WHERE slug = ?")
-      .get(listing.slug) as { status: Listing["status"] } | undefined;
-    if (!current) throw new Error("Listing not found");
+export function updateListing(listing: Listing, actorUserId: string, expectedRevision: number): Listing {
+  return database.transaction(() => {
+    const current = database.prepare("SELECT * FROM listings WHERE slug = ?")
+      .get(listing.slug) as StoredListing | undefined;
+    if (!current) throw new HttpError(404, "Listing not found");
+    const actor = database.prepare(`SELECT role, banned, emailVerified
+      FROM "user" WHERE id = ?`).get(actorUserId) as {
+        role: string | null; banned: number; emailVerified: number;
+      } | undefined;
+    if (!actor || actor.banned || !actor.emailVerified || !canManageCatalog(actor.role)) {
+      throw new HttpError(403, "Forbidden");
+    }
+    if (!canAdmin(actor.role) && current.owner_user_id !== null) {
+      throw new HttpError(404, "Listing not found");
+    }
+    if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1) {
+      throw new HttpError(400, "Expected revision required");
+    }
+    if (current.revision !== expectedRevision) {
+      throw new HttpError(409, "Listing changed since it was opened; refresh before saving");
+    }
+    if (!canModerate(actor.role) && (current.status === "suspended" || listing.status === "suspended")) {
+      throw new HttpError(403, "Moderation permission required");
+    }
     database.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)").run(listing.category);
     database.prepare(`UPDATE listings SET name = ?, summary = ?, description = ?,
-      category = ?, url = ?, status = ? WHERE slug = ?`).run(
+      category = ?, url = ?, status = ?, revision = revision + 1 WHERE slug = ?`).run(
       listing.name, listing.summary, listing.description, listing.category,
       listing.url, listing.status, listing.slug,
     );
@@ -137,5 +161,6 @@ export function updateListing(listing: Listing, actorUserId: string): void {
         ? "catalog.unpublish" : listing.status === "suspended" && current.status !== "suspended"
           ? "catalog.suspend" : "catalog.update";
     recordAudit(action, actorUserId, listing.slug);
+    return listingBySlug(listing.slug)!;
   }).immediate();
 }

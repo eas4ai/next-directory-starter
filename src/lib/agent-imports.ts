@@ -144,7 +144,8 @@ export function publishAgentImport(actorUserId: string, slug: string) {
     if (row.status === "suspended") throw new Error("Suspended imports cannot be published");
     if (row.status === "published") return { slug, status: "published" };
     const now = new Date().toISOString();
-    database.prepare("UPDATE listings SET status = 'published' WHERE slug = ?").run(slug);
+    database.prepare(`UPDATE listings SET status = 'published', revision = revision + 1
+      WHERE slug = ?`).run(slug);
     database.prepare(`UPDATE agent_imports SET published_at = ?, published_by = ?
       WHERE slug = ?`).run(now, actorUserId, slug);
     recordAudit("catalog.publish", actorUserId, slug);

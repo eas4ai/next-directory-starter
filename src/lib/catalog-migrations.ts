@@ -471,6 +471,14 @@ function migrateAgentIngestion(): void {
   }).immediate();
 }
 
+function migrateListingRevisions(): void {
+  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 19").get()) return;
+  database.transaction(() => {
+    database.exec("ALTER TABLE listings ADD COLUMN revision INTEGER NOT NULL DEFAULT 1");
+    database.prepare("INSERT INTO catalog_migrations (version) VALUES (19)").run();
+  }).immediate();
+}
+
 export function migrateCatalog(explicit = false): void {
   if (process.env.DIRECTORY_EXPLICIT_MIGRATIONS === "1" && !explicit) return;
   migrate.immediate();
@@ -486,6 +494,7 @@ export function migrateCatalog(explicit = false): void {
   migrateSeoSettings();
   migrateSeoRoutes();
   migrateAgentIngestion();
+  migrateListingRevisions();
 }
 
 export function seedCatalog(): void {
