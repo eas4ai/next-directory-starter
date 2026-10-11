@@ -16,6 +16,7 @@ let adminCookie;
 let ownerACookie;
 let ownerBCookie;
 let moderatorCookie;
+let catalogCookie;
 let mail;
 
 function command(args) {
@@ -74,6 +75,40 @@ function json(body, cookie, method = 'POST') {
   };
 }
 
+function delayedJson(body, cookie) {
+  const serialized = JSON.stringify(body);
+  const encoder = new TextEncoder();
+  let release;
+  let markStarted;
+  const released = new Promise((resolve) => { release = resolve; });
+  const started = new Promise((resolve) => { markStarted = resolve; });
+  let firstChunk = true;
+  const stream = new ReadableStream({
+    pull(controller) {
+      if (firstChunk) {
+        firstChunk = false;
+        controller.enqueue(encoder.encode(serialized.slice(0, -1)));
+        markStarted();
+        return;
+      }
+      return released.then(() => {
+        controller.enqueue(encoder.encode(serialized.slice(-1)));
+        controller.close();
+      });
+    },
+  });
+  return {
+    started,
+    release,
+    options: {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Origin: origin, Cookie: cookie },
+      body: stream,
+      duplex: 'half',
+    },
+  };
+}
+
 function cookieFrom(response) {
   return response.headers.getSetCookie().map((value) => value.split(';')[0]).join('; ');
 }
@@ -111,6 +146,9 @@ async function identities() {
   requireCommand(['run', 'account:provision', '--', '--email', 'moderator@example.invalid',
     '--password', password, '--role', 'moderator', '--yes']);
   moderatorCookie = await signIn('moderator@example.invalid', password);
+    requireCommand(['run', 'account:provision', '--', '--email', 'catalog@example.invalid',
+      '--password', password, '--role', 'catalog', '--yes']);
+    catalogCookie = await signIn('catalog@example.invalid', password);
 }
 
 function draft(slug, name = `Owner ${slug}`) {
@@ -264,12 +302,35 @@ try {
     const operatorCreate = await request('/api/admin/listings',
       json({ ...draft('operator-entry'), status: 'published' }, adminCookie));
     if (operatorCreate.status !== 201) throw new Error(`Operator listing creation returned ${operatorCreate.status}.`);
+      const operator = (await operatorCreate.json()).listing;
+      if (!Number.isSafeInteger(operator?.revision)) throw new Error('Operator listing has no revision.');
     const moderatorPage = await request('/admin/review', { headers: { Cookie: moderatorCookie } });
     const moderatorHtml = await moderatorPage.text();
     if (!moderatorPage.ok || !contains(moderatorHtml, 'operator-entry') ||
         !contains(moderatorHtml, 'Suspend operator-entry')) {
       throw new Error('The moderator has no suspension control for an operator-created listing.');
     }
+      const delayedEdit = delayedJson({ name: 'Stale catalog edit', expectedRevision: operator.revision }, catalogCookie);
+      const staleEditPromise = request('/api/admin/listings/operator-entry', delayedEdit.options);
+      await delayedEdit.started;
+      let raceSuspension;
+      try {
+        raceSuspension = await request('/api/admin/listings/operator-entry/suspend',
+          json({ reason: 'Concurrent suspension' }, moderatorCookie));
+      } finally {
+        delayedEdit.release();
+      }
+      const staleEdit = await staleEditPromise;
+      const catalogStateResponse = await request('/api/admin/listings', { headers: { Cookie: catalogCookie } });
+      const catalogState = await catalogStateResponse.json();
+      const operatorAfter = catalogState.listings?.find((listing) => listing.slug === 'operator-entry');
+      const operatorDetail = await request('/listings/operator-entry');
+      const operatorSearch = await request('/listings?q=operator-entry');
+      if (!raceSuspension.ok || staleEdit.status !== 409 || !catalogStateResponse.ok ||
+          operatorAfter?.status !== 'suspended' || operatorAfter?.name !== 'Owner operator-entry' ||
+          operatorDetail.status !== 404 || contains(await operatorSearch.text(), 'Owner operator-entry')) {
+        throw new Error(`Stale catalog edit was not rejected after suspension: suspend ${raceSuspension.status}, edit ${staleEdit.status}.`);
+      }
     await createDraft('suspended-entry');
     await decide(await submit('suspended-entry'), 'approve', 'Initial approval');
     const proposedEdit = await request('/api/owner/listings/suspended-entry',
