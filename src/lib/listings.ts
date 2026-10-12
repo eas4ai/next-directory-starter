@@ -5,6 +5,7 @@ import { checkoutMode } from "@/lib/plans";
 import { redirectForPath } from "@/lib/seo-redirects";
 import { HttpError } from "@/lib/http-error";
 import { canAdmin, canManageCatalog, canModerate } from "@/lib/admin";
+import { markAgentImportPublished } from "@/lib/agent-imports";
 
 export type Listing = {
   slug: string;
@@ -160,6 +161,7 @@ export function updateListing(listing: Listing, actorUserId: string, expectedRev
       ? "catalog.publish" : current.status === "published" && listing.status === "draft"
         ? "catalog.unpublish" : listing.status === "suspended" && current.status !== "suspended"
           ? "catalog.suspend" : "catalog.update";
+    if (action === "catalog.publish") markAgentImportPublished(actorUserId, listing.slug);
     recordAudit(action, actorUserId, listing.slug);
     return listingBySlug(listing.slug)!;
   }).immediate();
