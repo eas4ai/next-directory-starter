@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: recovered-invoice-missing-charge-id
+Current: article-status-publish-skips-version
 
 ## public-starter-and-theme
 
@@ -501,3 +501,9 @@ Delivers backlog item restore-symlink-isolation: Audit 2026-10-11 (M4, reproduce
 Requirements: COM-008
 
 Delivers backlog item recovered-invoice-missing-charge-id: Audit 2026-10-11 (M5, verified in reconciliation code). Recovered Stripe invoice evidence (src/lib/payment-reconciliation.ts:115) stores paymentId as the invoice id (in_*) with no charge or payment-intent id. matchingPeriod (src/lib/payment-lifecycle.ts:207) matches outcomes by payment or charge id, so later refunds or disputes against pi_* or ch_* match nothing and placement stays active. Store the payment-intent and charge ids on recovered evidence and let a duplicate paid-period event fill a missing association.
+
+## article-status-publish-skips-version
+
+Requirements: EDIT-001
+
+Delivers backlog item article-status-publish-skips-version: Audit 2026-10-11 (M6, verified code path). A status-only PATCH to /api/admin/articles/[slug] ({"status":"published"}) calls updateArticle, which publishes the current stored draft without the version check publishArticleRevision uses. Editor A can publish editor B's newer unreviewed text; a stale withdrawal can discard newer staged work. Require a version for every publish and withdraw transition and route them through the revision-aware functions.
