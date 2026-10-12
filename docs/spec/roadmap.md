@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: article-status-publish-skips-version
+Current: submission-approval-overwrites-changes
 
 ## public-starter-and-theme
 
@@ -507,3 +507,9 @@ Delivers backlog item recovered-invoice-missing-charge-id: Audit 2026-10-11 (M5,
 Requirements: EDIT-001
 
 Delivers backlog item article-status-publish-skips-version: Audit 2026-10-11 (M6, verified code path). A status-only PATCH to /api/admin/articles/[slug] ({"status":"published"}) calls updateArticle, which publishes the current stored draft without the version check publishArticleRevision uses. Editor A can publish editor B's newer unreviewed text; a stale withdrawal can discard newer staged work. Require a version for every publish and withdraw transition and route them through the revision-aware functions.
+
+## submission-approval-overwrites-changes
+
+Requirements: PUB-004
+
+Delivers backlog item submission-approval-overwrites-changes: Audit 2026-10-11 (M7, reviewer reproduced in memory). Approval (src/lib/moderation.ts:228) replaces the listing with the submission payload and sets published without comparing the listing's current revision to the submission's base. If an admin corrects and withdraws a listing after an owner submits, approving the old submission loses the correction and republishes the listing. Bind submissions to a listing revision and reject or invalidate them after intervening changes.
