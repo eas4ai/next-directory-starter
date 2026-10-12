@@ -82,10 +82,11 @@ function formArticle(form: HTMLFormElement) {
   };
 }
 
-function SavedArticles({ articles, pending, onEdit }: {
+function SavedArticles({ articles, pending, onEdit, onUnpublish }: {
   articles: Article[];
   pending: boolean;
   onEdit: (article: Article) => void;
+  onUnpublish: (article: Article) => void;
 }) {
   return (
     <section className="space-y-3">
@@ -96,7 +97,12 @@ function SavedArticles({ articles, pending, onEdit }: {
             <p className="font-medium">{article.title}</p>
             <p className="text-sm text-muted-foreground">{article.slug} · {article.status}</p>
           </div>
-          <Button type="button" size="sm" variant="outline" disabled={pending} onClick={() => onEdit(article)}>Edit</Button>
+            <div className="flex gap-2">
+              <Button type="button" size="sm" variant="outline" disabled={pending} onClick={() => onEdit(article)}>Edit</Button>
+              {article.status === "published" &&
+                <Button type="button" size="sm" variant="outline" disabled={pending}
+                  onClick={() => onUnpublish(article)}>Unpublish</Button>}
+            </div>
         </div>
       ))}
       {articles.length === 0 && <p className="text-sm text-muted-foreground">No articles yet.</p>}
@@ -181,6 +187,29 @@ export function ArticleEditor({ initialArticles, categories }: { initialArticles
     }
   }
 
+  async function unpublish(article: Article) {
+    setPending(true);
+    setMessage("");
+    try {
+      const response = await fetch(`/api/admin/articles/${encodeURIComponent(article.slug)}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "unpublish", version: article.version }),
+      });
+      if (!response.ok) {
+        setMessage((await response.json()).error ?? "Could not unpublish the article.");
+        return;
+      }
+      const current = (await response.json() as { article: Article }).article;
+      if (editing?.slug === article.slug) setEditing(current);
+      setMessage("Article unpublished.");
+      router.refresh();
+    } catch {
+      setMessage("Could not connect to the server. Try again.");
+    } finally {
+      setPending(false);
+    }
+  }
+
   async function rename() {
     if (!editing || renameSlug === editing.slug) return;
     setPending(true);
@@ -208,7 +237,7 @@ export function ArticleEditor({ initialArticles, categories }: { initialArticles
         <Button type="submit" disabled={pending}>Create article</Button>
       </form>
       {message && <p role="status" className="text-sm text-muted-foreground">{message}</p>}
-      <SavedArticles articles={initialArticles} pending={pending} onEdit={edit} />
+      <SavedArticles articles={initialArticles} pending={pending} onEdit={edit} onUnpublish={unpublish} />
       {editing && (
         <form key={editing.slug} onSubmit={(event) => save(event, editing.slug)} className="space-y-4 rounded-lg border p-6">
           <div className="flex items-center justify-between gap-3">
