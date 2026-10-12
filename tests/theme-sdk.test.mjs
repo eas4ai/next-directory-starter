@@ -453,7 +453,8 @@ test('THM-004 protected branding, metadata, cards and restored assets', async ()
     VALUES ('listing', 'example-tool', 'public', ?)`).run(mediaId);
   mediaDb.close();
   const published = await (await fetch(`${origin}/listings/example-tool`)).text();
-  assert.ok(published.includes(`content="${origin}/media/${mediaId}"`));
+  assert.ok(published.includes(
+    `content="${origin}/social-card?path=%2Flistings%2Fexample-tool"`));
   const overrideDb = new Database(join(directory, 'directory.db'));
   overrideDb.prepare(`INSERT INTO seo_overrides (kind, slug, public_json, updated_at)
     VALUES ('listing', 'example-tool', ?, ?)`).run(JSON.stringify({
@@ -462,7 +463,8 @@ test('THM-004 protected branding, metadata, cards and restored assets', async ()
     }), now);
   overrideDb.close();
   const explicit = await (await fetch(`${origin}/listings/example-tool`)).text();
-  assert.ok(explicit.includes('content="https://cdn.example.com/explicit.png"'));
+  assert.ok(explicit.includes(
+    `content="${origin}/social-card?path=%2Flistings%2Fexample-tool"`));
 
   await restartApp();
   const restoredHome = await (await fetch(origin)).text();

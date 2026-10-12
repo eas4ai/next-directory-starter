@@ -21,10 +21,10 @@ export function pageMetadata(path: string, title: string, description: string,
   const settings = getSeoSettings();
   const searchTitle = settings.titleFormat.replace("%s", overrides?.title || title);
   const searchDescription = overrides?.description || description;
-  const selectedImage = overrides?.socialImage || images?.published || images?.generated;
-  const imageUrl = selectedImage
-    ? selectedImage.startsWith("/") ? publicUrl(selectedImage) : selectedImage
-    : publicUrl(`/social-card?path=${encodeURIComponent(path)}`);
+  const listingSlug = /^\/listings\/([a-z0-9]+(?:-[a-z0-9]+)*)$/.exec(path)?.[1];
+  const generatedImage = listingSlug && !overrides?.socialImage && !images?.published &&
+    images?.generated === `/og/listings/${listingSlug}.png` ? images.generated : undefined;
+  const imageUrl = publicUrl(generatedImage || `/social-card?path=${encodeURIComponent(path)}`);
   const image = { url: imageUrl, width: 1200, height: 630, type: "image/png" };
   return {
     title: searchTitle,
