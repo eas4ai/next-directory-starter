@@ -60,8 +60,9 @@ function hostedPurchase(event: Stripe.Event): boolean {
     return Boolean(database.prepare(`SELECT pp.id FROM payment_periods pp
       JOIN purchases p ON p.id = pp.purchase_id AND p.provider = 'stripe'
       WHERE pp.provider = 'stripe' AND
-        (pp.provider_payment_id = ? OR pp.provider_charge_id = ?)`)
-      .get(paymentId, paymentId));
+        (pp.provider_payment_id = ? OR pp.provider_payment_intent_id = ?
+          OR pp.provider_charge_id = ?)`)
+      .get(paymentId, paymentId, paymentId));
   }
   return false;
 }

@@ -90,14 +90,16 @@ export function stripeEffect(event: Stripe.Event): PaymentEffect {
   const payments = object(data.payments);
   const firstPayment = Array.isArray(payments?.data) ? object(payments.data[0]) : null;
   const payment = object(firstPayment?.payment);
-  const chargeId = string(data.payment_intent) ?? string(payment?.payment_intent);
+  const paymentIntentId = string(data.payment_intent) ?? string(payment?.payment_intent);
+  const chargeId = string(data.charge) ?? string(payment?.charge);
   if (!purchaseId || !subscriptionId || !paymentId || !priceId ||
       amountMinor === null || paidAmount === null || paidAmount < amountMinor ||
       !currency || !first ||
       (first.quantity !== undefined && first.quantity !== 1) ||
       amountMinor <= 0) return { kind: "noop" };
   return { kind: "paid", purchaseId, resourceId: paymentId, paymentId,
-    subscriptionId, priceId, amountMinor, currency, chargeId: chargeId ?? undefined,
+    subscriptionId, priceId, amountMinor, currency,
+    paymentIntentId: paymentIntentId ?? undefined, chargeId: chargeId ?? undefined,
     periodStart: date(period?.start), periodEnd: date(period?.end) };
 }
 
