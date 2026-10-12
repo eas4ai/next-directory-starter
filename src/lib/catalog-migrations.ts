@@ -479,6 +479,28 @@ function migrateListingRevisions(): void {
   }).immediate();
 }
 
+function migrateMediaStorageSafety(): void {
+  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 20").get()) return;
+  database.transaction(() => {
+    database.exec(`CREATE TABLE media_upload_windows (
+        user_id TEXT PRIMARY KEY NOT NULL,
+        window_started_at TEXT NOT NULL,
+        accepted_count INTEGER NOT NULL CHECK (accepted_count BETWEEN 1 AND 30)
+      );
+      CREATE TABLE media_cleanup_queue (
+        asset_id TEXT PRIMARY KEY NOT NULL,
+        queued_at TEXT NOT NULL
+      );`);
+    const queuedAt = new Date().toISOString();
+    database.prepare(`INSERT INTO media_cleanup_queue (asset_id, queued_at)
+      SELECT a.id, ? FROM media_assets a
+      WHERE NOT EXISTS (SELECT 1 FROM media_assignments m WHERE m.asset_id = a.id)`).run(queuedAt);
+    database.exec(`DELETE FROM media_assets
+      WHERE NOT EXISTS (SELECT 1 FROM media_assignments m WHERE m.asset_id = media_assets.id)`);
+    database.prepare("INSERT INTO catalog_migrations (version) VALUES (20)").run();
+  }).immediate();
+}
+
 export function migrateCatalog(explicit = false): void {
   if (process.env.DIRECTORY_EXPLICIT_MIGRATIONS === "1" && !explicit) return;
   migrate.immediate();
@@ -495,6 +517,7 @@ export function migrateCatalog(explicit = false): void {
   migrateSeoRoutes();
   migrateAgentIngestion();
   migrateListingRevisions();
+  migrateMediaStorageSafety();
 }
 
 export function seedCatalog(): void {

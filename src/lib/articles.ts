@@ -2,7 +2,7 @@ import { database } from "@/lib/database";
 import { migrateCatalog } from "@/lib/catalog-migrations";
 import { HttpError, httpErrorResponse } from "@/lib/http-error";
 import { recordAudit } from "@/lib/audit";
-import { promoteDraftMedia } from "@/lib/media";
+import { drainMediaCleanupQueue, promoteDraftMedia } from "@/lib/media";
 import { editableSeoOverrides, publicSeoOverrides, publishDraftSeo, saveDraftSeo,
   type SeoOverrides } from "@/lib/seo-settings";
 import { redirectForPath, saveRedirect } from "@/lib/seo-redirects";
@@ -279,7 +279,7 @@ export function saveArticleRevision(slug: string, changes: unknown,
 
 export function publishArticleRevision(slug: string, expectedVersion: number,
   actorId: string): Article {
-  return database.transaction(() => {
+  const article = database.transaction(() => {
     const current = articleBySlug(slug);
     if (!current) throw new ArticleError(404, "Article not found");
     if (!Number.isSafeInteger(expectedVersion) || current.version !== expectedVersion) {
@@ -309,13 +309,15 @@ export function publishArticleRevision(slug: string, expectedVersion: number,
     recordAudit("article.publish", actorId, slug);
     return articleBySlug(slug)!;
   }).immediate();
+  drainMediaCleanupQueue();
+  return article;
 }
 
 export function updateArticle(slug: string, changes: unknown, actorId: string): Article {
   if (!changes || typeof changes !== "object" || Array.isArray(changes)) {
     throw new ArticleError(400, "Invalid article changes");
   }
-  return database.transaction(() => {
+  const article = database.transaction(() => {
     const current = articleBySlug(slug);
     if (!current) throw new ArticleError(404, "Article not found");
     const article = validate({ ...current, ...changes, slug });
@@ -337,6 +339,8 @@ export function updateArticle(slug: string, changes: unknown, actorId: string): 
       current.status === "published" ? "article.unpublish" : "article.update", actorId, slug);
     return articleBySlug(slug)!;
   }).immediate();
+  drainMediaCleanupQueue();
+  return article;
 }
 
 export function renameArticle(slug: string, newSlug: unknown, expectedVersion: number,
