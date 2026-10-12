@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -13,6 +13,7 @@ let app;
 let origin;
 let appEnv;
 let adminCookie;
+const migrationWorkerMode = process.argv.includes('--migration-worker');
 
 function command(args) {
   return spawnSync('npm', args, { env: appEnv, encoding: 'utf8', timeout: 120_000 });
@@ -53,6 +54,87 @@ async function stopApp() {
   try { process.kill(-app.pid, 'SIGTERM'); } catch { /* already stopped */ }
   app = undefined;
   await new Promise((resolve) => setTimeout(resolve, 300));
+}
+
+async function migrationWorker() {
+  const barrier = process.env.MIGRATION_PROBE_BARRIER;
+  const slot = process.env.MIGRATION_PROBE_SLOT;
+  if (!barrier || !slot) throw new Error('Migration probe worker is missing its barrier.');
+  const { database } = await import('../src/lib/database.ts');
+  const { applyCatalogMigration } = await import('../src/lib/catalog-migrations.ts');
+  try {
+    writeFileSync(join(barrier, `migration-${slot}`), 'ready');
+    const deadline = Date.now() + 5_000;
+    while ((!existsSync(join(barrier, 'migration-a')) ||
+        !existsSync(join(barrier, 'migration-b'))) && Date.now() < deadline) {
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+    }
+    if (Date.now() >= deadline) throw new Error('Migration probe peer did not reach the barrier.');
+    applyCatalogMigration(1000, () => {
+      database.exec('CREATE TABLE migration_concurrency_probe (id INTEGER PRIMARY KEY)');
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
+    });
+  } finally {
+    database.close();
+  }
+}
+
+function spawnMigrationWorker(slot, filename) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath,
+      ['--import', 'tsx', process.argv[1], '--migration-worker'], {
+        env: {
+          ...process.env,
+          DATABASE_URL: `file:${filename}`,
+          DIRECTORY_EXPLICIT_MIGRATIONS: '1',
+          MIGRATION_PROBE_BARRIER: workspace,
+          MIGRATION_PROBE_SLOT: slot,
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    let output = '';
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => { output += chunk; });
+    child.stderr.on('data', (chunk) => { output += chunk; });
+    child.once('error', reject);
+    child.once('exit', (code, signal) => resolve({ code, signal, output }));
+  });
+}
+
+async function checkConcurrentMigrations() {
+  const filename = join(workspace, 'migration-concurrency.db');
+  const probe = new Database(filename);
+  probe.exec('CREATE TABLE catalog_migrations (version INTEGER PRIMARY KEY)');
+  probe.close();
+  const workers = await Promise.all([
+    spawnMigrationWorker('a', filename),
+    spawnMigrationWorker('b', filename),
+  ]);
+  const failed = workers.find((worker) => worker.code !== 0 || worker.signal);
+  if (failed) throw new Error(`Concurrent migration failed: ${failed.output.trim()}`);
+  const verified = new Database(filename, { readonly: true });
+  try {
+    const versions = verified.prepare(
+      'SELECT count(*) AS count FROM catalog_migrations WHERE version = 1000',
+    ).get().count;
+    const tables = verified.prepare(
+      "SELECT count(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'migration_concurrency_probe'",
+    ).get().count;
+    if (versions !== 1 || tables !== 1) {
+      throw new Error('Concurrent migration did not commit one version and one schema change.');
+    }
+  } finally {
+    verified.close();
+  }
+}
+
+function checkDockerBuildMigrations() {
+  const dockerfile = readFileSync('Dockerfile', 'utf8').replace(/\\\r?\n/g, ' ');
+  const build = dockerfile.split('\n').find((line) => /^RUN\s+.*npm run build\s*$/.test(line));
+  if (!build?.includes('DIRECTORY_EXPLICIT_MIGRATIONS=1')) {
+    throw new Error('The Docker build permits implicit catalog migrations.');
+  }
 }
 
 const request = (path, options = {}) => fetch(new URL(path, origin), { redirect: 'manual', ...options });
@@ -106,7 +188,13 @@ async function check(id, run) {
   }
 }
 
-try {
+if (migrationWorkerMode) {
+  try {
+    await migrationWorker();
+  } finally {
+    rmSync(workspace, { recursive: true, force: true });
+  }
+} else try {
   origin = `http://127.0.0.1:${await freePort()}`;
   appEnv = {
     ...process.env,
@@ -166,6 +254,8 @@ try {
   try { await provision(); } catch (error) { process.stderr.write(`Admin setup: ${error.message}\n`); }
 
   await check('FOUND-004', async () => {
+    await checkConcurrentMigrations();
+    checkDockerBuildMigrations();
     if (!adminCookie) throw new Error('An administrator cannot create content.');
     const editor = await request('/admin/catalog', { headers: { Cookie: adminCookie } });
     if (!editor.ok || !/name=["']name["']/.test(await editor.text())) {

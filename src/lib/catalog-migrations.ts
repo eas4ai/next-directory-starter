@@ -167,15 +167,24 @@ const migrate = database.transaction(() => {
 
 });
 
+export function applyCatalogMigration(version: number, change: () => void): void {
+  database.transaction(() => {
+    const installed = database.prepare(
+      "SELECT version FROM catalog_migrations WHERE version = ?",
+    ).get(version);
+    if (installed) return;
+    change();
+    database.prepare("INSERT INTO catalog_migrations (version) VALUES (?)").run(version);
+  }).immediate();
+}
+
 function migratePlanModes(): void {
-  const planModesInstalled = database.prepare("SELECT version FROM catalog_migrations WHERE version = 7").get();
-  if (planModesInstalled) return;
   // SQLite cannot relax the existing plan CHECK constraints in place. Rebuild the
   // parent table with foreign keys paused, then validate every reference before
   // committing the migration.
   database.pragma("foreign_keys = OFF");
   try {
-    database.transaction(() => {
+    applyCatalogMigration(7, () => {
       const legacyMode = process.env.BILLING_CHECKOUT_MODE === "live" ? "live" :
         process.env.BILLING_CHECKOUT_MODE === "test" ? "test" :
           process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_") ? "live" : "test";
@@ -214,17 +223,14 @@ function migratePlanModes(): void {
         .run(legacyMode);
       const violations = database.pragma("foreign_key_check") as unknown[];
       if (violations.length) throw new Error("Plan migration left invalid foreign keys");
-      database.prepare("INSERT INTO catalog_migrations (version) VALUES (7)").run();
-    }).immediate();
+    });
   } finally {
     database.pragma("foreign_keys = ON");
   }
 }
 
 function migrateBillingProfiles(): void {
-  const billingProfilesInstalled = database.prepare("SELECT version FROM catalog_migrations WHERE version = 8").get();
-  if (billingProfilesInstalled) return;
-  database.transaction(() => {
+  applyCatalogMigration(8, () => {
     database.exec(`CREATE TABLE billing_profiles (
         provider TEXT NOT NULL CHECK (provider IN ('stripe', 'paddle', 'nowpayments')),
         mode TEXT NOT NULL CHECK (mode IN ('test', 'live')),
@@ -237,14 +243,11 @@ function migrateBillingProfiles(): void {
         updated_at TEXT NOT NULL,
         PRIMARY KEY (provider, mode)
       );`);
-    database.prepare("INSERT INTO catalog_migrations (version) VALUES (8)").run();
-  }).immediate();
+  });
 }
 
 function migratePaymentLifecycle(): void {
-  const installed = database.prepare("SELECT version FROM catalog_migrations WHERE version = 9").get();
-  if (installed) return;
-  database.transaction(() => {
+  applyCatalogMigration(9, () => {
     database.exec(`ALTER TABLE purchases ADD COLUMN provider TEXT NOT NULL DEFAULT 'stripe';
       ALTER TABLE purchases ADD COLUMN provider_resource_id TEXT;
       ALTER TABLE purchases ADD COLUMN provider_subscription_id TEXT;
@@ -288,26 +291,22 @@ function migratePaymentLifecycle(): void {
         current_period_end TEXT,
         updated_at TEXT NOT NULL
       );`);
-    database.prepare("INSERT INTO catalog_migrations (version) VALUES (9)").run();
-  }).immediate();
+  });
 }
 
 function migratePaymentOutcomes(): void {
-  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 10").get()) return;
-  database.transaction(() => {
+  applyCatalogMigration(10, () => {
     database.exec(`ALTER TABLE payment_periods ADD COLUMN provider_charge_id TEXT;
       ALTER TABLE subscription_states ADD COLUMN provider_event_at TEXT;
       CREATE UNIQUE INDEX payment_periods_charge ON payment_periods(provider, provider_charge_id)
         WHERE provider_charge_id IS NOT NULL;
       CREATE UNIQUE INDEX purchases_provider_subscription ON purchases(provider, plan_mode, provider_subscription_id)
         WHERE provider_subscription_id IS NOT NULL;`);
-    database.prepare("INSERT INTO catalog_migrations (version) VALUES (10)").run();
-  }).immediate();
+  });
 }
 
 function migrateArticleRevisions(): void {
-  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 11").get()) return;
-  database.transaction(() => {
+  applyCatalogMigration(11, () => {
     database.exec(`ALTER TABLE articles ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
       CREATE TABLE article_revisions (
         slug TEXT PRIMARY KEY NOT NULL REFERENCES articles(slug) ON DELETE CASCADE,
@@ -317,24 +316,20 @@ function migrateArticleRevisions(): void {
         tags_json TEXT NOT NULL,
         saved_at TEXT NOT NULL
       );`);
-    database.prepare("INSERT INTO catalog_migrations (version) VALUES (11)").run();
-  }).immediate();
+  });
 }
 
 function migrateArticleCategories(): void {
-  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 12").get()) return;
-  database.transaction(() => {
+  applyCatalogMigration(12, () => {
     database.exec(`CREATE TABLE article_categories (name TEXT PRIMARY KEY NOT NULL);
       ALTER TABLE articles ADD COLUMN category TEXT REFERENCES article_categories(name);
       ALTER TABLE article_revisions ADD COLUMN category TEXT REFERENCES article_categories(name);
       CREATE INDEX articles_public_category ON articles(status, category, published_at DESC, slug);`);
-    database.prepare("INSERT INTO catalog_migrations (version) VALUES (12)").run();
-  }).immediate();
+  });
 }
 
 function migrateMedia(): void {
-  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 13").get()) return;
-  database.transaction(() => {
+  applyCatalogMigration(13, () => {
     database.exec(`CREATE TABLE media_assets (
         id TEXT PRIMARY KEY NOT NULL,
         target_kind TEXT NOT NULL CHECK (target_kind IN ('listing', 'article')),
@@ -353,13 +348,11 @@ function migrateMedia(): void {
         PRIMARY KEY (target_kind, target_slug, slot)
       );
       CREATE INDEX media_assignments_asset ON media_assignments(asset_id);`);
-    database.prepare("INSERT INTO catalog_migrations (version) VALUES (13)").run();
-  }).immediate();
+  });
 }
 
 function migrateNotifications(): void {
-  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 14").get()) return;
-  database.transaction(() => {
+  applyCatalogMigration(14, () => {
     database.exec(`CREATE TABLE owner_notifications (
         id TEXT PRIMARY KEY NOT NULL,
         owner_user_id TEXT NOT NULL,
@@ -378,25 +371,21 @@ function migrateNotifications(): void {
       );
       CREATE INDEX owner_notifications_recent ON owner_notifications(owner_user_id, created_at DESC, id DESC);
       CREATE INDEX owner_notifications_delivery ON owner_notifications(email_state, email_next_attempt_at, created_at);`);
-    database.prepare("INSERT INTO catalog_migrations (version) VALUES (14)").run();
-  }).immediate();
+  });
 }
 
 function migrateNotificationClaims(): void {
-  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 15").get()) return;
-  database.transaction(() => {
+  applyCatalogMigration(15, () => {
     database.exec(`ALTER TABLE owner_notifications ADD COLUMN email_to TEXT;
       ALTER TABLE owner_notifications ADD COLUMN email_from TEXT;
       ALTER TABLE owner_notifications ADD COLUMN email_first_attempt_at TEXT;
       ALTER TABLE owner_notifications ADD COLUMN email_claim_token TEXT;
       ALTER TABLE owner_notifications ADD COLUMN email_provider_id TEXT;`);
-    database.prepare("INSERT INTO catalog_migrations (version) VALUES (15)").run();
-  }).immediate();
+  });
 }
 
 function migrateSeoSettings(): void {
-  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 16").get()) return;
-  database.transaction(() => {
+  applyCatalogMigration(16, () => {
     database.exec(`CREATE TABLE seo_settings (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         title_format TEXT NOT NULL,
@@ -415,13 +404,11 @@ function migrateSeoSettings(): void {
         PRIMARY KEY (kind, slug)
       );
       ALTER TABLE submissions ADD COLUMN seo_json TEXT;`);
-    database.prepare("INSERT INTO catalog_migrations (version) VALUES (16)").run();
-  }).immediate();
+  });
 }
 
 function migrateSeoRoutes(): void {
-  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 17").get()) return;
-  database.transaction(() => {
+  applyCatalogMigration(17, () => {
     database.exec(`CREATE TABLE seo_redirects (
         source_path TEXT PRIMARY KEY NOT NULL,
         destination_path TEXT NOT NULL,
@@ -436,13 +423,11 @@ function migrateSeoRoutes(): void {
         last_request_id TEXT NOT NULL
       );
       CREATE INDEX seo_not_found_recent ON seo_not_found(last_seen_at DESC, path);`);
-    database.prepare("INSERT INTO catalog_migrations (version) VALUES (17)").run();
-  }).immediate();
+  });
 }
 
 function migrateAgentIngestion(): void {
-  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 18").get()) return;
-  database.transaction(() => {
+  applyCatalogMigration(18, () => {
     database.exec(`CREATE TABLE agent_keys (
         id TEXT PRIMARY KEY NOT NULL,
         user_id TEXT NOT NULL,
@@ -467,21 +452,17 @@ function migrateAgentIngestion(): void {
         UNIQUE(actor_user_id, idempotency_key)
       );
       CREATE INDEX agent_imports_recent ON agent_imports(created_at DESC, slug);`);
-    database.prepare("INSERT INTO catalog_migrations (version) VALUES (18)").run();
-  }).immediate();
+  });
 }
 
 function migrateListingRevisions(): void {
-  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 19").get()) return;
-  database.transaction(() => {
+  applyCatalogMigration(19, () => {
     database.exec("ALTER TABLE listings ADD COLUMN revision INTEGER NOT NULL DEFAULT 1");
-    database.prepare("INSERT INTO catalog_migrations (version) VALUES (19)").run();
-  }).immediate();
+  });
 }
 
 function migrateMediaStorageSafety(): void {
-  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 20").get()) return;
-  database.transaction(() => {
+  applyCatalogMigration(20, () => {
     database.exec(`CREATE TABLE media_upload_windows (
         user_id TEXT PRIMARY KEY NOT NULL,
         window_started_at TEXT NOT NULL,
@@ -497,13 +478,11 @@ function migrateMediaStorageSafety(): void {
       WHERE NOT EXISTS (SELECT 1 FROM media_assignments m WHERE m.asset_id = a.id)`).run(queuedAt);
     database.exec(`DELETE FROM media_assets
       WHERE NOT EXISTS (SELECT 1 FROM media_assignments m WHERE m.asset_id = media_assets.id)`);
-    database.prepare("INSERT INTO catalog_migrations (version) VALUES (20)").run();
-  }).immediate();
+  });
 }
 
 function migrateAgentImportPublications(): void {
-  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 23").get()) return;
-  database.transaction(() => {
+  applyCatalogMigration(23, () => {
     database.prepare(`UPDATE agent_imports
       SET published_at = COALESCE(published_at, (
             SELECT occurred_at FROM audit_events
@@ -520,8 +499,7 @@ function migrateAgentImportPublications(): void {
           WHERE slug = agent_imports.slug AND status = 'published')
         AND EXISTS (SELECT 1 FROM audit_events
           WHERE action = 'catalog.publish' AND target = agent_imports.slug)`).run();
-    database.prepare("INSERT INTO catalog_migrations (version) VALUES (23)").run();
-  }).immediate();
+  });
 }
 
 export function migrateCatalog(explicit = false): void {
@@ -541,25 +519,19 @@ export function migrateCatalog(explicit = false): void {
   migrateAgentIngestion();
   migrateListingRevisions();
   migrateMediaStorageSafety();
-  if (!database.prepare("SELECT version FROM catalog_migrations WHERE version = 21").get()) {
-    database.transaction(() => {
-      database.exec(`ALTER TABLE payment_periods ADD COLUMN provider_payment_intent_id TEXT;
-        UPDATE payment_periods
-          SET provider_payment_intent_id = provider_charge_id, provider_charge_id = NULL
-          WHERE provider = 'stripe' AND provider_charge_id GLOB 'pi_*';
-        CREATE UNIQUE INDEX payment_periods_payment_intent
-          ON payment_periods(provider, provider_payment_intent_id)
-          WHERE provider_payment_intent_id IS NOT NULL;`);
-      database.prepare("INSERT INTO catalog_migrations (version) VALUES (21)").run();
-    }).immediate();
-  }
-  if (!database.prepare("SELECT version FROM catalog_migrations WHERE version = 22").get()) {
-    database.transaction(() => {
-      database.exec(`ALTER TABLE submissions ADD COLUMN base_revision INTEGER
-        CHECK (base_revision IS NULL OR base_revision > 0)`);
-      database.prepare("INSERT INTO catalog_migrations (version) VALUES (22)").run();
-    }).immediate();
-  }
+  applyCatalogMigration(21, () => {
+    database.exec(`ALTER TABLE payment_periods ADD COLUMN provider_payment_intent_id TEXT;
+      UPDATE payment_periods
+        SET provider_payment_intent_id = provider_charge_id, provider_charge_id = NULL
+        WHERE provider = 'stripe' AND provider_charge_id GLOB 'pi_*';
+      CREATE UNIQUE INDEX payment_periods_payment_intent
+        ON payment_periods(provider, provider_payment_intent_id)
+        WHERE provider_payment_intent_id IS NOT NULL;`);
+  });
+  applyCatalogMigration(22, () => {
+    database.exec(`ALTER TABLE submissions ADD COLUMN base_revision INTEGER
+      CHECK (base_revision IS NULL OR base_revision > 0)`);
+  });
   migrateAgentImportPublications();
 }
 
