@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: paddle-partial-refunds
+Current: dispute-event-ordering
 
 ## public-starter-and-theme
 
@@ -537,3 +537,9 @@ Delivers backlog item migration-version-check-race: Audit 2026-10-11 (M10, verif
 Requirements: COM-008
 
 Delivers backlog item paddle-partial-refunds: Audit 2026-10-11 (M11, reported, not re-verified). Paddle refunds count as full only when the adjustment type is 'full' (src/lib/payment-normalizers.ts:119); partial adjustments are ignored and never summed (src/lib/payment-lifecycle.ts:229). Two approved 6-dollar refunds on a 12-dollar payment leave placement active. Record approved refund amounts idempotently and revoke the period when the total reaches the amount paid.
+
+## dispute-event-ordering
+
+Requirements: COM-008
+
+Delivers backlog item dispute-event-ordering: Audit 2026-10-11 (M12, reported, not re-verified). Dispute effects keep only the payment reference and an open flag; disputePeriod (src/lib/payment-lifecycle.ts:243) toggles disputed_at without checking dispute id, event time, or terminal state. A delayed charge.dispute.created arriving after charge.dispute.closed (won) revokes placement again. Track each dispute's id and state and ignore older events.
