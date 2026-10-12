@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: media-orphaned-files
+Current: restore-symlink-isolation
 
 ## public-starter-and-theme
 
@@ -489,3 +489,9 @@ Delivers backlog item rss-cursor-blocks-writes: Audit 2026-10-11 (M1, reproduced
 Requirements: MED-001
 
 Delivers backlog item media-orphaned-files: Audit 2026-10-11 (M3, verified). uploadPrivateImage (src/lib/media.ts) writes a new UUID file and media_assets row per upload and moves the draft assignment; superseded files and rows are never removed (unlinkSync runs only on a failed transaction). Branding replacement (src/lib/branding.ts:75) does the same. A verified owner re-uploading in a loop fills the volume that also holds SQLite. Reclaim unreferenced superseded assets inside the reassignment transaction and add a per-account upload quota or rate limit.
+
+## restore-symlink-isolation
+
+Requirements: OPS-001
+
+Delivers backlog item restore-symlink-isolation: Audit 2026-10-11 (M4, reproduced). scripts/restore.mjs hashes and inspects database.db through symlinks, and cpSync keeps symlinks by default; regularFiles checks links inside media/ but not the media root. A tampered or hand-built backup with database.db pointing at the live database passes every check, and the restored copy then writes to live storage. lstat the database, key and media root and require a regular file or real directory; reject any symlink in the staged copy before renaming it into place.
