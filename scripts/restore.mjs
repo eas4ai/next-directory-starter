@@ -3,7 +3,8 @@ import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync,
   renameSync, rmSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { canonicalPath, contained, databasePath, hashFile, inspectDatabase,
-  mediaPath, parsePairs, pathEntryExists, readKey, regularFiles } from './ops-common.mjs';
+  mediaPath, parsePairs, pathEntryExists, readKey, regularFiles,
+  requireRegularFile } from './ops-common.mjs';
 
 async function main() {
   const { '--backup': backup, '--target': target } =
@@ -23,8 +24,13 @@ async function main() {
       typeof manifest.hashes !== 'object' || Array.isArray(manifest.hashes)) {
     throw new Error('Invalid backup manifest');
   }
+  const backupDatabase = join(backup, 'database.db');
+  const backupKey = join(backup, 'billing.key');
+  const backupMedia = join(backup, 'media');
+  requireRegularFile(backupDatabase, 'Backup database');
+  requireRegularFile(backupKey, 'Backup billing key');
   const files = ['database.db', 'billing.key',
-    ...regularFiles(join(backup, 'media')).map((file) => relative(backup, file))];
+    ...regularFiles(backupMedia).map((file) => relative(backup, file))];
   if (files.length !== Object.keys(manifest.hashes).length ||
       files.some((file) => !/^[a-f0-9]{64}$/.test(manifest.hashes[file]))) {
     throw new Error('Backup file list does not match manifest');
@@ -34,17 +40,24 @@ async function main() {
       throw new Error('Backup checksum failed');
     }
   }
-  const key = readKey(join(backup, 'billing.key'));
-  inspectDatabase(join(backup, 'database.db'), join(backup, 'media'), key);
+  const key = readKey(backupKey);
+  inspectDatabase(backupDatabase, backupMedia, key);
   mkdirSync(dirname(target), { recursive: true });
   if (canonicalPath(target) !== plannedTarget) throw new Error('Restore path changed');
   const stage = mkdtempSync(join(dirname(target), '.directory-restore-'));
   try {
-    cpSync(join(backup, 'database.db'), join(stage, 'database.db'), { force: false });
-    cpSync(join(backup, 'media'), join(stage, 'media'), { recursive: true, force: false });
-    cpSync(join(backup, 'billing.key'), join(stage, 'billing.key'), { force: false });
-    chmodSync(join(stage, 'billing.key'), 0o600);
-    inspectDatabase(join(stage, 'database.db'), join(stage, 'media'), key);
+    const stagedDatabase = join(stage, 'database.db');
+    const stagedMedia = join(stage, 'media');
+    const stagedKeyFile = join(stage, 'billing.key');
+    cpSync(backupDatabase, stagedDatabase, { force: false });
+    cpSync(backupMedia, stagedMedia, { recursive: true, force: false });
+    cpSync(backupKey, stagedKeyFile, { force: false });
+    chmodSync(stagedKeyFile, 0o600);
+    requireRegularFile(stagedDatabase, 'Restored database');
+    regularFiles(stagedMedia);
+    const stagedKey = readKey(stagedKeyFile);
+    if (stagedKey !== key) throw new Error('Restored billing key changed during copy');
+    inspectDatabase(stagedDatabase, stagedMedia, stagedKey);
     if (pathEntryExists(target) || canonicalPath(target) !== plannedTarget) {
       throw new Error('Restore target changed or already exists');
     }
