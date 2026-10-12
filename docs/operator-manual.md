@@ -131,6 +131,26 @@ The limit must be 1–50. The command reports attempted, sent, and failed counts
 
 This Compose setup runs one application instance on one host. Install Docker Engine with Compose, then copy `.env.docker.example` to `.env.docker`. Set `SITE_URL` and `BETTER_AUTH_URL` to the public HTTPS origin and replace `BETTER_AUTH_SECRET` with a unique long random value. Keep `.env.docker` private. Set optional mail and payment variables there as described above. If provider profiles are saved, keep `BILLING_ENCRYPTION_KEY` stable and store its matching key file outside the repository. Compose fixes `DATABASE_URL` to `file:/app/data/directory.db` and `MEDIA_DIR` to `/app/data/media`; both live in its named volume. It maps port 3000 to `127.0.0.1` only, so configure a reverse proxy with HTTPS at the public origin. Change `DIRECTORY_PORT` if another local service uses 3000.
 
+Set a hard request-body limit at that proxy. The largest application request is the agent screenshot JSON envelope, capped at 7,100,000 bytes, so an 8 MiB proxy limit admits valid screenshots while bounding every public request before it reaches Next.js. For Nginx, add the following to the TLS server block that owns the public hostname, replace the certificate paths and hostname, then run `sudo nginx -t` before reloading Nginx. The `8m` value is 8 MiB. Nginx answers a larger request with `413 Request Entity Too Large` without forwarding its body to the application.
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name directory.example.com;
+
+    ssl_certificate /etc/letsencrypt/live/directory.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/directory.example.com/privkey.pem;
+    client_max_body_size 8m;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
 From the repository root, build the image, migrate the empty database, optionally add sample listings, and start the service. Migration and seeding are explicit, not startup actions. Use the same `--env-file` and Compose project for every command so the one-off containers share the service's volume. Check `docker compose --env-file .env.docker ps` for `healthy`, then open `/listings` through the proxy.
 
 ```sh
