@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
@@ -15,6 +15,7 @@ test('branding replacements reclaim only files no branding slot still uses', asy
     ({ database } = await import('../src/lib/database.ts'));
     const { migrateCatalog } = await import('../src/lib/catalog-migrations.ts');
     const { saveBranding, uploadBrandAsset } = await import('../src/lib/branding.ts');
+    const { drainMediaCleanupQueue } = await import('../src/lib/media.ts');
     migrateCatalog();
     const bytes = await sharp({ create: { width: 6, height: 4, channels: 3,
       background: '#336699' } }).png().toBuffer();
@@ -34,7 +35,26 @@ test('branding replacements reclaim only files no branding slot still uses', asy
     assert.equal(existsSync(secondPath), true);
     assert.equal(existsSync(thirdPath), true);
 
-    const iconCleared = saveBranding({ ...third, iconUrl: undefined }, 'admin');
+    rmSync(secondPath);
+    mkdirSync(secondPath);
+    writeFileSync(join(secondPath, 'blocks-unlink'), 'blocked');
+    const cleanupErrors = [];
+    const originalConsoleError = console.error;
+    console.error = (...args) => cleanupErrors.push(args);
+    let iconCleared;
+    try {
+      iconCleared = saveBranding({ ...third, iconUrl: undefined }, 'admin');
+    } finally {
+      console.error = originalConsoleError;
+    }
+    const secondId = second.logoUrl.split('/').at(-1).slice(0, -5);
+    assert.equal(cleanupErrors.length, 1);
+    assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM media_cleanup_queue
+      WHERE asset_id = ?`).get(secondId).count, 1);
+    rmSync(secondPath, { recursive: true });
+    drainMediaCleanupQueue();
+    assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM media_cleanup_queue
+      WHERE asset_id = ?`).get(secondId).count, 0);
     assert.equal(existsSync(secondPath), false);
     saveBranding({ ...iconCleared, logoUrl: undefined }, 'admin');
     assert.equal(existsSync(thirdPath), false);
