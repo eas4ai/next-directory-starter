@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: import-screenshot-after-publish
+Current: request-body-buffered-before-limit
 
 ## public-starter-and-theme
 
@@ -519,3 +519,9 @@ Delivers backlog item submission-approval-overwrites-changes: Audit 2026-10-11 (
 Requirements: ING-004
 
 Delivers backlog item import-screenshot-after-publish: Audit 2026-10-11 (M8, verified). attach_screenshot updates agent_imports only WHERE published_at IS NULL (src/lib/agent-imports.ts:170), but publishing through the catalog PATCH route changes listings.status without setting published_at. After that publication an agent can still replace the screenshot and change the public card. Check the real listing status in the screenshot update and set published_at on every publication path.
+
+## request-body-buffered-before-limit
+
+Requirements: ADM-001
+
+Delivers backlog item request-body-buffered-before-limit: Audit 2026-10-11 (M9, verified for listing and role routes). Many handlers call await request.text() and only then compare body.length to the limit: admin listings POST and PATCH, account role and suspension, plans, theme save and preview, agent imports, agent keys, and the agent screenshot route. Better Auth (/api/auth/*) parses the full JSON body before authorization. Concurrent large bodies are fully buffered before rejection, unauthenticated on the auth routes. Use the existing streaming requestJson(request, limit) helper everywhere, add a streaming cap before Better Auth, and set a request size limit at the reverse proxy.
