@@ -501,15 +501,6 @@ function migrateMediaStorageSafety(): void {
   }).immediate();
 }
 
-function migrateSubmissionRevisions(): void {
-  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 22").get()) return;
-  database.transaction(() => {
-    database.exec(`ALTER TABLE submissions ADD COLUMN base_revision INTEGER
-      CHECK (base_revision IS NULL OR base_revision > 0)`);
-    database.prepare("INSERT INTO catalog_migrations (version) VALUES (22)").run();
-  }).immediate();
-}
-
 export function migrateCatalog(explicit = false): void {
   if (process.env.DIRECTORY_EXPLICIT_MIGRATIONS === "1" && !explicit) return;
   migrate.immediate();
@@ -539,7 +530,13 @@ export function migrateCatalog(explicit = false): void {
       database.prepare("INSERT INTO catalog_migrations (version) VALUES (21)").run();
     }).immediate();
   }
-  migrateSubmissionRevisions();
+  if (!database.prepare("SELECT version FROM catalog_migrations WHERE version = 22").get()) {
+    database.transaction(() => {
+      database.exec(`ALTER TABLE submissions ADD COLUMN base_revision INTEGER
+        CHECK (base_revision IS NULL OR base_revision > 0)`);
+      database.prepare("INSERT INTO catalog_migrations (version) VALUES (22)").run();
+    }).immediate();
+  }
 }
 
 export function seedCatalog(): void {
