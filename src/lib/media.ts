@@ -10,6 +10,8 @@ import { HttpError, httpErrorResponse } from "@/lib/http-error";
 migrateCatalog();
 
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const PRIVATE_UPLOAD_LIMIT = 30;
+const PRIVATE_UPLOAD_WINDOW_MS = 60 * 60 * 1000;
 export type MediaKind = "listing" | "article";
 export type MediaAsset = { id: string; kind: MediaKind; slug: string; alt: string; width: number; height: number };
 export class MediaError extends HttpError {}
@@ -30,6 +32,65 @@ export function mediaFilePath(id: string): string {
   if (!/^[0-9a-f-]{36}$/.test(id)) throw new MediaError(404, "Image not found");
   return join(mediaDirectory(), `${id}.webp`);
 }
+
+const queueMediaFileCleanup = database.prepare(`INSERT OR IGNORE INTO media_cleanup_queue
+  (asset_id, queued_at) VALUES (?, ?)`);
+
+function isMissingFile(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
+}
+
+export function drainMediaCleanupQueue(): void {
+  const queued = database.prepare(`SELECT asset_id FROM media_cleanup_queue
+    ORDER BY queued_at, asset_id LIMIT 100`).all() as { asset_id: string }[];
+  for (const { asset_id: id } of queued) {
+    try {
+      unlinkSync(mediaFilePath(id));
+    } catch (error) {
+      if (!isMissingFile(error)) {
+        console.error(`Media cleanup deferred for ${id}`, error);
+        continue;
+      }
+    }
+    try {
+      database.prepare("DELETE FROM media_cleanup_queue WHERE asset_id = ?").run(id);
+    } catch (error) {
+      console.error(`Media cleanup record could not be cleared for ${id}`, error);
+    }
+  }
+}
+
+function queueUnreferencedMediaAsset(id: string, queuedAt: string): void {
+  const orphan = database.prepare(`SELECT 1 FROM media_assets a WHERE a.id = ?
+    AND NOT EXISTS (SELECT 1 FROM media_assignments m WHERE m.asset_id = a.id)`).get(id);
+  if (!orphan) return;
+  queueMediaFileCleanup.run(id, queuedAt);
+  database.prepare(`DELETE FROM media_assets WHERE id = ?
+    AND NOT EXISTS (SELECT 1 FROM media_assignments WHERE asset_id = ?)`).run(id, id);
+}
+
+function consumePrivateUpload(actorId: string, now: string): void {
+  const row = database.prepare(`SELECT window_started_at, accepted_count FROM media_upload_windows
+    WHERE user_id = ?`).get(actorId) as {
+      window_started_at: string; accepted_count: number;
+    } | undefined;
+  const nowMs = Date.parse(now);
+  const startedMs = row ? Date.parse(row.window_started_at) : Number.NaN;
+  if (!row || !Number.isFinite(startedMs) || startedMs > nowMs ||
+      nowMs - startedMs >= PRIVATE_UPLOAD_WINDOW_MS) {
+    database.prepare(`INSERT INTO media_upload_windows (user_id, window_started_at, accepted_count)
+      VALUES (?, ?, 1) ON CONFLICT(user_id) DO UPDATE SET
+      window_started_at = excluded.window_started_at, accepted_count = 1`).run(actorId, now);
+    return;
+  }
+  if (row.accepted_count >= PRIVATE_UPLOAD_LIMIT) {
+    throw new MediaError(429, "Private image upload limit reached; try again later");
+  }
+  database.prepare(`UPDATE media_upload_windows SET accepted_count = accepted_count + 1
+    WHERE user_id = ?`).run(actorId);
+}
+
+drainMediaCleanupQueue();
 
 export function ensureUploadPermission(kind: MediaKind, slug: string,
   actorId: string, actorRole: string | null | undefined): void {
@@ -101,13 +162,24 @@ export async function uploadPrivateImage(input: {
   }
   const id = randomUUID();
   const directory = mediaDirectory();
-  mkdirSync(directory, { recursive: true });
   const file = mediaFilePath(id);
-  writeFileSync(file, output, { flag: "wx" });
+  const queuedAt = new Date().toISOString();
+  queueMediaFileCleanup.run(id, queuedAt);
+  try {
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(file, output, { flag: "wx" });
+  } catch (error) {
+    drainMediaCleanupQueue();
+    throw error;
+  }
   try {
     database.transaction(() => {
       ensureUploadPermission(input.kind, input.slug, input.actorId, input.actorRole);
       const now = new Date().toISOString();
+      consumePrivateUpload(input.actorId, now);
+      const displaced = database.prepare(`SELECT asset_id FROM media_assignments
+        WHERE target_kind = ? AND target_slug = ? AND slot = 'draft'`)
+        .get(input.kind, input.slug) as { asset_id: string } | undefined;
       database.prepare(`INSERT INTO media_assets
         (id, target_kind, target_slug, uploaded_by, alt, width, height, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
@@ -138,11 +210,14 @@ export async function uploadPrivateImage(input: {
             .run(input.slug, input.actorId, JSON.stringify(listing), now);
         }
       }
+      if (displaced) queueUnreferencedMediaAsset(displaced.asset_id, now);
+      database.prepare("DELETE FROM media_cleanup_queue WHERE asset_id = ?").run(id);
     }).immediate();
   } catch (error) {
-    unlinkSync(file);
+    drainMediaCleanupQueue();
     throw error;
   }
+  drainMediaCleanupQueue();
   return { id, kind: input.kind, slug: input.slug, alt, width, height };
 }
 
@@ -164,13 +239,27 @@ export function assignedMedia(kind: MediaKind, slug: string, slot: "draft" | "pu
 }
 
 export function promoteDraftMedia(kind: MediaKind, slug: string): void {
-  const draft = assignedMedia(kind, slug, "draft");
-  if (!draft) return;
-  database.prepare(`INSERT INTO media_assignments (target_kind, target_slug, slot, asset_id)
-    VALUES (?, ?, 'public', ?) ON CONFLICT(target_kind, target_slug, slot)
-    DO UPDATE SET asset_id = excluded.asset_id`).run(kind, slug, draft.id);
-  database.prepare(`DELETE FROM media_assignments
-    WHERE target_kind = ? AND target_slug = ? AND slot = 'draft'`).run(kind, slug);
+  const promote = () => {
+    const draft = assignedMedia(kind, slug, "draft");
+    if (!draft) return;
+    const displaced = database.prepare(`SELECT asset_id FROM media_assignments
+      WHERE target_kind = ? AND target_slug = ? AND slot = 'public'`)
+      .get(kind, slug) as { asset_id: string } | undefined;
+    database.prepare(`INSERT INTO media_assignments (target_kind, target_slug, slot, asset_id)
+      VALUES (?, ?, 'public', ?) ON CONFLICT(target_kind, target_slug, slot)
+      DO UPDATE SET asset_id = excluded.asset_id`).run(kind, slug, draft.id);
+    database.prepare(`DELETE FROM media_assignments
+      WHERE target_kind = ? AND target_slug = ? AND slot = 'draft'`).run(kind, slug);
+    if (displaced && displaced.asset_id !== draft.id) {
+      queueUnreferencedMediaAsset(displaced.asset_id, new Date().toISOString());
+    }
+  };
+  if (database.inTransaction) {
+    promote();
+    return;
+  }
+  database.transaction(promote).immediate();
+  drainMediaCleanupQueue();
 }
 
 export function privateMediaAsset(id: string, actorId: string,

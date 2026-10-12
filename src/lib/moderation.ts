@@ -5,7 +5,7 @@ import { parseListing } from "@/lib/catalog-input";
 import type { Listing } from "@/lib/listings";
 import { HttpError, httpErrorResponse } from "@/lib/http-error";
 import { recordAudit } from "@/lib/audit";
-import { promoteDraftMedia } from "@/lib/media";
+import { drainMediaCleanupQueue, promoteDraftMedia } from "@/lib/media";
 import { recordOwnerNotification } from "@/lib/notifications";
 import { redirectForPath } from "@/lib/seo-redirects";
 import { editableSeoOverrides, hasDraftSeo, publishDraftSeo, saveDraftSeo,
@@ -257,6 +257,7 @@ export function decideSubmission(id: string, actorId: string, decision: "approve
         : `Your listing ${row.slug} was not approved. ${reason}`);
     recordAudit(decision === "approve" ? "moderation.approve" : "moderation.reject", actorId, row.slug);
   }).immediate();
+  drainMediaCleanupQueue();
 }
 
 export function suspendPublishedListing(slug: string, actorId: string, reason: string): void {
