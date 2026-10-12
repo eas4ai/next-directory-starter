@@ -296,6 +296,37 @@ try {
     if (!contains(await (await request(path)).text(), 'Proposed version')) {
       throw new Error('Approved revision did not become public.');
     }
+
+    await createDraft('stale-revision-entry', ownerACookie, 'Approved before correction');
+    await decide(await submit('stale-revision-entry'), 'approve', 'Initial approval');
+    const staleEdit = await request('/api/owner/listings/stale-revision-entry',
+      json({ name: 'Owner stale proposal', revision: 3 }, ownerACookie, 'PATCH'));
+    if (!staleEdit.ok) throw new Error(`Owner stale revision returned ${staleEdit.status}.`);
+    const staleSubmissionId = await submit('stale-revision-entry');
+    const catalogBeforeResponse = await request('/api/admin/listings', { headers: { Cookie: adminCookie } });
+    const catalogBefore = (await catalogBeforeResponse.json()).listings
+      ?.find((listing) => listing.slug === 'stale-revision-entry');
+    const correction = await request('/api/admin/listings/stale-revision-entry',
+      json({ name: 'Admin correction', status: 'draft', expectedRevision: catalogBefore?.revision },
+        adminCookie, 'PATCH'));
+    const staleApproval = await request(`/api/admin/submissions/${staleSubmissionId}/decision`,
+      json({ decision: 'approve', reason: 'Approve stale proposal' }, moderatorCookie));
+    const catalogAfterResponse = await request('/api/admin/listings', { headers: { Cookie: adminCookie } });
+    const catalogAfter = (await catalogAfterResponse.json()).listings
+      ?.find((listing) => listing.slug === 'stale-revision-entry');
+    const ownerAfterResponse = await request('/api/owner/listings/stale-revision-entry',
+      { headers: { Cookie: ownerACookie } });
+    const ownerAfter = await ownerAfterResponse.json();
+    const stalePublic = await request('/listings/stale-revision-entry');
+    const staleRecord = (await reviewRecords()).find((item) => item.id === staleSubmissionId);
+    if (!catalogBeforeResponse.ok || !catalogBefore || !correction.ok ||
+        staleApproval.status !== 409 || !catalogAfterResponse.ok ||
+        catalogAfter?.name !== 'Admin correction' || catalogAfter?.status !== 'draft' ||
+        catalogAfter?.revision !== catalogBefore.revision + 1 || !ownerAfterResponse.ok ||
+        ownerAfter.proposal?.name !== 'Owner stale proposal' || stalePublic.status !== 404 ||
+        staleRecord?.status !== 'pending') {
+      throw new Error(`Stale approval was not rejected with the correction and proposal intact: approval ${staleApproval.status}.`);
+    }
   });
 
   await check('PUB-005', async () => {

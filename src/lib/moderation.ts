@@ -31,6 +31,7 @@ type StoredSubmission = {
   decided_by_email?: string | null;
   listing_status?: Listing["status"];
   seo_json: string | null;
+  base_revision: number | null;
 };
 
 export type ReviewSubmission = {
@@ -163,6 +164,7 @@ export function updateOwnerListing(userId: string, slug: string, changes: unknow
     const base = draft ? JSON.parse(draft.payload) as Listing : current;
     const listing = parseListing({ ...base, ...changes, slug, status: current.status });
     if (!listing) throw new ModerationError(400, "Invalid listing changes");
+    listing.revision = current.revision;
     listing.category = existingCategory(listing.category);
     if (current.status === "draft") {
       database.prepare(`UPDATE listings SET name = ?, summary = ?, description = ?, category = ?, url = ?,
@@ -195,9 +197,9 @@ export function submitOwnerListing(userId: string, slug: string): ReviewSubmissi
     const submittedAt = new Date().toISOString();
     const proposedSeo = editableSeoOverrides("listing", slug);
     database.prepare(`INSERT INTO submissions
-      (id, slug, owner_user_id, payload, status, submitted_at, seo_json)
-      VALUES (?, ?, ?, ?, 'pending', ?, ?)`).run(id, slug, userId, JSON.stringify(proposed),
-        submittedAt, JSON.stringify(proposedSeo));
+      (id, slug, owner_user_id, payload, status, submitted_at, seo_json, base_revision)
+      VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)`).run(id, slug, userId, JSON.stringify(proposed),
+        submittedAt, JSON.stringify(proposedSeo), current.revision);
     return {
       id, slug, ownerUserId: userId, ownerEmail: "", proposed,
       status: "pending" as const, reason: null, submittedAt, decidedAt: null,
@@ -232,6 +234,9 @@ export function decideSubmission(id: string, actorId: string, decision: "approve
     if (!current) throw new ModerationError(409, "Listing ownership changed");
     if (decision === "approve") {
       if (current.status === "suspended") throw new ModerationError(409, "Suspended listing cannot be approved");
+      if (row.base_revision !== current.revision) {
+        throw new ModerationError(409, "Listing changed after submission; review the current version");
+      }
       const proposed = JSON.parse(row.payload) as Listing;
       proposed.category = existingCategory(proposed.category, 409);
       database.prepare(`UPDATE listings SET name = ?, summary = ?, description = ?, category = ?,
