@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: admin-actor-not-rechecked
+Current: rss-cursor-blocks-writes
 
 ## public-starter-and-theme
 
@@ -477,3 +477,9 @@ Delivers backlog item listing-edit-reverses-suspension: Audit 2026-10-11 (H2, ve
 Requirements: ADM-001
 
 Delivers backlog item admin-actor-not-rechecked: Audit 2026-10-11 (M2, verified code path). Account role and suspension routes check canAdmin before awaiting the body and params; changeAccountRole and changeAccountSuspension (src/lib/accounts.ts) recheck the target and last-admin rule but not the actor. An admin who is demoted or suspended while holding a request open can still restore their own role or reinstate themselves. Re-read the actor inside the same immediate transaction and require a verified, unbanned administrator.
+
+## rss-cursor-blocks-writes
+
+Requirements: EDIT-003
+
+Delivers backlog item rss-cursor-blocks-writes: Audit 2026-10-11 (M1, reproduced). /feed.xml streams rows from publishedArticleFeedRows, a live better-sqlite3 iterator on the shared connection kept open across stream pulls. While an iterator is open every write on that connection throws 'This database connection is busy executing a query' (reads still work). A slow anonymous reader of a feed larger than socket and Next.js buffers blocks publication, sessions, audit and notification writes for the whole process. Read bounded rows with .all() before streaming, or use a separate read-only connection.
