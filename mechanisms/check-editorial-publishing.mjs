@@ -212,16 +212,16 @@ try {
       title: 'Article private-draft', summary: 'Summary for private-draft',
       body: 'Updated draft body, readable without JavaScript.', tags: [],
     });
-    const missingPublishVersion = await patchArticle('private-draft', { action: 'publish' });
+    const missingPublishVersion = await patchArticle('private-draft', { status: 'published' });
     const stalePublish = await patchArticle('private-draft', {
-      action: 'publish', version: draft.version,
+      status: 'published', version: draft.version,
     });
     if (missingPublishVersion.status !== 409 || stalePublish.status !== 409 ||
         (await request('/articles/private-draft')).status !== 404) {
       throw new Error('A missing or stale publication version was accepted.');
     }
     const { article: publishedArticle } = await updateArticle('private-draft', {
-      action: 'publish', version: savedDraft.article.version,
+      status: 'published', version: savedDraft.article.version,
     });
     const published = await request('/articles/private-draft');
     const index = await request('/articles');
@@ -238,9 +238,9 @@ try {
       title: 'Article private-draft', summary: 'Summary for private-draft',
       body: 'Newer staged body that must survive a stale withdrawal.', tags: [],
     });
-    const missingWithdrawalVersion = await patchArticle('private-draft', { action: 'unpublish' });
+    const missingWithdrawalVersion = await patchArticle('private-draft', { status: 'draft' });
     const staleWithdrawal = await patchArticle('private-draft', {
-      action: 'unpublish', version: publishedArticle.version,
+      status: 'draft', version: publishedArticle.version,
     });
     const afterStale = await request('/api/admin/articles/private-draft', {
       headers: { Cookie: editorCookie },
@@ -252,7 +252,7 @@ try {
       throw new Error('A missing or stale withdrawal version was accepted or destroyed staged work.');
     }
     const { article: withdrawnArticle } = await updateArticle('private-draft', {
-      action: 'unpublish', version: staged.article.version,
+      status: 'draft', version: staged.article.version,
     });
     if (withdrawnArticle.status !== 'draft' || withdrawnArticle.staged ||
         !contains(withdrawnArticle.body, 'must survive')) {
