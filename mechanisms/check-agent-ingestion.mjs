@@ -550,7 +550,29 @@ try {
       }
     }
     assert(screenshotPixels > 1000, 'Generated card omitted the attached screenshot.');
-    await tool('publish_import', { slug: staged.second });
+    const catalogPublished = await request(`/api/admin/listings/${staged.second}`,
+      json({ name: second.name, summary: second.summary, description: second.description,
+        category: second.category, url: second.url, status: 'published', expectedRevision: 1 },
+      adminCookie, 'PATCH'));
+    assert(catalogPublished.ok,
+      `Publishing an import through the catalog returned ${catalogPublished.status}.`);
+    const replacement = await sharp({ create: { width: 640, height: 400,
+      channels: 3, background: '#00eeee' } }).png().toBuffer();
+    const replaced = await mcp('tools/call', { name: 'attach_screenshot', arguments: {
+      slug: staged.second, mimeType: 'image/png', base64: replacement.toString('base64') } });
+    assert(replaced.isError, 'Catalog-published import accepted a replacement screenshot.');
+    const sealedRaw = await request(`/api/agent/imports/${staged.second}/screenshot`,
+      { headers: { Cookie: adminCookie } });
+    assert(sealedRaw.ok && Buffer.from(await sealedRaw.arrayBuffer()).equals(cleanBytes),
+      'Rejected post-publication screenshot changed the public card source.');
+    const publicationDb = new Database(databasePath, { readonly: true });
+    try {
+      const publication = publicationDb.prepare(`SELECT i.published_at, u.email
+        FROM agent_imports i LEFT JOIN "user" u ON u.id = i.published_by
+        WHERE i.slug = ?`).get(staged.second);
+      assert(publication?.published_at && publication.email === 'agent-admin@example.invalid',
+        'Catalog publication did not record the import actor and time.');
+    } finally { publicationDb.close(); }
     const publishedCard = await request(`/og/listings/${staged.second}.png`);
     assert(publishedCard.ok && publishedCard.headers.get('content-type')?.includes('image/png'),
       'Published card is unavailable as PNG.');
