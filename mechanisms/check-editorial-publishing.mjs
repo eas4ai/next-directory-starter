@@ -146,9 +146,13 @@ async function createArticle(slug, status = 'draft', tags = []) {
 }
 
 async function updateArticle(slug, changes) {
-  const response = await request(`/api/admin/articles/${slug}`, json(changes, editorCookie, 'PATCH'));
+  const response = await patchArticle(slug, changes);
   if (!response.ok) throw new Error(`Article update returned ${response.status}.`);
   return response.json();
+}
+
+async function patchArticle(slug, changes) {
+  return request(`/api/admin/articles/${slug}`, json(changes, editorCookie, 'PATCH'));
 }
 
 async function check(id, run) {
@@ -189,7 +193,7 @@ try {
     if (!editorPage.ok || !contains(await editorPage.text(), 'Articles') || memberPage.status === 200) {
       throw new Error('An authorized editor has no article workspace or a member can open it.');
     }
-    await createArticle('private-draft');
+    const { article: draft } = await createArticle('private-draft');
     const longArticle = await request('/api/admin/articles', json({
       ...article('long-draft'), body: 'x'.repeat(50_000),
     }, editorCookie));
@@ -203,14 +207,57 @@ try {
         ![401, 403].includes(memberCreate.status)) {
       throw new Error('A draft is public or an unauthorized account can create an article.');
     }
-    await updateArticle('private-draft', { status: 'published' });
+    const savedDraft = await updateArticle('private-draft', {
+      action: 'save', version: draft.version,
+      title: 'Article private-draft', summary: 'Summary for private-draft',
+      body: 'Updated draft body, readable without JavaScript.', tags: [],
+    });
+    const missingPublishVersion = await patchArticle('private-draft', { action: 'publish' });
+    const stalePublish = await patchArticle('private-draft', {
+      action: 'publish', version: draft.version,
+    });
+    if (missingPublishVersion.status !== 409 || stalePublish.status !== 409 ||
+        (await request('/articles/private-draft')).status !== 404) {
+      throw new Error('A missing or stale publication version was accepted.');
+    }
+    const { article: publishedArticle } = await updateArticle('private-draft', {
+      action: 'publish', version: savedDraft.article.version,
+    });
     const published = await request('/articles/private-draft');
     const index = await request('/articles');
-    if (!published.ok || !contains(await published.text(), 'Body for private-draft') ||
+    if (!published.ok || !contains(await published.text(), 'Updated draft body') ||
         !index.ok || !contains(await index.text(), 'Article private-draft')) {
       throw new Error('A published article is absent from its public page or article index.');
     }
-    await updateArticle('private-draft', { status: 'draft' });
+    const controls = await request('/admin/articles', { headers: { Cookie: editorCookie } });
+    if (!controls.ok || !contains(await controls.text(), 'Unpublish')) {
+      throw new Error('The protected article workspace has no Unpublish control.');
+    }
+    const staged = await updateArticle('private-draft', {
+      action: 'save', version: publishedArticle.version,
+      title: 'Article private-draft', summary: 'Summary for private-draft',
+      body: 'Newer staged body that must survive a stale withdrawal.', tags: [],
+    });
+    const missingWithdrawalVersion = await patchArticle('private-draft', { action: 'unpublish' });
+    const staleWithdrawal = await patchArticle('private-draft', {
+      action: 'unpublish', version: publishedArticle.version,
+    });
+    const afterStale = await request('/api/admin/articles/private-draft', {
+      headers: { Cookie: editorCookie },
+    });
+    const afterStaleArticle = afterStale.ok ? (await afterStale.json()).article : null;
+    if (missingWithdrawalVersion.status !== 409 || staleWithdrawal.status !== 409 ||
+        !afterStaleArticle?.staged || !contains(afterStaleArticle.body, 'must survive') ||
+        !contains(await (await request('/articles/private-draft')).text(), 'Updated draft body')) {
+      throw new Error('A missing or stale withdrawal version was accepted or destroyed staged work.');
+    }
+    const { article: withdrawnArticle } = await updateArticle('private-draft', {
+      action: 'unpublish', version: staged.article.version,
+    });
+    if (withdrawnArticle.status !== 'draft' || withdrawnArticle.staged ||
+        !contains(withdrawnArticle.body, 'must survive')) {
+      throw new Error('A current withdrawal did not preserve the staged revision as the draft.');
+    }
     if ((await request('/articles/private-draft')).status !== 404) {
       throw new Error('An unpublished article remains publicly reachable.');
     }
@@ -296,7 +343,7 @@ try {
     }
     parsedFeed(await initialFeed.text());
     await ensureEditor();
-    await createArticle('feed-published', 'published');
+    const { article: feedPublished } = await createArticle('feed-published', 'published');
     await createArticle('feed-second', 'published');
     await createArticle('feed-draft');
     const special = await request('/api/admin/articles', json({
@@ -315,7 +362,7 @@ try {
         byTitle.get('A & B < C valid')?.description !== 'Summary & <world> valid') {
       throw new Error('The feed omits a published article or includes a draft.');
     }
-    await updateArticle('feed-published', { status: 'draft' });
+    await updateArticle('feed-published', { action: 'unpublish', version: feedPublished.version });
     const after = new Set(parsedFeed(await (await request('/feed.xml')).text()).map((item) => item.title));
     if (after.has('Article feed-published') || !after.has('Article feed-second')) {
       throw new Error('The feed retains an unpublished article or loses a still-published one.');
