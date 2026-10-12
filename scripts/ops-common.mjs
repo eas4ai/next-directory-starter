@@ -38,6 +38,18 @@ export function pathEntryExists(path) {
   return lstatSync(path, { throwIfNoEntry: false }) !== undefined;
 }
 
+export function requireRegularFile(path, label) {
+  if (!lstatSync(path, { throwIfNoEntry: false })?.isFile()) {
+    throw new Error(`${label} must be a regular file`);
+  }
+}
+
+export function requireRealDirectory(path, label) {
+  if (!lstatSync(path, { throwIfNoEntry: false })?.isDirectory()) {
+    throw new Error(`${label} must be a real directory`);
+  }
+}
+
 export function canonicalPath(path) {
   let current = resolve(path);
   const missing = [];
@@ -51,6 +63,7 @@ export function canonicalPath(path) {
 }
 
 export function regularFiles(root) {
+  requireRealDirectory(root, 'Media root');
   const files = [];
   function visit(directory) {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -71,7 +84,7 @@ export async function hashFile(file) {
 }
 
 export function readKey(file) {
-  if (!lstatSync(file).isFile()) throw new Error('Billing key must be a regular file');
+  requireRegularFile(file, 'Billing key');
   const encoded = readFileSync(file, 'utf8').trim();
   if (!/^[A-Za-z0-9_-]{43}$/.test(encoded) ||
       Buffer.from(encoded, 'base64url').toString('base64url') !== encoded) {
