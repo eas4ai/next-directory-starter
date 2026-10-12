@@ -39,7 +39,11 @@ export type PaymentEffect = PaidEffect | { kind: "noop" } | {
 } | {
   kind: "dispute";
   paymentId: string;
+  disputeId: string;
   open: boolean;
+  terminal: boolean;
+  occurredAt: string;
+  closesPrior?: boolean;
 } | {
   kind: "subscription-state";
   purchaseId: string;
@@ -311,19 +315,79 @@ function refundPeriod(evidence: VerifiedEvidence,
     "Payment refunded", "A publishing payment was fully refunded.");
 }
 
+type DisputeEffect = Extract<PaymentEffect, { kind: "dispute" }>;
+type DisputeRow = {
+  payment_period_id: string; open: number; terminal: number; occurred_at: string;
+};
+
+function recordDispute(evidence: VerifiedEvidence, periodId: string,
+  effect: DisputeEffect): void {
+  const occurred = Date.parse(effect.occurredAt);
+  if (!effect.disputeId || effect.disputeId.length > 200 || !Number.isFinite(occurred)) {
+    throw new PaymentLifecycleError(400, "Invalid dispute evidence");
+  }
+  const occurredAt = new Date(occurred).toISOString();
+  const prior = database.prepare(`SELECT payment_period_id, open, terminal, occurred_at
+    FROM payment_disputes WHERE provider = ? AND mode = ? AND provider_dispute_id = ?`)
+    .get(evidence.provider, evidence.mode, effect.disputeId) as DisputeRow | undefined;
+  if (prior && prior.payment_period_id !== periodId) {
+    throw new PaymentLifecycleError(409, "Dispute ID was already used for another paid period");
+  }
+  const rank = Number(effect.terminal) * 2 + Number(effect.open);
+  const priorRank = prior ? prior.terminal * 2 + prior.open : -1;
+  if (prior && (prior.terminal === 1 && !effect.terminal ||
+      occurredAt < prior.occurred_at ||
+      (occurredAt === prior.occurred_at && rank <= priorRank))) return;
+  const recordedAt = new Date().toISOString();
+  database.prepare(`INSERT INTO payment_disputes
+    (provider, mode, provider_dispute_id, payment_period_id, open, terminal, occurred_at,
+      closes_prior, recorded_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(provider, mode, provider_dispute_id) DO UPDATE SET
+      open = excluded.open, terminal = excluded.terminal,
+      occurred_at = excluded.occurred_at, closes_prior = excluded.closes_prior,
+      recorded_at = excluded.recorded_at`).run(
+    evidence.provider, evidence.mode, effect.disputeId, periodId, Number(effect.open),
+    Number(effect.terminal), occurredAt, Number(effect.closesPrior === true), recordedAt,
+  );
+  if (effect.terminal && !effect.open) {
+    database.prepare(`UPDATE payment_disputes SET open = 0, terminal = 1,
+        occurred_at = ?, recorded_at = ?
+      WHERE provider = ? AND mode = ? AND payment_period_id = ?
+        AND provider_dispute_id LIKE 'legacy:%' AND occurred_at <= ?`).run(
+      occurredAt, recordedAt, evidence.provider, evidence.mode, periodId, occurredAt,
+    );
+  }
+}
+
+function disputeOpenedAt(periodId: string): string | null {
+  return (database.prepare(`SELECT MAX(d.occurred_at) AS occurred_at
+    FROM payment_disputes d
+    WHERE d.payment_period_id = ? AND d.open = 1
+      AND NOT EXISTS (
+        SELECT 1 FROM payment_disputes closed
+        WHERE closed.payment_period_id = d.payment_period_id
+          AND closed.closes_prior = 1
+          AND closed.occurred_at >= d.occurred_at
+      )`).get(periodId) as { occurred_at: string | null }).occurred_at;
+}
+
 function disputePeriod(evidence: VerifiedEvidence,
-  effect: Extract<PaymentEffect, { kind: "dispute" }>): void {
+  effect: DisputeEffect): void {
   const period = matchingPeriod(evidence, effect.paymentId);
+  recordDispute(evidence, period.id, effect);
+  const occurredAt = disputeOpenedAt(period.id);
+  const open = occurredAt !== null;
   const changed = database.prepare(`UPDATE payment_periods SET disputed_at = ? WHERE id = ?
-    AND ${effect.open ? "disputed_at IS NULL" : "disputed_at IS NOT NULL"}`).run(
-    effect.open ? new Date().toISOString() : null, period.id);
+    AND ${open ? "disputed_at IS NULL" : "disputed_at IS NOT NULL"}`).run(
+    occurredAt, period.id);
   if (!changed.changes) return;
   refreshEntitlement(period.purchase_id);
   recordPurchaseNotification(period.purchase_id,
-    effect.open ? "payment.dispute-open" : "payment.dispute-closed",
+    open ? "payment.dispute-open" : "payment.dispute-closed",
     `payment:${evidence.provider}:${evidence.mode}:${evidence.eventId}:dispute`,
-    effect.open ? "Payment dispute opened" : "Payment dispute closed",
-    effect.open ? "A publishing payment is under dispute." : "The publishing payment dispute closed.");
+    open ? "Payment dispute opened" : "Payment dispute closed",
+    open ? "A publishing payment is under dispute." : "The publishing payment dispute closed.");
 }
 
 function subscriptionState(evidence: VerifiedEvidence,

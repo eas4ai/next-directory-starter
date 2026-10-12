@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import Stripe from "stripe";
-import { Environment, Paddle } from "@paddle/paddle-node-sdk";
+import { Environment, Paddle, type TransactionAdjustment } from "@paddle/paddle-node-sdk";
 import { database } from "@/lib/database";
 import { migrateCatalog } from "@/lib/catalog-migrations";
 import { providerRecoveryConfiguration, type BillingMode, type BillingProvider } from "@/lib/billing-profiles";
@@ -64,7 +64,9 @@ async function stripeOutcomes(purchase: Purchase, stripe: Stripe,
   const disputes = await stripe.disputes.list({ payment_intent: paymentIntentId, limit: 5 });
   for (const dispute of disputes.data.sort((a, b) => a.created - b.created)) {
     found.push(evidence(purchase, "dispute", `${dispute.id}:${dispute.status}`, {
-      kind: "dispute", paymentId: paymentIntentId, open: dispute.status !== "won",
+      kind: "dispute", paymentId: paymentIntentId, disputeId: dispute.id,
+      open: dispute.status !== "won", terminal: dispute.status === "won" || dispute.status === "lost",
+      occurredAt: new Date(dispute.created * 1000).toISOString(),
     }));
   }
   return { chargeId: charge?.id, evidence: found };
@@ -231,6 +233,32 @@ async function inspectStripe(purchase: Purchase, limit: number): Promise<Verifie
   return results;
 }
 
+const paddleDisputeActions = new Set([
+  "chargeback", "chargeback_warning", "chargeback_reverse", "chargeback_warning_reverse",
+]);
+const paddleReversalActions = new Set(["chargeback_reverse", "chargeback_warning_reverse"]);
+
+function paddleAdjustmentEvidence(purchase: Purchase, paymentId: string,
+  adjustment: TransactionAdjustment): VerifiedEvidence | null {
+  if (adjustment.action === "refund" && adjustment.status === "approved") {
+    const amountMinor = Number(adjustment.totals?.total);
+    if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0) return null;
+    return evidence(purchase, "refund", `${adjustment.id}:${adjustment.status}`, {
+      kind: "refund", paymentId, refundId: adjustment.id,
+      full: adjustment.items.length === 1 && adjustment.items[0].type === "full",
+      amountMinor, currency: adjustment.currencyCode,
+    });
+  }
+  if (!paddleDisputeActions.has(adjustment.action)) return null;
+  const reversal = paddleReversalActions.has(adjustment.action);
+  const closed = reversal || adjustment.status === "reversed" || adjustment.status === "rejected";
+  return evidence(purchase, "dispute", `${adjustment.id}:${adjustment.status}`, {
+    kind: "dispute", paymentId, disputeId: adjustment.id,
+    open: !closed, terminal: closed || adjustment.status === "approved",
+    occurredAt: adjustment.updatedAt, closesPrior: reversal,
+  });
+}
+
 async function inspectPaddle(purchase: Purchase, limit: number): Promise<VerifiedEvidence[]> {
   const config = providerRecoveryConfiguration("paddle", purchase.plan_mode);
   if (!config) throw new Error("Paddle recovery credentials are unavailable");
@@ -265,23 +293,8 @@ async function inspectPaddle(purchase: Purchase, limit: number): Promise<Verifie
       periodEnd: transaction.billingPeriod?.endsAt,
     })];
     for (const adjustment of transaction.adjustments ?? []) {
-      if (adjustment.action === "refund" && adjustment.status === "approved") {
-        const amountMinor = Number(adjustment.totals?.total);
-        if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0) continue;
-        results.push(evidence(purchase, "refund", `${adjustment.id}:${adjustment.status}`, {
-          kind: "refund", paymentId: transaction.id, refundId: adjustment.id,
-          full: adjustment.items.length === 1 && adjustment.items[0].type === "full",
-          amountMinor, currency: adjustment.currencyCode,
-        }));
-      }
-      if (adjustment.action === "chargeback" ||
-          adjustment.action === "chargeback_warning" ||
-          adjustment.action === "chargeback_reverse") {
-        results.push(evidence(purchase, "dispute", `${adjustment.id}:${adjustment.status}`, {
-          kind: "dispute", paymentId: transaction.id,
-          open: adjustment.action !== "chargeback_reverse" && adjustment.status !== "reversed",
-        }));
-      }
+      const outcome = paddleAdjustmentEvidence(purchase, transaction.id, adjustment);
+      if (outcome) results.push(outcome);
     }
     return results;
   });

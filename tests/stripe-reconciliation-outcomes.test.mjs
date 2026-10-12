@@ -86,12 +86,13 @@ test('Stripe reconciliation restores outcome associations and duplicate evidence
       if (url.pathname === '/v1/charges') return reply({ object: 'list', has_more: false,
         data: [{ id: 'ch_recovered', object: 'charge', amount: 1200,
           amount_refunded: 0, currency: 'usd', refunded: false }] });
-      if (url.pathname === '/v1/disputes') return reply({ object: 'list', has_more: false, data: [] });
+      if (url.pathname === '/v1/disputes') return reply({ object: 'list', has_more: false,
+        data: [{ id: 'dp_recovered', object: 'dispute', status: 'won', created: 100 }] });
       throw new Error(`Unexpected Stripe request: ${url.pathname}`);
     };
 
     assert.deepEqual(await reconcilePurchase('purchase', 5), {
-      purchaseId: 'purchase', found: 2, processed: 2, unresolved: 0,
+      purchaseId: 'purchase', found: 3, processed: 3, unresolved: 0,
     });
     assert.deepEqual(database.prepare(`SELECT provider_payment_id,
       provider_payment_intent_id, provider_charge_id FROM payment_periods
@@ -111,20 +112,24 @@ test('Stripe reconciliation restores outcome associations and duplicate evidence
         method: 'POST', body, headers: { 'stripe-signature': signature },
       }));
     };
-    const event = (id, type, object) => ({ id, type, object: 'event', livemode: false,
-      created: Math.floor(Date.now() / 1000), data: { object } });
+    const event = (id, type, object, created) => ({ id, type, object: 'event', livemode: false,
+      created, data: { object } });
+    assert.equal((await send(event('evt_dispute_open_stale', 'charge.dispute.created', {
+      id: 'dp_recovered', object: 'dispute', charge: 'ch_recovered', status: 'needs_response',
+    }, 200))).status, 200);
+    assert.deepEqual([...activeFeaturedSlugs(['mine'])], ['mine']);
     assert.equal((await send(event('evt_dispute_open', 'charge.dispute.created', {
-      object: 'dispute', charge: 'ch_recovered', status: 'needs_response',
-    }))).status, 200);
+      id: 'dp_second', object: 'dispute', charge: 'ch_recovered', status: 'needs_response',
+    }, 300))).status, 200);
     assert.deepEqual([...activeFeaturedSlugs(['mine'])], []);
     assert.equal((await send(event('evt_dispute_won', 'charge.dispute.closed', {
-      object: 'dispute', charge: 'ch_recovered', status: 'won',
-    }))).status, 200);
+      id: 'dp_second', object: 'dispute', charge: 'ch_recovered', status: 'won',
+    }, 400))).status, 200);
     assert.deepEqual([...activeFeaturedSlugs(['mine'])], ['mine']);
     assert.equal((await send(event('evt_refund', 'charge.refunded', {
       object: 'charge', id: 'ch_recovered', payment_intent: 'pi_recovered',
       amount: 1200, amount_refunded: 1200, refunded: true, currency: 'usd',
-    }))).status, 200);
+    }, 500))).status, 200);
     assert.deepEqual([...activeFeaturedSlugs(['mine'])], []);
   } finally {
     globalThis.fetch = fetchBefore;

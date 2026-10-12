@@ -613,7 +613,7 @@ function applyHistoricalPaddleRefunds(): Set<string> {
   return affected;
 }
 
-function refreshHistoricalRefundEntitlements(purchaseIds: Set<string>): void {
+function refreshHistoricalPaymentEntitlements(purchaseIds: Set<string>): void {
   const refresh = database.prepare(`UPDATE entitlements SET
       starts_at = COALESCE((SELECT MIN(starts_at) FROM payment_periods
         WHERE purchase_id = ? AND refunded_at IS NULL AND disputed_at IS NULL), starts_at),
@@ -650,7 +650,209 @@ function migratePaddleRefundLedger(): void {
       const refund = historicalPaddleRefund(row);
       if (refund) importHistoricalPaddleRefund(row.mode, refund);
     }
-    refreshHistoricalRefundEntitlements(applyHistoricalPaddleRefunds());
+    refreshHistoricalPaymentEntitlements(applyHistoricalPaddleRefunds());
+  });
+}
+
+type HistoricalDisputeEvidence = {
+  provider: string; mode: string; event_id: string; event_type: string;
+  payload: string; received_at: string; processed_at: string | null;
+};
+
+type HistoricalDispute = {
+  provider: string; disputeId: string; paymentId: string; open: boolean;
+  terminal: boolean; occurredAt: string; closesPrior: boolean;
+};
+
+function validDate(value: unknown, fallback: string): string {
+  const parsed = typeof value === "number" && Number.isFinite(value)
+    ? value * 1000 : typeof value === "string" ? Date.parse(value) : Number.NaN;
+  return new Date(Number.isFinite(parsed) ? parsed : Date.parse(fallback)).toISOString();
+}
+
+function stripeHistoricalDispute(raw: Record<string, unknown>, effect: Record<string, unknown>,
+  fallback: string): HistoricalDispute | null {
+  const data = objectValue(objectValue(raw.data)?.object);
+  const paymentId = nonEmptyString(data?.payment_intent) ?? nonEmptyString(data?.charge) ??
+    nonEmptyString(effect.paymentId);
+  const disputeId = nonEmptyString(data?.id) ?? nonEmptyString(effect.disputeId);
+  const status = nonEmptyString(data?.status);
+  const eventType = nonEmptyString(raw.type);
+  if (!paymentId || !disputeId) return null;
+  const open = status ? status !== "won" : effect.open === true;
+  return {
+    provider: "stripe", disputeId, paymentId, open,
+    terminal: eventType === "charge.dispute.closed" || status === "won" || status === "lost" ||
+      effect.terminal === true,
+    occurredAt: validDate(raw.created, nonEmptyString(effect.occurredAt) ?? fallback),
+    closesPrior: false,
+  };
+}
+
+function paddleHistoricalDispute(raw: Record<string, unknown>, effect: Record<string, unknown>,
+  fallback: string): HistoricalDispute | null {
+  const data = objectValue(raw.data);
+  const action = nonEmptyString(data?.action);
+  const status = nonEmptyString(data?.status);
+  const paymentId = nonEmptyString(data?.transaction_id) ?? nonEmptyString(effect.paymentId);
+  const disputeId = nonEmptyString(data?.id) ?? nonEmptyString(effect.disputeId);
+  if (!paymentId || !disputeId) return null;
+  const reversal = action === "chargeback_reverse" || action === "chargeback_warning_reverse";
+  const closed = reversal || status === "reversed" || status === "rejected";
+  return {
+    provider: "paddle", disputeId, paymentId,
+    open: action ? !closed : effect.open === true,
+    terminal: action ? closed || status === "approved" : effect.terminal === true,
+    occurredAt: validDate(raw.occurred_at, nonEmptyString(effect.occurredAt) ?? fallback),
+    closesPrior: reversal || effect.closesPrior === true,
+  };
+}
+
+function reconciliationHistoricalDispute(row: HistoricalDisputeEvidence,
+  raw: Record<string, unknown>, effect: Record<string, unknown>,
+  fallback: string): HistoricalDispute | null {
+  const resource = nonEmptyString(raw.resource);
+  const separator = resource?.lastIndexOf(":") ?? -1;
+  const disputeId = nonEmptyString(effect.disputeId) ??
+    (resource && separator > 0 ? resource.slice(0, separator) : null);
+  const paymentId = nonEmptyString(effect.paymentId);
+  if (!disputeId || !paymentId) return null;
+  const status = resource && separator > 0 ? resource.slice(separator + 1) : null;
+  const open = effect.open === true;
+  return {
+    provider: row.provider, disputeId, paymentId, open,
+    terminal: effect.terminal === true || !open || status === "won" || status === "lost",
+    occurredAt: validDate(effect.occurredAt, fallback),
+    closesPrior: effect.closesPrior === true,
+  };
+}
+
+function historicalDispute(row: HistoricalDisputeEvidence): HistoricalDispute | null {
+  let saved: Record<string, unknown> | null;
+  try {
+    saved = objectValue(JSON.parse(row.payload));
+  } catch {
+    return null;
+  }
+  const effect = objectValue(saved?.effect);
+  const raw = objectValue(saved?.raw);
+  if (effect?.kind !== "dispute" || !raw) return null;
+  const fallback = row.processed_at ?? row.received_at;
+  if (row.provider === "stripe" && objectValue(objectValue(raw.data)?.object)) {
+    return stripeHistoricalDispute(raw, effect, fallback);
+  }
+  if (row.provider === "paddle" && objectValue(raw.data)) {
+    return paddleHistoricalDispute(raw, effect, fallback);
+  }
+  return reconciliationHistoricalDispute(row, raw, effect, fallback);
+}
+
+function importHistoricalDispute(row: HistoricalDisputeEvidence,
+  dispute: HistoricalDispute): string | null {
+  const periods = database.prepare(`SELECT pp.id, pp.purchase_id
+    FROM payment_periods pp JOIN purchases p ON p.id = pp.purchase_id
+    WHERE pp.provider = ? AND p.provider = ? AND p.plan_mode = ?
+      AND (pp.provider_payment_id = ? OR pp.provider_payment_intent_id = ?
+        OR pp.provider_charge_id = ?)`)
+    .all(dispute.provider, dispute.provider, row.mode,
+      dispute.paymentId, dispute.paymentId, dispute.paymentId) as
+      { id: string; purchase_id: string }[];
+  if (periods.length !== 1) return null;
+  const period = periods[0];
+  const prior = database.prepare(`SELECT payment_period_id, open, terminal, occurred_at
+    FROM payment_disputes WHERE provider = ? AND mode = ? AND provider_dispute_id = ?`)
+    .get(dispute.provider, row.mode, dispute.disputeId) as { payment_period_id: string; open: number;
+      terminal: number; occurred_at: string } | undefined;
+  if (prior?.payment_period_id !== undefined && prior.payment_period_id !== period.id) {
+    throw new Error("Historical dispute ID belongs to multiple paid periods");
+  }
+  const rank = Number(dispute.terminal) * 2 + Number(dispute.open);
+  const priorRank = prior ? prior.terminal * 2 + prior.open : -1;
+  const newer = !prior || dispute.occurredAt > prior.occurred_at ||
+    dispute.occurredAt === prior.occurred_at && rank > priorRank;
+  const terminalSafe = !prior || prior.terminal !== 1 || dispute.terminal;
+  if (newer && terminalSafe) {
+    database.prepare(`INSERT INTO payment_disputes
+      (provider, mode, provider_dispute_id, payment_period_id, open, terminal, occurred_at,
+        closes_prior, recorded_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(provider, mode, provider_dispute_id) DO UPDATE SET
+        open = excluded.open, terminal = excluded.terminal,
+        occurred_at = excluded.occurred_at, closes_prior = excluded.closes_prior,
+        recorded_at = excluded.recorded_at`).run(
+      dispute.provider, row.mode, dispute.disputeId, period.id, Number(dispute.open),
+      Number(dispute.terminal), dispute.occurredAt, Number(dispute.closesPrior),
+      row.processed_at ?? row.received_at,
+    );
+  }
+  return period.purchase_id;
+}
+
+function periodHasOpenDispute(periodId: string): boolean {
+  return database.prepare(`SELECT d.provider_dispute_id
+    FROM payment_disputes d
+    LEFT JOIN payment_disputes closed
+      ON closed.payment_period_id = d.payment_period_id
+      AND closed.closes_prior = 1 AND closed.occurred_at >= d.occurred_at
+    WHERE d.payment_period_id = ? AND d.open = 1
+      AND closed.provider_dispute_id IS NULL
+    LIMIT 1`).get(periodId) !== undefined;
+}
+
+function migrateDisputeLedger(): void {
+  applyCatalogMigration(25, () => {
+    database.exec(`CREATE TABLE payment_disputes (
+        provider TEXT NOT NULL,
+        mode TEXT NOT NULL CHECK (mode IN ('test', 'live')),
+        provider_dispute_id TEXT NOT NULL,
+        payment_period_id TEXT NOT NULL REFERENCES payment_periods(id) ON DELETE CASCADE,
+        open INTEGER NOT NULL CHECK (open IN (0, 1)),
+        terminal INTEGER NOT NULL CHECK (terminal IN (0, 1)),
+        occurred_at TEXT NOT NULL,
+        closes_prior INTEGER NOT NULL CHECK (closes_prior IN (0, 1)),
+        recorded_at TEXT NOT NULL,
+        PRIMARY KEY (provider, mode, provider_dispute_id)
+      );
+      CREATE INDEX payment_disputes_period
+        ON payment_disputes(payment_period_id, open, occurred_at);`);
+    const rows = database.prepare(`SELECT provider, mode, event_id, event_type, payload,
+        received_at, processed_at
+      FROM payment_evidence
+      WHERE provider IN ('stripe', 'paddle') AND state = 'processed'
+      ORDER BY received_at, event_id`).all() as HistoricalDisputeEvidence[];
+    const affected = new Set<string>();
+    for (const row of rows) {
+      const dispute = historicalDispute(row);
+      if (!dispute) continue;
+      const purchaseId = importHistoricalDispute(row, dispute);
+      if (purchaseId) affected.add(purchaseId);
+    }
+    const periods = database.prepare(`SELECT id, purchase_id, disputed_at
+      FROM payment_periods`).all() as
+      { id: string; purchase_id: string; disputed_at: string | null }[];
+    for (const period of periods) {
+      const hasHistory = database.prepare(`SELECT 1 FROM payment_disputes
+        WHERE payment_period_id = ? LIMIT 1`).get(period.id);
+      if (period.disputed_at && !hasHistory) {
+        database.prepare(`INSERT INTO payment_disputes
+          (provider, mode, provider_dispute_id, payment_period_id, open, terminal,
+            occurred_at, closes_prior, recorded_at)
+          SELECT pp.provider, p.plan_mode, 'legacy:' || pp.id, pp.id, 1, 0, ?, 0, ?
+          FROM payment_periods pp JOIN purchases p ON p.id = pp.purchase_id
+          WHERE pp.id = ?`).run(
+          period.disputed_at, new Date().toISOString(), period.id,
+        );
+      }
+      const open = periodHasOpenDispute(period.id);
+      if (open === Boolean(period.disputed_at)) continue;
+      const occurredAt = open ? (database.prepare(`SELECT MAX(occurred_at) AS occurred_at
+        FROM payment_disputes WHERE payment_period_id = ? AND open = 1`)
+        .get(period.id) as { occurred_at: string }).occurred_at : null;
+      database.prepare("UPDATE payment_periods SET disputed_at = ? WHERE id = ?")
+        .run(occurredAt, period.id);
+      affected.add(period.purchase_id);
+    }
+    refreshHistoricalPaymentEntitlements(affected);
   });
 }
 
@@ -686,6 +888,7 @@ export function migrateCatalog(explicit = false): void {
   });
   migrateAgentImportPublications();
   migratePaddleRefundLedger();
+  migrateDisputeLedger();
 }
 
 export function seedCatalog(): void {
