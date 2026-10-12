@@ -25,7 +25,8 @@ test('published edits stay private until explicit publication and stale saves fa
     ({ database } = await import('../src/lib/database.ts'));
     const { migrateCatalog } = await import('../src/lib/catalog-migrations.ts');
     const { createArticle, editableArticleBySlug, publishedArticleBySlug,
-      saveArticleRevision, publishArticleRevision } = await import('../src/lib/articles.ts');
+      saveArticleRevision, publishArticleRevision,
+      unpublishArticleRevision } = await import('../src/lib/articles.ts');
     migrateCatalog();
     const article = createArticle({ slug: 'revised', title: 'Old title', summary: 'Old summary',
       body: 'Old **body**', status: 'published', tags: [] }, 'editor');
@@ -35,9 +36,20 @@ test('published edits stay private until explicit publication and stale saves fa
     assert.equal(publishedArticleBySlug('revised')?.body, 'Old **body**');
     assert.throws(() => saveArticleRevision('revised', { title: 'Stale', summary: 'Stale',
       body: 'Stale', tags: [] }, article.version, 'editor'), /stale|changed|conflict/i);
-    publishArticleRevision('revised', saved.version, 'editor');
+    const published = publishArticleRevision('revised', saved.version, 'editor');
     assert.equal(publishedArticleBySlug('revised')?.body, 'New **body**');
     assert.equal(publishedArticleBySlug('revised')?.title, 'New title');
+    const staged = saveArticleRevision('revised', { title: 'Next title', summary: 'Next summary',
+      body: 'Next **body**', tags: [] }, published.version, 'editor-b');
+    assert.throws(() => unpublishArticleRevision('revised', published.version, 'editor'),
+      /refresh before unpublishing/i);
+    assert.equal(editableArticleBySlug('revised')?.body, 'Next **body**');
+    assert.equal(publishedArticleBySlug('revised')?.body, 'New **body**');
+    const withdrawn = unpublishArticleRevision('revised', staged.version, 'editor-b');
+    assert.equal(withdrawn.status, 'draft');
+    assert.equal(withdrawn.staged, false);
+    assert.equal(withdrawn.body, 'Next **body**');
+    assert.equal(publishedArticleBySlug('revised'), undefined);
   } finally {
     database?.close();
     if (previous === undefined) delete process.env.DATABASE_URL;

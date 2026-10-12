@@ -19,7 +19,7 @@ test('draft images stay private and public images follow approved content state'
     const { createOwnerListing, submitOwnerListing, decideSubmission,
       suspendPublishedListing } = await import('../src/lib/moderation.ts');
     const { articleBySlug, createArticle, publishArticleRevision,
-      updateArticle } = await import('../src/lib/articles.ts');
+      unpublishArticleRevision } = await import('../src/lib/articles.ts');
     migrateCatalog();
     database.exec('CREATE TABLE IF NOT EXISTS "user" (id TEXT PRIMARY KEY, banned INTEGER NOT NULL DEFAULT 0)');
     database.prepare("INSERT INTO \"user\" (id, banned) VALUES ('owner', 0)").run();
@@ -68,7 +68,7 @@ test('draft images stay private and public images follow approved content state'
     publishArticleRevision('story', articleBySlug('story').version, 'editor');
     assert.equal(publicMediaAsset(draft.id), undefined);
     assert.equal(publicMediaAsset(revised.id)?.id, revised.id);
-    updateArticle('story', { status: 'draft' }, 'editor');
+    unpublishArticleRevision('story', articleBySlug('story').version, 'editor');
     assert.equal(publicMediaAsset(revised.id), undefined);
   } finally {
     database?.close();

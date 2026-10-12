@@ -1,6 +1,6 @@
 import { canEditArticles, sameOrigin, sessionUser } from "@/lib/admin";
-import { articleBySlug, articleErrorResponse, editableArticleBySlug,
-  publishArticleRevision, renameArticle, saveArticleRevision, updateArticle } from "@/lib/articles";
+import { articleErrorResponse, editableArticleBySlug, publishArticleRevision,
+  renameArticle, saveArticleRevision, unpublishArticleRevision } from "@/lib/articles";
 import { requestJson, requestJsonErrorResponse } from "@/lib/request-json";
 
 const MAX_ARTICLE_JSON_LENGTH = 512_000;
@@ -32,6 +32,9 @@ export async function PATCH(request: Request, { params }: Params) {
     if (changes.action === "publish") {
       return Response.json({ article: publishArticleRevision(slug, changes.version as number, user.id) });
     }
+    if (changes.action === "unpublish") {
+      return Response.json({ article: unpublishArticleRevision(slug, changes.version as number, user.id) });
+    }
     if (changes.action === "rename") {
       return Response.json({ article: renameArticle(slug, changes.newSlug, changes.version as number, user.id) });
     }
@@ -39,14 +42,12 @@ export async function PATCH(request: Request, { params }: Params) {
       ["title", "summary", "body", "tags"].includes(key))) {
       return Response.json({ article: saveArticleRevision(slug, changes, changes.version as number, user.id) });
     }
-    if (Object.keys(changes).length === 1 &&
-        (changes.status === "draft" || changes.status === "published")) {
-      const current = articleBySlug(slug);
-      if (!current) return Response.json({ error: "Article not found" }, { status: 404 });
-      if (changes.status === "published" && current.status === "published") {
-        return Response.json({ error: "No saved revision to publish" }, { status: 409 });
-      }
-      return Response.json({ article: updateArticle(slug, changes, user.id) });
+    const keys = Object.keys(changes);
+    if ((changes.status === "draft" || changes.status === "published") &&
+        keys.every((key) => key === "status" || key === "version")) {
+      const transition = changes.status === "published"
+        ? publishArticleRevision : unpublishArticleRevision;
+      return Response.json({ article: transition(slug, changes.version as number, user.id) });
     }
     return Response.json({ error: "Invalid article action" }, { status: 400 });
   } catch (error) {

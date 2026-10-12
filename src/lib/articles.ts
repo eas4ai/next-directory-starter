@@ -313,31 +313,25 @@ export function publishArticleRevision(slug: string, expectedVersion: number,
   return article;
 }
 
-export function updateArticle(slug: string, changes: unknown, actorId: string): Article {
-  if (!changes || typeof changes !== "object" || Array.isArray(changes)) {
-    throw new ArticleError(400, "Invalid article changes");
-  }
+export function unpublishArticleRevision(slug: string, expectedVersion: number,
+  actorId: string): Article {
   const article = database.transaction(() => {
-    const current = articleBySlug(slug);
+    const current = editableArticleBySlug(slug);
     if (!current) throw new ArticleError(404, "Article not found");
-    const article = validate({ ...current, ...changes, slug });
-    const category = canonicalCategory(article.category);
-    const now = new Date().toISOString();
-    const publishedAt = article.status === "published"
-      ? current.publishedAt ?? now : null;
-    database.prepare(`UPDATE articles SET title = ?, summary = ?, body = ?, status = ?, category = ?,
-      updated_at = ?, published_at = ?, revision = revision + 1 WHERE slug = ?`).run(
-      article.title, article.summary, article.body, article.status, category, now, publishedAt, slug,
-    );
-    if (article.status === "draft") database.prepare("DELETE FROM article_revisions WHERE slug = ?").run(slug);
-    if (article.status === "published" && current.status !== "published") {
-      promoteDraftMedia("article", slug);
-      publishDraftSeo("article", slug);
+    if (!Number.isSafeInteger(expectedVersion) || current.version !== expectedVersion) {
+      throw new ArticleError(409, "Article changed since it was opened; refresh before unpublishing");
     }
-    setTags(slug, article.tags);
-    recordAudit(article.status === "published" ? "article.publish" :
-      current.status === "published" ? "article.unpublish" : "article.update", actorId, slug);
-    return articleBySlug(slug)!;
+    if (current.status !== "published") {
+      throw new ArticleError(409, "Article is already unpublished");
+    }
+    const now = new Date().toISOString();
+    database.prepare(`UPDATE articles SET title = ?, summary = ?, body = ?, status = 'draft',
+      category = ?, updated_at = ?, published_at = NULL, revision = revision + 1 WHERE slug = ?`)
+      .run(current.title, current.summary, current.body, current.category, now, slug);
+    setTags(slug, current.tags);
+    database.prepare("DELETE FROM article_revisions WHERE slug = ?").run(slug);
+    recordAudit("article.unpublish", actorId, slug);
+    return editableArticleBySlug(slug)!;
   }).immediate();
   drainMediaCleanupQueue();
   return article;
