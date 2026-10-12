@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync,
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync,
   symlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -457,6 +457,17 @@ try {
       throw new Error('Backup exposed a billing secret or lost its encrypted profile');
     }
     command(['run', 'ops:restore', '--', '--backup', backup, '--target', restore]);
+    if (!lstatSync(join(restore, 'database.db')).isFile() ||
+        !lstatSync(join(restore, 'billing.key')).isFile() ||
+        !lstatSync(join(restore, 'media')).isDirectory()) {
+      throw new Error('Restore installed a linked or unsupported storage root');
+    }
+    const linkedRoots = spawnSync(process.execPath,
+      ['tests/restore-symlink-isolation.test.mjs'],
+      { env, encoding: 'utf8', timeout: 30_000 });
+    if (linkedRoots.status !== 0) {
+      throw new Error(`Restore accepted a linked backup root: ${linkedRoots.stderr || linkedRoots.stdout || linkedRoots.signal || linkedRoots.status}`);
+    }
     const restored = new Database(join(restore, 'database.db'), { readonly: true });
     const listing = restored.prepare('SELECT name FROM listings WHERE slug = ?').get('example-tool');
     restored.close();
