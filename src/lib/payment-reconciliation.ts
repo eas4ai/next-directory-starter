@@ -142,11 +142,15 @@ async function inspectStripe(purchase: Purchase, limit: number): Promise<Verifie
     throw new Error("Stripe checkout price does not match the reserved purchase");
   }
   const results: VerifiedEvidence[] = [];
-  const outcomes = async (paymentIntentId: string) => {
+  const outcomes = async (paymentIntentId: string): Promise<{
+    chargeId?: string;
+    evidence: VerifiedEvidence[];
+  }> => {
+    const found: VerifiedEvidence[] = [];
     const charges = await stripe.charges.list({ payment_intent: paymentIntentId, limit: 1 });
     const charge = charges.data[0];
     if (charge?.amount_refunded > 0) {
-      results.push(evidence(purchase, "refund", `${charge.id}:${charge.amount_refunded}`, {
+      found.push(evidence(purchase, "refund", `${charge.id}:${charge.amount_refunded}`, {
         kind: "refund", paymentId: paymentIntentId,
         full: charge.refunded && charge.amount_refunded >= charge.amount,
         amountMinor: charge.amount_refunded, currency: charge.currency,
@@ -154,21 +158,24 @@ async function inspectStripe(purchase: Purchase, limit: number): Promise<Verifie
     }
     const disputes = await stripe.disputes.list({ payment_intent: paymentIntentId, limit: 5 });
     for (const dispute of disputes.data.sort((a, b) => a.created - b.created)) {
-      results.push(evidence(purchase, "dispute", `${dispute.id}:${dispute.status}`, {
+      found.push(evidence(purchase, "dispute", `${dispute.id}:${dispute.status}`, {
         kind: "dispute", paymentId: paymentIntentId, open: dispute.status !== "won",
       }));
     }
+    return { chargeId: charge?.id, evidence: found };
   };
   if (purchase.billing_mode === "one-time" && session.payment_status === "paid" &&
       typeof session.payment_intent === "string" &&
       session.amount_total !== null && session.currency) {
+    const linked = await outcomes(session.payment_intent);
     results.push(evidence(purchase, "session", session.id, {
       kind: "paid", purchaseId: purchase.id, resourceId: session.id,
-      paymentId: session.payment_intent,
+      paymentId: session.payment_intent, paymentIntentId: session.payment_intent,
+      chargeId: linked.chargeId,
       priceId: purchase.provider_price_id ?? undefined,
       amountMinor: session.amount_total, currency: session.currency,
     }));
-    await outcomes(session.payment_intent);
+    results.push(...linked.evidence);
   }
   if ((purchase.billing_mode === "monthly" || purchase.billing_mode === "annual") &&
       typeof session.subscription === "string") {
@@ -191,21 +198,28 @@ async function inspectStripe(purchase: Purchase, limit: number): Promise<Verifie
       const unit = line.pricing?.type === "price_details" ? line.amount : legacy?.unit_amount;
       if (price !== purchase.provider_price_id || unit !== purchase.amount_minor ||
           !line.period?.start || !line.period?.end) continue;
-      results.push(evidence(purchase, "invoice", invoice.id, {
+      const invoicePayments = (invoice as unknown as {
+        payments?: { data?: { payment?: { payment_intent?: string; charge?: string } }[] };
+        payment_intent?: string;
+        charge?: string;
+      });
+      const invoicePayment = invoicePayments.payments?.data?.[0]?.payment;
+      const paymentIntentId = invoicePayments.payment_intent ??
+        invoicePayment?.payment_intent;
+      const linked = paymentIntentId ? await outcomes(paymentIntentId) : null;
+      const chargeId = linked?.chargeId ?? invoicePayments.charge ?? invoicePayment?.charge;
+      const associationSource = paymentIntentId && chargeId ? "invoice-payment-intent-charge" :
+        paymentIntentId ? "invoice-payment-intent" : chargeId ? "invoice-charge" : "invoice";
+      results.push(evidence(purchase, associationSource, invoice.id, {
         kind: "paid", purchaseId: purchase.id, resourceId: invoice.id,
         paymentId: invoice.id, subscriptionId: session.subscription,
+        paymentIntentId, chargeId,
         priceId: price ?? undefined, amountMinor: purchase.amount_minor,
         currency: invoice.currency,
         periodStart: new Date(line.period.start * 1000).toISOString(),
         periodEnd: new Date(line.period.end * 1000).toISOString(),
       }));
-      const invoicePayments = (invoice as unknown as {
-        payments?: { data?: { payment?: { payment_intent?: string } }[] };
-        payment_intent?: string;
-      });
-      const paymentIntentId = invoicePayments.payment_intent ??
-        invoicePayments.payments?.data?.[0]?.payment?.payment_intent;
-      if (paymentIntentId) await outcomes(paymentIntentId);
+      if (linked) results.push(...linked.evidence);
     }
   }
   return results;
@@ -331,9 +345,10 @@ export async function reconcilePurchase(purchaseId: string, limit: number,
   for (const item of found) {
     if (item.effect.kind === "refund" || item.effect.kind === "dispute") {
       const linked = database.prepare(`SELECT purchase_id FROM payment_periods
-        WHERE provider = ? AND (provider_payment_id = ? OR provider_charge_id = ?)
+        WHERE provider = ? AND (provider_payment_id = ? OR provider_payment_intent_id = ?
+          OR provider_charge_id = ?)
         LIMIT 1`).get(purchase.provider, item.effect.paymentId,
-        item.effect.paymentId) as { purchase_id: string } | undefined;
+        item.effect.paymentId, item.effect.paymentId) as { purchase_id: string } | undefined;
       if (linked && linked.purchase_id !== purchase.id) {
         throw new Error("Provider outcome belongs to a different purchase");
       }

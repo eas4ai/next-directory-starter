@@ -16,6 +16,7 @@ export type PaidEffect = {
   resourceId: string;
   paymentId: string;
   subscriptionId?: string;
+  paymentIntentId?: string;
   chargeId?: string;
   priceId?: string;
   amountMinor: number;
@@ -124,6 +125,12 @@ function paidPeriod(evidence: VerifiedEvidence, effect: PaidEffect): void {
       throw new PaymentLifecycleError(409, "One-time purchase already has a paid period");
     }
   }
+  const paymentIntentId = effect.paymentIntentId ?? null;
+  const chargeId = effect.chargeId ?? null;
+  if ((paymentIntentId !== null && (!paymentIntentId || paymentIntentId.length > 200)) ||
+      (chargeId !== null && (!chargeId || chargeId.length > 200))) {
+    throw new PaymentLifecycleError(400, "Invalid payment association");
+  }
   const now = new Date();
   let startsAt = now.toISOString();
   let endsAt: string;
@@ -143,24 +150,32 @@ function paidPeriod(evidence: VerifiedEvidence, effect: PaidEffect): void {
     endsAt = new Date(end).toISOString();
   }
   const inserted = database.prepare(`INSERT INTO payment_periods
-    (id, purchase_id, provider, provider_payment_id, amount_minor, currency, starts_at, ends_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    (id, purchase_id, provider, provider_payment_id, provider_payment_intent_id,
+      provider_charge_id, amount_minor, currency, starts_at, ends_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(provider, provider_payment_id) DO NOTHING`).run(
-    randomUUID(), purchase.id, evidence.provider, effect.paymentId,
+    randomUUID(), purchase.id, evidence.provider, effect.paymentId, paymentIntentId, chargeId,
     effect.amountMinor, purchase.currency, startsAt, endsAt,
   );
   if (!inserted.changes) {
-    const prior = database.prepare(`SELECT purchase_id FROM payment_periods
+    const prior = database.prepare(`SELECT id, purchase_id, provider_payment_intent_id,
+        provider_charge_id FROM payment_periods
       WHERE provider = ? AND provider_payment_id = ?`)
-      .get(evidence.provider, effect.paymentId) as { purchase_id: string } | undefined;
+      .get(evidence.provider, effect.paymentId) as { id: string; purchase_id: string;
+        provider_payment_intent_id: string | null; provider_charge_id: string | null } | undefined;
     if (prior?.purchase_id !== purchase.id) {
       throw new PaymentLifecycleError(409, "Payment ID was already used for another purchase");
     }
+    if ((paymentIntentId && prior.provider_payment_intent_id &&
+        prior.provider_payment_intent_id !== paymentIntentId) ||
+        (chargeId && prior.provider_charge_id && prior.provider_charge_id !== chargeId)) {
+      throw new PaymentLifecycleError(409, "Payment association conflicts with prior evidence");
+    }
+    database.prepare(`UPDATE payment_periods SET
+      provider_payment_intent_id = COALESCE(provider_payment_intent_id, ?),
+      provider_charge_id = COALESCE(provider_charge_id, ?)
+      WHERE id = ?`).run(paymentIntentId, chargeId, prior.id);
     return;
-  }
-  if (effect.chargeId && effect.chargeId.length <= 200) {
-    database.prepare(`UPDATE payment_periods SET provider_charge_id = ? WHERE provider = ?
-      AND provider_payment_id = ?`).run(effect.chargeId, evidence.provider, effect.paymentId);
   }
   database.prepare("UPDATE purchases SET status = 'paid', provider_subscription_id = COALESCE(provider_subscription_id, ?) WHERE id = ?")
     .run(effect.subscriptionId ?? null, purchase.id);
@@ -212,8 +227,9 @@ function matchingPeriod(evidence: VerifiedEvidence, paymentId: string): {
   const rows = database.prepare(`SELECT pp.id, pp.purchase_id, pp.amount_minor, pp.currency,
       p.billing_mode FROM payment_periods pp JOIN purchases p ON p.id = pp.purchase_id
     WHERE pp.provider = ? AND p.provider = ? AND p.plan_mode = ?
-      AND (pp.provider_payment_id = ? OR pp.provider_charge_id = ?)`)
-    .all(evidence.provider, evidence.provider, evidence.mode, paymentId, paymentId) as
+      AND (pp.provider_payment_id = ? OR pp.provider_payment_intent_id = ?
+        OR pp.provider_charge_id = ?)`)
+    .all(evidence.provider, evidence.provider, evidence.mode, paymentId, paymentId, paymentId) as
       { id: string; purchase_id: string; amount_minor: number; currency: string; billing_mode: string }[];
   if (rows.length !== 1) throw new PaymentLifecycleError(409, "Payment outcome has no unique paid period");
   return rows[0];

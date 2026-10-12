@@ -140,8 +140,10 @@ test('signed Stripe hosted checkout, recurring invoice, and refund match the pur
         period: { start: periodStart, end: periodEnd } }] },
     });
     assert.equal((await send(invoice)).status, 200);
-    assert.equal(database.prepare("SELECT provider_charge_id FROM payment_periods WHERE purchase_id = 'month-purchase'")
-      .get().provider_charge_id, 'pi_month');
+    assert.deepEqual(database.prepare(`SELECT provider_payment_intent_id, provider_charge_id
+      FROM payment_periods WHERE purchase_id = 'month-purchase'`).get(), {
+      provider_payment_intent_id: 'pi_month', provider_charge_id: null,
+    });
     assert.equal(database.prepare("SELECT COUNT(*) AS n FROM entitlements WHERE purchase_id = 'month-purchase'")
       .get().n, 1);
     assert.equal((await send(event('evt_dispute_open', 'charge.dispute.created', {
