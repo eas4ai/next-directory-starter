@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: restore-symlink-isolation
+Current: recovered-invoice-missing-charge-id
 
 ## public-starter-and-theme
 
@@ -495,3 +495,9 @@ Delivers backlog item media-orphaned-files: Audit 2026-10-11 (M3, verified). upl
 Requirements: OPS-001
 
 Delivers backlog item restore-symlink-isolation: Audit 2026-10-11 (M4, reproduced). scripts/restore.mjs hashes and inspects database.db through symlinks, and cpSync keeps symlinks by default; regularFiles checks links inside media/ but not the media root. A tampered or hand-built backup with database.db pointing at the live database passes every check, and the restored copy then writes to live storage. lstat the database, key and media root and require a regular file or real directory; reject any symlink in the staged copy before renaming it into place.
+
+## recovered-invoice-missing-charge-id
+
+Requirements: COM-008
+
+Delivers backlog item recovered-invoice-missing-charge-id: Audit 2026-10-11 (M5, verified in reconciliation code). Recovered Stripe invoice evidence (src/lib/payment-reconciliation.ts:115) stores paymentId as the invoice id (in_*) with no charge or payment-intent id. matchingPeriod (src/lib/payment-lifecycle.ts:207) matches outcomes by payment or charge id, so later refunds or disputes against pi_* or ch_* match nothing and placement stays active. Store the payment-intent and charge ids on recovered evidence and let a duplicate paid-period event fill a missing association.
