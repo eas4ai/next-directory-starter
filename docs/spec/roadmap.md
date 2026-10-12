@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: request-body-buffered-before-limit
+Current: migration-version-check-race
 
 ## public-starter-and-theme
 
@@ -525,3 +525,9 @@ Delivers backlog item import-screenshot-after-publish: Audit 2026-10-11 (M8, ver
 Requirements: ADM-001
 
 Delivers backlog item request-body-buffered-before-limit: Audit 2026-10-11 (M9, verified for listing and role routes). Many handlers call await request.text() and only then compare body.length to the limit: admin listings POST and PATCH, account role and suspension, plans, theme save and preview, agent imports, agent keys, and the agent screenshot route. Better Auth (/api/auth/*) parses the full JSON body before authorization. Concurrent large bodies are fully buffered before rejection, unauthenticated on the auth routes. Use the existing streaming requestJson(request, limit) helper everywhere, add a streaming cap before Better Auth, and set a request size limit at the reverse proxy.
+
+## migration-version-check-race
+
+Requirements: FOUND-004
+
+Delivers backlog item migration-version-check-race: Audit 2026-10-11 (M10, verified). Migration helpers for versions 7-18 in src/lib/catalog-migrations.ts check catalog_migrations before opening their immediate transaction and then run unconditional DDL; versions 1-6 check inside migrate.immediate(). The Docker build stage does not set DIRECTORY_EXPLICIT_MIGRATIONS=1. Two processes (build workers, web and CLI job) can both see a version missing; the second fails with 'table already exists'. Move each version check inside its transaction and disable implicit migrations in the build stage.
