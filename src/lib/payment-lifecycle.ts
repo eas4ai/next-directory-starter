@@ -50,6 +50,12 @@ export type PaymentEffect = PaidEffect | { kind: "noop" } | {
   subscriptionId: string;
   state: "active" | "cancel-scheduled" | "canceled";
   occurredAt: string;
+} | {
+  kind: "checkout-terminal";
+  purchaseId: string;
+  resourceId: string;
+  state: "expired" | "canceled";
+  occurredAt: string;
 };
 
 export type VerifiedEvidence = {
@@ -67,11 +73,14 @@ type Purchase = {
   duration_days: number; featured: number; provider_price_id: string | null;
   provider_resource_id: string | null; provider_subscription_id: string | null;
   stripe_session_id: string; checkout_request_id: string | null; status: string;
+  checkout_terminal_state: "expired" | "canceled" | null;
+  checkout_terminal_at: string | null;
 };
 
 function bindEarlyResource(evidence: VerifiedEvidence, purchase: Purchase,
   resourceId: string, linkedSubscription = false): boolean {
   if (purchase.provider_resource_id !== null || purchase.status !== "pending" ||
+      purchase.checkout_terminal_state !== null ||
       !purchase.checkout_request_id || purchase.stripe_session_id !== `pending:${purchase.id}` ||
       !resourceId || resourceId.length > 200) return false;
   const supported = evidence.provider === "stripe"
@@ -136,7 +145,8 @@ function paidPeriod(evidence: VerifiedEvidence, effect: PaidEffect): void {
   const purchase = database.prepare("SELECT * FROM purchases WHERE id = ?")
     .get(effect.purchaseId) as Purchase | undefined;
   if (!purchase || purchase.provider !== evidence.provider || purchase.plan_mode !== evidence.mode ||
-      purchase.status === "refunded" || purchase.billing_mode === "free") {
+      purchase.status === "refunded" || purchase.billing_mode === "free" ||
+      purchase.checkout_terminal_state !== null) {
     throw new PaymentLifecycleError(409, "Payment has no eligible matching purchase");
   }
   if (purchase.provider_price_id !== (effect.priceId ?? null) ||
@@ -223,6 +233,52 @@ function paidPeriod(evidence: VerifiedEvidence, effect: PaidEffect): void {
   recordPurchaseNotification(purchase.id, "payment.paid",
     `payment:${evidence.provider}:${evidence.mode}:${effect.paymentId}:paid`,
     "Payment confirmed", "Your publishing payment was confirmed.");
+}
+
+function terminalCheckout(evidence: VerifiedEvidence,
+  effect: Extract<PaymentEffect, { kind: "checkout-terminal" }>): void {
+  if (!effect.resourceId || effect.resourceId.length > 200 ||
+      !Number.isFinite(Date.parse(effect.occurredAt))) {
+    throw new PaymentLifecycleError(400, "Invalid terminal checkout evidence");
+  }
+  const purchase = database.prepare("SELECT * FROM purchases WHERE id = ?")
+    .get(effect.purchaseId) as Purchase | undefined;
+  if (!purchase || purchase.provider !== evidence.provider || purchase.plan_mode !== evidence.mode ||
+      purchase.billing_mode === "free") {
+    throw new PaymentLifecycleError(409, "Terminal checkout has no matching purchase");
+  }
+  const resourceMatches = purchase.provider_resource_id === effect.resourceId;
+  const earlyStripe = evidence.provider === "stripe" && purchase.provider_resource_id === null &&
+    purchase.checkout_request_id !== null && purchase.stripe_session_id === `pending:${purchase.id}` &&
+    (evidence.eventType === "checkout.session.expired" ||
+      evidence.eventType === "reconcile.session-expired");
+  if (!resourceMatches && !earlyStripe) {
+    throw new PaymentLifecycleError(409, "Terminal checkout resource does not match the purchase");
+  }
+  if (purchase.checkout_terminal_state !== null) {
+    if (purchase.checkout_terminal_state !== effect.state) {
+      throw new PaymentLifecycleError(409, "Checkout already has a different terminal state");
+    }
+    return;
+  }
+  if (purchase.status !== "pending") {
+    throw new PaymentLifecycleError(409, "Checkout already has a payment outcome");
+  }
+  const changed = database.prepare(`UPDATE purchases SET
+      provider_resource_id = COALESCE(provider_resource_id, ?),
+      stripe_session_id = CASE WHEN provider_resource_id IS NULL AND provider = 'stripe'
+        THEN ? ELSE stripe_session_id END,
+      checkout_url = NULL, checkout_terminal_state = ?, checkout_terminal_at = ?
+    WHERE id = ? AND provider = ? AND plan_mode = ? AND status = 'pending'
+      AND checkout_terminal_state IS NULL
+      AND (provider_resource_id = ? OR (provider = 'stripe' AND provider_resource_id IS NULL
+        AND checkout_request_id IS NOT NULL AND stripe_session_id = 'pending:' || id))`).run(
+    effect.resourceId, effect.resourceId, effect.state, effect.occurredAt,
+    purchase.id, evidence.provider, evidence.mode, effect.resourceId,
+  );
+  if (changed.changes !== 1) {
+    throw new PaymentLifecycleError(409, "Checkout changed before its terminal state was recorded");
+  }
 }
 
 function refreshEntitlement(purchaseId: string): void {
@@ -428,6 +484,7 @@ function applyEffect(evidence: VerifiedEvidence): void {
   if (evidence.effect.kind === "refund") refundPeriod(evidence, evidence.effect);
   if (evidence.effect.kind === "dispute") disputePeriod(evidence, evidence.effect);
   if (evidence.effect.kind === "subscription-state") subscriptionState(evidence, evidence.effect);
+  if (evidence.effect.kind === "checkout-terminal") terminalCheckout(evidence, evidence.effect);
   if (evidence.effect.kind === "subscription-linked") {
     const { purchaseId, resourceId, subscriptionId } = evidence.effect;
     if (!subscriptionId || subscriptionId.length > 200) {
@@ -436,6 +493,7 @@ function applyEffect(evidence: VerifiedEvidence): void {
     const purchase = database.prepare("SELECT * FROM purchases WHERE id = ?")
       .get(purchaseId) as Purchase | undefined;
     if (!purchase || purchase.provider !== evidence.provider || purchase.plan_mode !== evidence.mode ||
+        purchase.checkout_terminal_state !== null ||
         (purchase.provider_resource_id !== resourceId &&
           !bindEarlyResource(evidence, purchase, resourceId, true))) {
       throw new PaymentLifecycleError(409, "Subscription does not match the checkout purchase");

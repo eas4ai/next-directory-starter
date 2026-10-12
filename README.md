@@ -54,7 +54,7 @@ An authenticated remote MCP endpoint lets a catalog agent list categories, stage
 
 ### Optional billing
 
-Operators can define free, one-time, monthly, and annual publication plans in test or live mode. Eligible paid plans use provider-hosted checkout with Stripe or Paddle; NOWPayments supports one-time invoices. Signed provider events, rather than a browser return, determine paid periods and featured eligibility. Owners can inspect purchases and request supported recurring cancellations. Paid checkout needs provider credentials; saved provider profiles also need a persistent encryption key. See [plans](src/lib/plans.ts), [hosted checkout](src/lib/payment-provider.ts), and [payment effects](src/lib/payment-lifecycle.ts).
+Operators can define free, one-time, monthly, and annual publication plans in test or live mode. Eligible paid plans use provider-hosted checkout with Stripe or Paddle; NOWPayments supports one-time invoices. Signed provider events, rather than a browser return, determine paid periods and featured eligibility. Owners can inspect purchases, expire an open Stripe checkout before replacing it, and request supported recurring cancellations. Paid checkout needs provider credentials; saved provider profiles also need a persistent encryption key. See [plans](src/lib/plans.ts), [hosted checkout](src/lib/payment-provider.ts), and [payment effects](src/lib/payment-lifecycle.ts).
 
 ### Operations
 

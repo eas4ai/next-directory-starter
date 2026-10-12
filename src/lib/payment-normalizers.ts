@@ -52,6 +52,16 @@ export function stripeEffect(event: Stripe.Event): PaymentEffect {
       ? { kind: "subscription-state", purchaseId, subscriptionId, state,
         occurredAt: new Date(event.created * 1000).toISOString() } : { kind: "noop" };
   }
+  if (event.type === "checkout.session.expired" && data.object === "checkout.session") {
+    const metadata = object(data.metadata);
+    const purchaseId = string(data.client_reference_id) ?? string(metadata?.purchaseId);
+    const resourceId = string(data.id);
+    const occurredAt = date(event.created);
+    return purchaseId && resourceId && occurredAt
+      ? { kind: "checkout-terminal", purchaseId, resourceId,
+        state: "expired", occurredAt }
+      : { kind: "noop" };
+  }
   if (event.type === "checkout.session.completed" ||
       event.type === "checkout.session.async_payment_succeeded") {
     const purchaseId = string(data.client_reference_id);

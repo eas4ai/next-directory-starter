@@ -12,7 +12,7 @@ test('owners see only their billing and schedule supported cancellation without 
   try {
     ({ database } = await import('../src/lib/database.ts'));
     const { migrateCatalog } = await import('../src/lib/catalog-migrations.ts');
-    const { listOwnerBilling, cancelOwnerSubscription } = await import('../src/lib/owner-billing.ts');
+    const { listOwnerBilling, cancelOwnerPurchase } = await import('../src/lib/owner-billing.ts');
     migrateCatalog();
     database.prepare('INSERT INTO categories (name) VALUES (?)').run('Tools');
     database.prepare(`INSERT INTO listings
@@ -48,13 +48,13 @@ test('owners see only their billing and schedule supported cancellation without 
       calls += 1;
       assert.deepEqual([provider, mode, subscriptionId], ['stripe', 'test', 'sub_mine']);
     };
-    await assert.rejects(cancelOwnerSubscription('other', 'mine-paid', fake), /Purchase not found/);
-    await assert.rejects(cancelOwnerSubscription('owner', 'mine-pending', fake), /does not support/);
+    await assert.rejects(cancelOwnerPurchase('other', 'mine-paid', fake), /Purchase not found/);
+    await assert.rejects(cancelOwnerPurchase('owner', 'mine-pending', fake), /does not support/);
     assert.equal(calls, 0);
-    assert.deepEqual(await cancelOwnerSubscription('owner', 'mine-paid', fake),
+    assert.deepEqual(await cancelOwnerPurchase('owner', 'mine-paid', fake),
       { status: 'cancel-scheduled' });
     assert.equal(calls, 1);
-    assert.deepEqual(await cancelOwnerSubscription('owner', 'mine-paid', fake),
+    assert.deepEqual(await cancelOwnerPurchase('owner', 'mine-paid', fake),
       { status: 'cancel-scheduled' });
     assert.equal(calls, 1);
     const row = listOwnerBilling('owner').find((item) => item.id === 'mine-paid');
@@ -62,6 +62,7 @@ test('owners see only their billing and schedule supported cancellation without 
     assert.equal(row.benefitActive, true);
     assert.equal(row.paidUntil, paidUntil);
     assert.equal(row.canCancel, false);
+    assert.equal(row.cancellationKind, null);
   } finally {
     database?.close();
     if (previous === undefined) delete process.env.DATABASE_URL;

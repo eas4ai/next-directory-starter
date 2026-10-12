@@ -5,7 +5,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-test('provider SDK recovery reads existing payments and cancellation schedules only', async () => {
+test('provider SDK recovery reads payments and confirms supported cancellation', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'directory-provider-adapters-'));
   const names = ['DATABASE_URL', 'BILLING_ENCRYPTION_KEY', 'NOWPAYMENTS_EMAIL',
     'NOWPAYMENTS_PASSWORD'];
@@ -21,7 +21,7 @@ test('provider SDK recovery reads existing payments and cancellation schedules o
     const { migrateCatalog } = await import('../src/lib/catalog-migrations.ts');
     const { saveBillingProfile } = await import('../src/lib/billing-profiles.ts');
     const { reconcilePurchase } = await import('../src/lib/payment-reconciliation.ts');
-    const { cancelOwnerSubscription } = await import('../src/lib/owner-billing.ts');
+    const { cancelOwnerPurchase } = await import('../src/lib/owner-billing.ts');
     migrateCatalog();
     database.prepare('INSERT INTO categories (name) VALUES (?)').run('Tools');
     database.prepare(`INSERT INTO listings
@@ -43,6 +43,8 @@ test('provider SDK recovery reads existing payments and cancellation schedules o
         1200, 'usd', 30, 30, 1, ?, 'pending', ?, ?, ?, ?)`)
       .run(id, `pending:${id}`, new Date().toISOString(), provider, resource, price);
     purchase('stripe-purchase', 'stripe', 'cs_stripe', 'price_once');
+    purchase('stripe-expired', 'stripe', 'cs_expired', 'price_once');
+    purchase('stripe-cancel', 'stripe', 'cs_cancel', 'price_once');
     purchase('paddle-purchase', 'paddle', 'txn_paddle', 'pri_once');
     purchase('paddle-refunds', 'paddle', 'txn_paddle_refunds', 'pri_once');
     purchase('now-purchase', 'nowpayments', 'invoice_now', null);
@@ -81,15 +83,21 @@ test('provider SDK recovery reads existing payments and cancellation schedules o
       const method = init.method ?? 'GET';
       requested.push(`${method} ${url.pathname}`);
       if (url.pathname === '/v1/checkout/sessions/cs_stripe' ||
+          url.pathname === '/v1/checkout/sessions/cs_expired' ||
           url.pathname === '/v1/checkout/sessions/cs_early' ||
           url.pathname === '/v1/checkout/sessions/cs_legacy') {
         const early = url.pathname.endsWith('cs_early');
         const legacy = url.pathname.endsWith('cs_legacy');
+        const expired = url.pathname.endsWith('cs_expired');
         return reply({
-        id: early ? 'cs_early' : legacy ? 'cs_legacy' : 'cs_stripe', object: 'checkout.session',
-        client_reference_id: early ? 'stripe-early' : legacy ? 'stripe-legacy' : 'stripe-purchase',
-        payment_status: 'paid',
-        payment_intent: early ? 'pi_early' : legacy ? 'pi_legacy' : 'pi_stripe', amount_total: 1200,
+        id: early ? 'cs_early' : legacy ? 'cs_legacy' : expired ? 'cs_expired' : 'cs_stripe',
+        object: 'checkout.session', status: expired ? 'expired' : 'complete',
+        expires_at: Math.floor(Date.now() / 1000),
+        client_reference_id: early ? 'stripe-early' : legacy ? 'stripe-legacy' :
+          expired ? 'stripe-expired' : 'stripe-purchase',
+        payment_status: expired ? 'unpaid' : 'paid',
+        payment_intent: expired ? null : early ? 'pi_early' : legacy ? 'pi_legacy' : 'pi_stripe',
+        amount_total: 1200,
         currency: 'usd', line_items: { object: 'list', data: [{ quantity: 1,
           price: { id: 'price_once' } }] },
         });
@@ -137,6 +145,11 @@ test('provider SDK recovery reads existing payments and cancellation schedules o
         processed: id === 'paddle-purchase' ? 2 : 1, unresolved: 0,
       });
     }
+    assert.deepEqual(await reconcilePurchase('stripe-expired', 5), {
+      purchaseId: 'stripe-expired', found: 1, processed: 1, unresolved: 0,
+    });
+    assert.equal(database.prepare(`SELECT checkout_terminal_state FROM purchases
+      WHERE id = 'stripe-expired'`).get().checkout_terminal_state, 'expired');
     assert.deepEqual(database.prepare(`SELECT open, terminal FROM payment_disputes
       WHERE provider = 'paddle' AND provider_dispute_id = 'adj_chargeback_reconciled'`).get(), {
       open: 0, terminal: 1,
@@ -197,14 +210,21 @@ test('provider SDK recovery reads existing payments and cancellation schedules o
         id: 'sub_paddle', status: 'active', billing_cycle: { interval: 'month', frequency: 1 },
         items: [], scheduled_change: { action: 'cancel', effective_at: new Date().toISOString() },
       } });
+      if (url.pathname === '/v1/checkout/sessions/cs_cancel/expire') return reply({
+        id: 'cs_cancel', object: 'checkout.session', status: 'expired',
+        client_reference_id: 'stripe-cancel', expires_at: Math.floor(Date.now() / 1000),
+      });
       throw new Error(`Unexpected cancellation request: ${method} ${url.pathname}`);
     };
-    assert.deepEqual(await cancelOwnerSubscription('owner', 'stripe-purchase'),
+    assert.deepEqual(await cancelOwnerPurchase('owner', 'stripe-purchase'),
       { status: 'cancel-scheduled' });
-    assert.deepEqual(await cancelOwnerSubscription('owner', 'paddle-purchase'),
+    assert.deepEqual(await cancelOwnerPurchase('owner', 'paddle-purchase'),
       { status: 'cancel-scheduled' });
+    assert.deepEqual(await cancelOwnerPurchase('owner', 'stripe-cancel'),
+      { status: 'expired' });
     assert.equal(requested.includes('POST /v1/subscriptions/sub_stripe'), true);
     assert.equal(requested.includes('POST /subscriptions/sub_paddle/cancel'), true);
+    assert.equal(requested.includes('POST /v1/checkout/sessions/cs_cancel/expire'), true);
   } finally {
     globalThis.fetch = fetchBefore;
     database?.close();
