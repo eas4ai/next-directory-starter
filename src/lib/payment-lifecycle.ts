@@ -93,6 +93,40 @@ function bindEarlyResource(evidence: VerifiedEvidence, purchase: Purchase,
   return updated.changes === 1;
 }
 
+type PaymentAssociations = { paymentIntentId: string | null; chargeId: string | null };
+
+function paymentAssociations(effect: PaidEffect): PaymentAssociations {
+  const paymentIntentId = effect.paymentIntentId ?? null;
+  const chargeId = effect.chargeId ?? null;
+  if ((paymentIntentId !== null && (!paymentIntentId || paymentIntentId.length > 200)) ||
+      (chargeId !== null && (!chargeId || chargeId.length > 200))) {
+    throw new PaymentLifecycleError(400, "Invalid payment association");
+  }
+  return { paymentIntentId, chargeId };
+}
+
+function enrichPaymentAssociations(provider: BillingProvider, purchaseId: string,
+  paymentId: string, associations: PaymentAssociations): void {
+  const prior = database.prepare(`SELECT id, purchase_id, provider_payment_intent_id,
+      provider_charge_id FROM payment_periods
+    WHERE provider = ? AND provider_payment_id = ?`)
+    .get(provider, paymentId) as { id: string; purchase_id: string;
+      provider_payment_intent_id: string | null; provider_charge_id: string | null } | undefined;
+  if (prior?.purchase_id !== purchaseId) {
+    throw new PaymentLifecycleError(409, "Payment ID was already used for another purchase");
+  }
+  if ((associations.paymentIntentId && prior.provider_payment_intent_id &&
+      prior.provider_payment_intent_id !== associations.paymentIntentId) ||
+      (associations.chargeId && prior.provider_charge_id &&
+        prior.provider_charge_id !== associations.chargeId)) {
+    throw new PaymentLifecycleError(409, "Payment association conflicts with prior evidence");
+  }
+  database.prepare(`UPDATE payment_periods SET
+    provider_payment_intent_id = COALESCE(provider_payment_intent_id, ?),
+    provider_charge_id = COALESCE(provider_charge_id, ?)
+    WHERE id = ?`).run(associations.paymentIntentId, associations.chargeId, prior.id);
+}
+
 function paidPeriod(evidence: VerifiedEvidence, effect: PaidEffect): void {
   const purchase = database.prepare("SELECT * FROM purchases WHERE id = ?")
     .get(effect.purchaseId) as Purchase | undefined;
@@ -125,12 +159,7 @@ function paidPeriod(evidence: VerifiedEvidence, effect: PaidEffect): void {
       throw new PaymentLifecycleError(409, "One-time purchase already has a paid period");
     }
   }
-  const paymentIntentId = effect.paymentIntentId ?? null;
-  const chargeId = effect.chargeId ?? null;
-  if ((paymentIntentId !== null && (!paymentIntentId || paymentIntentId.length > 200)) ||
-      (chargeId !== null && (!chargeId || chargeId.length > 200))) {
-    throw new PaymentLifecycleError(400, "Invalid payment association");
-  }
+  const associations = paymentAssociations(effect);
   const now = new Date();
   let startsAt = now.toISOString();
   let endsAt: string;
@@ -154,27 +183,12 @@ function paidPeriod(evidence: VerifiedEvidence, effect: PaidEffect): void {
       provider_charge_id, amount_minor, currency, starts_at, ends_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(provider, provider_payment_id) DO NOTHING`).run(
-    randomUUID(), purchase.id, evidence.provider, effect.paymentId, paymentIntentId, chargeId,
+    randomUUID(), purchase.id, evidence.provider, effect.paymentId,
+    associations.paymentIntentId, associations.chargeId,
     effect.amountMinor, purchase.currency, startsAt, endsAt,
   );
   if (!inserted.changes) {
-    const prior = database.prepare(`SELECT id, purchase_id, provider_payment_intent_id,
-        provider_charge_id FROM payment_periods
-      WHERE provider = ? AND provider_payment_id = ?`)
-      .get(evidence.provider, effect.paymentId) as { id: string; purchase_id: string;
-        provider_payment_intent_id: string | null; provider_charge_id: string | null } | undefined;
-    if (prior?.purchase_id !== purchase.id) {
-      throw new PaymentLifecycleError(409, "Payment ID was already used for another purchase");
-    }
-    if ((paymentIntentId && prior.provider_payment_intent_id &&
-        prior.provider_payment_intent_id !== paymentIntentId) ||
-        (chargeId && prior.provider_charge_id && prior.provider_charge_id !== chargeId)) {
-      throw new PaymentLifecycleError(409, "Payment association conflicts with prior evidence");
-    }
-    database.prepare(`UPDATE payment_periods SET
-      provider_payment_intent_id = COALESCE(provider_payment_intent_id, ?),
-      provider_charge_id = COALESCE(provider_charge_id, ?)
-      WHERE id = ?`).run(paymentIntentId, chargeId, prior.id);
+    enrichPaymentAssociations(evidence.provider, purchase.id, effect.paymentId, associations);
     return;
   }
   database.prepare("UPDATE purchases SET status = 'paid', provider_subscription_id = COALESCE(provider_subscription_id, ?) WHERE id = ?")

@@ -501,20 +501,6 @@ function migrateMediaStorageSafety(): void {
   }).immediate();
 }
 
-function migrateStripePaymentAssociations(): void {
-  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 21").get()) return;
-  database.transaction(() => {
-    database.exec(`ALTER TABLE payment_periods ADD COLUMN provider_payment_intent_id TEXT;
-      UPDATE payment_periods
-        SET provider_payment_intent_id = provider_charge_id, provider_charge_id = NULL
-        WHERE provider = 'stripe' AND provider_charge_id GLOB 'pi_*';
-      CREATE UNIQUE INDEX payment_periods_payment_intent
-        ON payment_periods(provider, provider_payment_intent_id)
-        WHERE provider_payment_intent_id IS NOT NULL;`);
-    database.prepare("INSERT INTO catalog_migrations (version) VALUES (21)").run();
-  }).immediate();
-}
-
 export function migrateCatalog(explicit = false): void {
   if (process.env.DIRECTORY_EXPLICIT_MIGRATIONS === "1" && !explicit) return;
   migrate.immediate();
@@ -532,7 +518,18 @@ export function migrateCatalog(explicit = false): void {
   migrateAgentIngestion();
   migrateListingRevisions();
   migrateMediaStorageSafety();
-  migrateStripePaymentAssociations();
+  if (!database.prepare("SELECT version FROM catalog_migrations WHERE version = 21").get()) {
+    database.transaction(() => {
+      database.exec(`ALTER TABLE payment_periods ADD COLUMN provider_payment_intent_id TEXT;
+        UPDATE payment_periods
+          SET provider_payment_intent_id = provider_charge_id, provider_charge_id = NULL
+          WHERE provider = 'stripe' AND provider_charge_id GLOB 'pi_*';
+        CREATE UNIQUE INDEX payment_periods_payment_intent
+          ON payment_periods(provider, provider_payment_intent_id)
+          WHERE provider_payment_intent_id IS NOT NULL;`);
+      database.prepare("INSERT INTO catalog_migrations (version) VALUES (21)").run();
+    }).immediate();
+  }
 }
 
 export function seedCatalog(): void {
