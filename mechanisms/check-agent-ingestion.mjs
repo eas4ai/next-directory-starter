@@ -596,7 +596,8 @@ try {
     assert(customHtml.includes('https://cdn.example.org/custom.png'),
       'Published custom social image was replaced by the generated card.');
     const suspend = await request(`/api/admin/listings/${staged.second}`,
-      json({ ...second, slug: staged.second, status: 'suspended' }, adminCookie, 'PATCH'));
+      json({ ...second, slug: staged.second, status: 'suspended', expectedRevision: 2 },
+        adminCookie, 'PATCH'));
     assert(suspend.ok, `Suspending the listing returned ${suspend.status}`);
     const suspendedCard = await request(`/og/listings/${staged.second}.png`);
     assert(suspendedCard.status === 404 &&
