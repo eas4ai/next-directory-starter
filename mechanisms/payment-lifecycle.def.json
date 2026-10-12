@@ -1,0 +1,14 @@
+{
+  "command": "node mechanisms/check-payment-lifecycle.mjs",
+  "requirements": ["COM-006", "COM-007", "COM-008", "COM-009"],
+  "results": "per-requirement",
+  "inputs": [
+    ".env.example", "README.md", "mechanisms/payment-lifecycle.def.json",
+    "mechanisms/check-payment-lifecycle.mjs", "mechanisms/account-test-mail.mjs",
+    "package.json", "package-lock.json", "scripts", "src", "tests"
+  ],
+  "identity": {
+    "env": [],
+    "tools": { "node": "node --version", "npm": "npm --version" }
+  }
+}
