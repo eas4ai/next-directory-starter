@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: migration-version-check-race
+Current: paddle-partial-refunds
 
 ## public-starter-and-theme
 
@@ -531,3 +531,9 @@ Delivers backlog item request-body-buffered-before-limit: Audit 2026-10-11 (M9, 
 Requirements: FOUND-004
 
 Delivers backlog item migration-version-check-race: Audit 2026-10-11 (M10, verified). Migration helpers for versions 7-18 in src/lib/catalog-migrations.ts check catalog_migrations before opening their immediate transaction and then run unconditional DDL; versions 1-6 check inside migrate.immediate(). The Docker build stage does not set DIRECTORY_EXPLICIT_MIGRATIONS=1. Two processes (build workers, web and CLI job) can both see a version missing; the second fails with 'table already exists'. Move each version check inside its transaction and disable implicit migrations in the build stage.
+
+## paddle-partial-refunds
+
+Requirements: COM-008
+
+Delivers backlog item paddle-partial-refunds: Audit 2026-10-11 (M11, reported, not re-verified). Paddle refunds count as full only when the adjustment type is 'full' (src/lib/payment-normalizers.ts:119); partial adjustments are ignored and never summed (src/lib/payment-lifecycle.ts:229). Two approved 6-dollar refunds on a 12-dollar payment leave placement active. Record approved refund amounts idempotently and revoke the period when the total reaches the amount paid.
