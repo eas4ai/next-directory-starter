@@ -501,6 +501,29 @@ function migrateMediaStorageSafety(): void {
   }).immediate();
 }
 
+function migrateAgentImportPublications(): void {
+  if (database.prepare("SELECT version FROM catalog_migrations WHERE version = 23").get()) return;
+  database.transaction(() => {
+    database.prepare(`UPDATE agent_imports
+      SET published_at = COALESCE(published_at, (
+            SELECT occurred_at FROM audit_events
+            WHERE action = 'catalog.publish' AND target = agent_imports.slug
+            ORDER BY occurred_at, id LIMIT 1
+          )),
+          published_by = COALESCE(published_by, (
+            SELECT actor_user_id FROM audit_events
+            WHERE action = 'catalog.publish' AND target = agent_imports.slug
+            ORDER BY occurred_at, id LIMIT 1
+          ))
+      WHERE (published_at IS NULL OR published_by IS NULL)
+        AND EXISTS (SELECT 1 FROM listings
+          WHERE slug = agent_imports.slug AND status = 'published')
+        AND EXISTS (SELECT 1 FROM audit_events
+          WHERE action = 'catalog.publish' AND target = agent_imports.slug)`).run();
+    database.prepare("INSERT INTO catalog_migrations (version) VALUES (23)").run();
+  }).immediate();
+}
+
 export function migrateCatalog(explicit = false): void {
   if (process.env.DIRECTORY_EXPLICIT_MIGRATIONS === "1" && !explicit) return;
   migrate.immediate();
@@ -537,6 +560,7 @@ export function migrateCatalog(explicit = false): void {
       database.prepare("INSERT INTO catalog_migrations (version) VALUES (22)").run();
     }).immediate();
   }
+  migrateAgentImportPublications();
 }
 
 export function seedCatalog(): void {
