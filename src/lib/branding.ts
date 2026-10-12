@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import sharp from "sharp";
 import { database } from "@/lib/database";
 import { recordAudit } from "@/lib/audit";
 import { HttpError, httpErrorResponse } from "@/lib/http-error";
-import { MAX_IMAGE_BYTES, mediaFilePath } from "@/lib/media";
+import { drainMediaCleanupQueue, MAX_IMAGE_BYTES, mediaFilePath } from "@/lib/media";
 import { getSiteConfig, parseSiteConfig, type SiteConfig } from "@/lib/site-config";
 import { writeSiteSetting } from "@/lib/site-settings";
 
@@ -20,6 +20,11 @@ const mimeFormat: Record<string, string> = {
   "image/jpeg": "jpeg", "image/png": "png", "image/webp": "webp",
 };
 const brandAssetPattern = /^\/brand-assets\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.webp$/;
+const queueBrandFileCleanup = database.prepare(`INSERT OR IGNORE INTO media_cleanup_queue
+  (asset_id, queued_at) VALUES (?, ?)`);
+const cancelBrandFileCleanup = database.prepare(
+  "DELETE FROM media_cleanup_queue WHERE asset_id = ?",
+);
 
 function brandAssetIds(branding: SiteConfig): Set<string> {
   const ids = new Set<string>();
@@ -30,15 +35,12 @@ function brandAssetIds(branding: SiteConfig): Set<string> {
   return ids;
 }
 
-function removeUnreferencedBrandAssets(previous: SiteConfig, current: SiteConfig): void {
+function queueUnreferencedBrandAssets(previous: SiteConfig, current: SiteConfig,
+  queuedAt: string): void {
   const currentIds = brandAssetIds(current);
   for (const id of brandAssetIds(previous)) {
     if (currentIds.has(id)) continue;
-    try {
-      unlinkSync(mediaFilePath(id));
-    } catch (error) {
-      if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
-    }
+    queueBrandFileCleanup.run(id, queuedAt);
   }
 }
 
@@ -55,20 +57,21 @@ export function saveBranding(input: unknown, actorId: string): SiteConfig {
       throw new BrandingError(400, "Uploaded brand asset is missing");
     }
   }
-  const previous = database.transaction(() => {
+  database.transaction(() => {
     const previousBranding = getSiteConfig();
+    const now = new Date().toISOString();
     writeSiteSetting("site_branding", JSON.stringify(branding));
     // A saved SEO row that still has the old brand default should follow the brand.
     // A distinct SEO description is an intentional override and keeps its value.
     if (branding.description !== previousBranding.description) {
       database.prepare(`UPDATE seo_settings SET description = ?, updated_at = ?
         WHERE id = 1 AND description = ?`).run(
-        branding.description, new Date().toISOString(), previousBranding.description);
+        branding.description, now, previousBranding.description);
     }
     recordAudit("site.brand.save", actorId, "site");
-    return previousBranding;
+    queueUnreferencedBrandAssets(previousBranding, branding, now);
   }).immediate();
-  removeUnreferencedBrandAssets(previous, branding);
+  drainMediaCleanupQueue();
   return branding;
 }
 
@@ -98,23 +101,32 @@ export async function uploadBrandAsset(slot: BrandAssetSlot, bytes: Buffer,
   }
   const id = randomUUID();
   const file = mediaFilePath(id);
-  mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, output, { flag: "wx" });
-  let update: { previous: SiteConfig; current: SiteConfig };
+  queueBrandFileCleanup.run(id, new Date().toISOString());
   try {
-    update = database.transaction(() => {
-      const previous = getSiteConfig();
-      const current = parseSiteConfig({ ...previous, [field]: `/brand-assets/${id}.webp` });
-      writeSiteSetting("site_branding", JSON.stringify(current));
-      recordAudit("site.brand.upload", actorId, slot);
-      return { previous, current };
-    }).immediate();
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, output, { flag: "wx" });
   } catch (error) {
-    unlinkSync(file);
+    drainMediaCleanupQueue();
     throw error;
   }
-  removeUnreferencedBrandAssets(update.previous, update.current);
-  return update.current;
+  let updated: SiteConfig;
+  try {
+    updated = database.transaction(() => {
+      const previous = getSiteConfig();
+      const current = parseSiteConfig({ ...previous, [field]: `/brand-assets/${id}.webp` });
+      const now = new Date().toISOString();
+      writeSiteSetting("site_branding", JSON.stringify(current));
+      recordAudit("site.brand.upload", actorId, slot);
+      queueUnreferencedBrandAssets(previous, current, now);
+      cancelBrandFileCleanup.run(id);
+      return current;
+    }).immediate();
+  } catch (error) {
+    drainMediaCleanupQueue();
+    throw error;
+  }
+  drainMediaCleanupQueue();
+  return updated;
 }
 
 export function brandAssetResponse(filename: string): Response {
