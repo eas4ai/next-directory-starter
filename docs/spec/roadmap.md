@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: submission-approval-overwrites-changes
+Current: import-screenshot-after-publish
 
 ## public-starter-and-theme
 
@@ -513,3 +513,9 @@ Delivers backlog item article-status-publish-skips-version: Audit 2026-10-11 (M6
 Requirements: PUB-004
 
 Delivers backlog item submission-approval-overwrites-changes: Audit 2026-10-11 (M7, reviewer reproduced in memory). Approval (src/lib/moderation.ts:228) replaces the listing with the submission payload and sets published without comparing the listing's current revision to the submission's base. If an admin corrects and withdraws a listing after an owner submits, approving the old submission loses the correction and republishes the listing. Bind submissions to a listing revision and reject or invalidate them after intervening changes.
+
+## import-screenshot-after-publish
+
+Requirements: ING-004
+
+Delivers backlog item import-screenshot-after-publish: Audit 2026-10-11 (M8, verified). attach_screenshot updates agent_imports only WHERE published_at IS NULL (src/lib/agent-imports.ts:170), but publishing through the catalog PATCH route changes listings.status without setting published_at. After that publication an agent can still replace the screenshot and change the public card. Check the real listing status in the screenshot update and set published_at on every publication path.
