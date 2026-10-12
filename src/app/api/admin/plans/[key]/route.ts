@@ -1,5 +1,6 @@
 import { canManageBilling, sameOrigin, sessionUser } from "@/lib/admin";
 import { planErrorResponse, updatePlan } from "@/lib/plans";
+import { requestJson, requestJsonErrorResponse } from "@/lib/request-json";
 
 type Params = { params: Promise<{ key: string }> };
 
@@ -9,11 +10,9 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!sameOrigin(request)) return Response.json({ error: "Invalid origin" }, { status: 403 });
   let input: unknown;
   try {
-    const body = await request.text();
-    if (body.length > 8192) throw new Error("Request is too large");
-    input = JSON.parse(body);
-  } catch {
-    return Response.json({ error: "Invalid JSON or oversized request" }, { status: 400 });
+    input = await requestJson(request, 8192);
+  } catch (error) {
+    return requestJsonErrorResponse(error);
   }
   try {
     return Response.json({ plan: updatePlan((await params).key, input, user.id) });

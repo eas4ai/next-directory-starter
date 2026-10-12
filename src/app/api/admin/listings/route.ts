@@ -2,6 +2,7 @@ import { canAdmin, canManageCatalog, canModerate, sessionUser } from "@/lib/admi
 import { parseListing } from "@/lib/catalog-input";
 import { allListings, createListing, listingBySlug } from "@/lib/listings";
 import { HttpError, httpErrorResponse } from "@/lib/http-error";
+import { requestJson, requestJsonErrorResponse } from "@/lib/request-json";
 
 export async function GET(request: Request) {
   const user = await sessionUser(request.headers);
@@ -18,11 +19,9 @@ export async function POST(request: Request) {
   }
   let input: unknown;
   try {
-    const body = await request.text();
-    if (body.length > 8192) throw new Error("Request is too large");
-    input = JSON.parse(body);
-  } catch {
-    return Response.json({ error: "Invalid JSON" }, { status: 400 });
+    input = await requestJson(request, 8192);
+  } catch (error) {
+    return requestJsonErrorResponse(error);
   }
   const listing = parseListing(input);
   if (!listing) return Response.json({ error: "Invalid listing" }, { status: 400 });

@@ -2,6 +2,7 @@ import { canAdmin, canManageCatalog, sessionUser } from "@/lib/admin";
 import { parseListing } from "@/lib/catalog-input";
 import { listingBySlug, updateListing } from "@/lib/listings";
 import { HttpError, httpErrorResponse } from "@/lib/http-error";
+import { requestJson, requestJsonErrorResponse } from "@/lib/request-json";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const user = await sessionUser(request.headers);
@@ -13,11 +14,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ sl
   const { slug } = await params;
   let changes: unknown;
   try {
-    const body = await request.text();
-    if (body.length > 8192) throw new Error("Request is too large");
-    changes = JSON.parse(body);
-  } catch {
-    return Response.json({ error: "Invalid JSON" }, { status: 400 });
+    changes = await requestJson(request, 8192);
+  } catch (error) {
+    return requestJsonErrorResponse(error);
   }
   if (!changes || typeof changes !== "object" || Array.isArray(changes)) {
     return Response.json({ error: "Invalid listing" }, { status: 400 });

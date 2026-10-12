@@ -1,9 +1,11 @@
 import { auth } from "@/lib/auth";
 import { accountMailConfigured } from "@/lib/mail";
 import { verificationLinkWasUsed } from "@/lib/email-verification";
+import { RequestTooLargeError, requestJsonErrorResponse, requestWithBodyLimit } from "@/lib/request-json";
 import { toNextJsHandler } from "better-auth/next-js";
 
 const handler = toNextJsHandler(auth);
+const AUTH_REQUEST_MAX_BYTES = 64 * 1024;
 
 export function GET(request: Request) {
   const url = new URL(request.url);
@@ -16,11 +18,16 @@ export function GET(request: Request) {
   return handler.GET(request);
 }
 
-export function POST(request: Request) {
+export async function POST(request: Request) {
   if (new URL(request.url).pathname.replace(/\/+$/, "").endsWith("/sign-up/email") &&
       !accountMailConfigured()) {
     return Response.json({ message: "Signup is temporarily unavailable. Contact the site operator." },
       { status: 503 });
   }
-  return handler.POST(request);
+  try {
+    return handler.POST(await requestWithBodyLimit(request, AUTH_REQUEST_MAX_BYTES));
+  } catch (error) {
+    if (error instanceof RequestTooLargeError) return requestJsonErrorResponse(error);
+    throw error;
+  }
 }
