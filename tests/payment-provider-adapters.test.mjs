@@ -104,6 +104,7 @@ test('provider SDK recovery reads existing payments and cancellation schedules o
       if (url.pathname === '/transactions/txn_paddle' ||
           url.pathname === '/transactions/txn_paddle_refunds') {
         const withRefunds = url.pathname.endsWith('_refunds');
+        const disputeAt = new Date(Date.now() - 1000).toISOString();
         return reply({ data: {
         id: withRefunds ? 'txn_paddle_refunds' : 'txn_paddle',
         status: 'completed', currency_code: 'USD',
@@ -117,7 +118,10 @@ test('provider SDK recovery reads existing payments and cancellation schedules o
             currency_code: 'USD', totals: { total: '600' }, items: [{ type: 'partial' }] },
           { id: 'adj_reconcile_two', action: 'refund', status: 'approved',
             currency_code: 'USD', totals: { total: '600' }, items: [{ type: 'partial' }] },
-        ] : [],
+        ] : [{ id: 'adj_chargeback_reconciled', action: 'chargeback', status: 'reversed',
+          currency_code: 'USD', created_at: disputeAt, updated_at: disputeAt,
+          customer_id: 'ctm_fixture', reason: 'reconciled', credit_applied_to_balance: false,
+          totals: null, payout_totals: null, items: [] }],
       } });
       }
       if (url.pathname === '/v1/auth') return reply({ token: 'fixture.jwt.token' });
@@ -129,9 +133,14 @@ test('provider SDK recovery reads existing payments and cancellation schedules o
     };
     for (const id of ['stripe-purchase', 'paddle-purchase', 'now-purchase']) {
       assert.deepEqual(await reconcilePurchase(id, 5), {
-        purchaseId: id, found: 1, processed: 1, unresolved: 0,
+        purchaseId: id, found: id === 'paddle-purchase' ? 2 : 1,
+        processed: id === 'paddle-purchase' ? 2 : 1, unresolved: 0,
       });
     }
+    assert.deepEqual(database.prepare(`SELECT open, terminal FROM payment_disputes
+      WHERE provider = 'paddle' AND provider_dispute_id = 'adj_chargeback_reconciled'`).get(), {
+      open: 0, terminal: 1,
+    });
     assert.deepEqual(await reconcilePurchase('paddle-refunds', 5), {
       purchaseId: 'paddle-refunds', found: 3, processed: 3, unresolved: 0,
     });

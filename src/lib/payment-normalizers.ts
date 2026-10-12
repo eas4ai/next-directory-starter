@@ -25,10 +25,17 @@ export function stripeEffect(event: Stripe.Event): PaymentEffect {
       ? { kind: "refund", paymentId, full: data.refunded === true && amountMinor >= original,
         amountMinor, currency } : { kind: "noop" };
   }
-  if (event.type === "charge.dispute.created" || event.type === "charge.dispute.closed") {
+  if (event.type === "charge.dispute.created" || event.type === "charge.dispute.updated" ||
+      event.type === "charge.dispute.closed") {
     const paymentId = string(data.payment_intent) ?? string(data.charge);
-    return paymentId ? { kind: "dispute", paymentId,
-      open: event.type === "charge.dispute.created" || data.status !== "won" } : { kind: "noop" };
+    const disputeId = string(data.id);
+    const status = string(data.status);
+    const occurredAt = date(event.created);
+    return paymentId && disputeId && status && occurredAt
+      ? { kind: "dispute", paymentId, disputeId, open: status !== "won",
+        terminal: event.type === "charge.dispute.closed" || status === "won" || status === "lost",
+        occurredAt }
+      : { kind: "noop" };
   }
   if (event.type === "customer.subscription.updated" ||
       event.type === "customer.subscription.deleted") {
@@ -110,10 +117,20 @@ export function paddleEffect(payload: unknown): PaymentEffect {
     const data = object(envelope?.data);
     const paymentId = string(data?.transaction_id);
     if (!paymentId) return { kind: "noop" };
-    if (data?.action === "chargeback" || data?.action === "chargeback_warning") {
-      return { kind: "dispute", paymentId, open: data.status !== "reversed" };
+    if (data?.action === "chargeback" || data?.action === "chargeback_warning" ||
+        data?.action === "chargeback_reverse" || data?.action === "chargeback_warning_reverse") {
+      const disputeId = string(data.id);
+      const occurredAt = string(envelope?.occurred_at);
+      const status = string(data.status);
+      const reversal = data.action === "chargeback_reverse" ||
+        data.action === "chargeback_warning_reverse";
+      const closed = reversal || status === "reversed" || status === "rejected";
+      return disputeId && occurredAt && status
+        ? { kind: "dispute", paymentId, disputeId, open: !closed,
+          terminal: closed || status === "approved", occurredAt,
+          closesPrior: reversal }
+        : { kind: "noop" };
     }
-    if (data?.action === "chargeback_reverse") return { kind: "dispute", paymentId, open: false };
     const totals = object(data?.totals);
     const amount = string(totals?.total);
     const amountMinor = amount && /^\d+$/.test(amount) ? Number(amount) : null;

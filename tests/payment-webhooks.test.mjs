@@ -128,6 +128,27 @@ test('Paddle and NOWPayments signatures authenticate the exact mode and purchase
         .update(`${ts}:${body}`).digest('hex')}`;
       return paddlePost(request('paddle', body, signature), context('test'));
     };
+    const dispute = (eventId, adjustmentId, action, occurredAt) => ({
+      event_id: eventId, event_type: 'adjustment.updated', occurred_at: occurredAt,
+      data: { id: adjustmentId, action, status: 'approved', type: 'full',
+        transaction_id: 'txn_paddle', currency_code: 'USD', totals: { total: '1200' } },
+    });
+    const disputeOpened = new Date(Date.now() - 3000).toISOString();
+    const disputeReversed = new Date(Date.now() - 2000).toISOString();
+    assert.equal((await signedPaddle(dispute('evt_chargeback', 'adj_chargeback',
+      'chargeback', disputeOpened))).status, 200);
+    assert.notEqual(database.prepare("SELECT disputed_at FROM payment_periods WHERE provider = 'paddle'")
+      .get().disputed_at, null);
+    assert.equal((await signedPaddle(dispute('evt_chargeback_reverse', 'adj_chargeback_reverse',
+      'chargeback_reverse', disputeReversed))).status, 200);
+    assert.equal(database.prepare("SELECT disputed_at FROM payment_periods WHERE provider = 'paddle'")
+      .get().disputed_at, null);
+    assert.equal((await signedPaddle(dispute('evt_chargeback_delayed', 'adj_chargeback',
+      'chargeback', disputeOpened))).status, 200);
+    assert.equal(database.prepare("SELECT disputed_at FROM payment_periods WHERE provider = 'paddle'")
+      .get().disputed_at, null);
+    assert.equal(database.prepare("SELECT COUNT(*) AS n FROM payment_disputes WHERE provider = 'paddle'")
+      .get().n, 2);
     assert.equal((await signedPaddle(adjustment('evt_partial_one', 'adj_partial_one',
       'partial', '600'))).status, 200);
     assert.equal(database.prepare("SELECT refunded_at FROM payment_periods WHERE provider = 'paddle'")

@@ -65,11 +65,35 @@ test('paid periods honor cancellation, partial and full refunds, disputes, expir
     assert.deepEqual(send('partial-refund', { kind: 'refund', paymentId: 'txn_first',
       refundId: 'adj_first', full: false, amountMinor: 300, currency: 'usd' }), { processed: true });
     assert.equal(activeFeaturedSlugs(['mine']).size, 1);
-    assert.deepEqual(send('dispute-open', { kind: 'dispute', paymentId: 'txn_first', open: true }),
+    const disputeOpened = new Date(Date.now() - 3000).toISOString();
+    const disputeWon = new Date(Date.now() - 2000).toISOString();
+    assert.deepEqual(send('dispute-open', { kind: 'dispute', paymentId: 'txn_first',
+      disputeId: 'adj_dispute_first', open: true, terminal: false, occurredAt: disputeOpened }),
       { processed: true });
     assert.equal(activeFeaturedSlugs(['mine']).size, 0);
-    assert.deepEqual(send('dispute-won', { kind: 'dispute', paymentId: 'txn_first', open: false }),
+    assert.deepEqual(send('dispute-won', { kind: 'dispute', paymentId: 'txn_first',
+      disputeId: 'adj_dispute_first', open: false, terminal: true, occurredAt: disputeWon }),
       { processed: true });
+    assert.equal(activeFeaturedSlugs(['mine']).size, 1);
+    assert.deepEqual(send('dispute-open-delayed', { kind: 'dispute', paymentId: 'txn_first',
+      disputeId: 'adj_dispute_first', open: true, terminal: false, occurredAt: disputeOpened }),
+      { processed: true });
+    assert.equal(activeFeaturedSlugs(['mine']).size, 1);
+
+    const concurrentStart = Date.now();
+    assert.deepEqual(send('dispute-a-open', { kind: 'dispute', paymentId: 'txn_first',
+      disputeId: 'adj_dispute_a', open: true, terminal: false,
+      occurredAt: new Date(concurrentStart).toISOString() }), { processed: true });
+    assert.deepEqual(send('dispute-b-open', { kind: 'dispute', paymentId: 'txn_first',
+      disputeId: 'adj_dispute_b', open: true, terminal: false,
+      occurredAt: new Date(concurrentStart + 1000).toISOString() }), { processed: true });
+    assert.deepEqual(send('dispute-a-won', { kind: 'dispute', paymentId: 'txn_first',
+      disputeId: 'adj_dispute_a', open: false, terminal: true,
+      occurredAt: new Date(concurrentStart + 2000).toISOString() }), { processed: true });
+    assert.equal(activeFeaturedSlugs(['mine']).size, 0);
+    assert.deepEqual(send('dispute-b-won', { kind: 'dispute', paymentId: 'txn_first',
+      disputeId: 'adj_dispute_b', open: false, terminal: true,
+      occurredAt: new Date(concurrentStart + 3000).toISOString() }), { processed: true });
     assert.equal(activeFeaturedSlugs(['mine']).size, 1);
 
     const renewalEnds = new Date(Date.now() + 55 * 86_400_000).toISOString();

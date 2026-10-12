@@ -67,9 +67,12 @@ test('moderation and verified payment changes retain one private notice atomical
     assert.equal(database.prepare("SELECT COUNT(*) AS count FROM payment_periods WHERE purchase_id = 'purchase'").get().count, 1);
     assert.equal(listOwnerNotifications('owner').length, 3);
 
+    const disputeAt = Date.now();
     for (const [eventId, effect] of [
-      ['dispute-open', { kind: 'dispute', paymentId: 'txn_paid', open: true }],
-      ['dispute-close', { kind: 'dispute', paymentId: 'txn_paid', open: false }],
+      ['dispute-open', { kind: 'dispute', paymentId: 'txn_paid', disputeId: 'adj_notice',
+        open: true, terminal: false, occurredAt: new Date(disputeAt).toISOString() }],
+      ['dispute-close', { kind: 'dispute', paymentId: 'txn_paid', disputeId: 'adj_notice',
+        open: false, terminal: true, occurredAt: new Date(disputeAt + 1000).toISOString() }],
       ['refund-full', { kind: 'refund', paymentId: 'txn_paid', full: true,
         amountMinor: 1200, currency: 'usd' }],
     ]) {

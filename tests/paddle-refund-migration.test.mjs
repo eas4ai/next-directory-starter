@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-test('refund migration backfills processed Paddle adjustments and revokes a fully refunded period', async () => {
+test('outcome migrations backfill processed Paddle refunds and ordered disputes', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'directory-paddle-refund-migration-'));
   const previous = process.env.DATABASE_URL;
   process.env.DATABASE_URL = `file:${join(directory, 'catalog.db')}`;
@@ -44,7 +44,9 @@ test('refund migration backfills processed Paddle adjustments and revokes a full
       VALUES ('purchase', 'mine', ?, ?, 1, NULL)`).run(now.toISOString(), ends);
 
     database.exec(`DROP TABLE payment_refunds;
-      DELETE FROM catalog_migrations WHERE version = 24;`);
+      DROP TABLE payment_disputes;
+      DELETE FROM catalog_migrations WHERE version IN (24, 25);
+      UPDATE payment_periods SET disputed_at = '${now.toISOString()}' WHERE id = 'period';`);
     const save = database.prepare(`INSERT INTO payment_evidence
       (provider, mode, event_id, event_type, payload, state, attempts,
         received_at, processed_at)
@@ -64,6 +66,18 @@ test('refund migration backfills processed Paddle adjustments and revokes a full
       effect: { kind: 'refund', paymentId: 'txn_paid', full: false,
         amountMinor: 600, currency: 'USD' },
     }), now.toISOString(), now.toISOString());
+    const disputePayload = (id, action, occurredAt, open) => JSON.stringify({
+      raw: { event_id: `event-${id}`, event_type: 'adjustment.updated', occurred_at: occurredAt,
+        data: { id, action, status: 'approved', type: 'full',
+          transaction_id: 'txn_paid', currency_code: 'USD' } },
+      effect: { kind: 'dispute', paymentId: 'txn_paid', open },
+    });
+    const chargebackAt = new Date(now.getTime() - 2000).toISOString();
+    const reversedAt = new Date(now.getTime() - 1000).toISOString();
+    save.run('dispute-reversed', disputePayload('adj_reversed', 'chargeback_reverse',
+      reversedAt, false), reversedAt, reversedAt);
+    save.run('dispute-open', disputePayload('adj_chargeback', 'chargeback',
+      chargebackAt, true), now.toISOString(), now.toISOString());
 
     migrateCatalog();
     migrateCatalog();
@@ -76,6 +90,11 @@ test('refund migration backfills processed Paddle adjustments and revokes a full
       .get().status, 'refunded');
     assert.equal(database.prepare(`SELECT COUNT(*) AS n FROM catalog_migrations
       WHERE version = 24`).get().n, 1);
+    assert.equal(database.prepare('SELECT COUNT(*) AS n FROM payment_disputes').get().n, 2);
+    assert.equal(database.prepare("SELECT disputed_at FROM payment_periods WHERE id = 'period'")
+      .get().disputed_at, null);
+    assert.equal(database.prepare(`SELECT COUNT(*) AS n FROM catalog_migrations
+      WHERE version = 25`).get().n, 1);
   } finally {
     database?.close();
     if (previous === undefined) delete process.env.DATABASE_URL;

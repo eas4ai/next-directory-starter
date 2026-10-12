@@ -74,8 +74,8 @@ test('signed Stripe hosted checkout, recurring invoice, and refund match the pur
         method: 'POST', body, headers: { 'stripe-signature': signature },
       }));
     };
-    const event = (id, type, object, livemode = false) => ({
-      id, type, object: 'event', livemode, created: Math.floor(Date.now() / 1000),
+    const event = (id, type, object, created = Math.floor(Date.now() / 1000), livemode = false) => ({
+      id, type, object: 'event', livemode, created,
       data: { object },
     });
     const oneTime = event('evt_once', 'checkout.session.completed', {
@@ -151,14 +151,25 @@ test('signed Stripe hosted checkout, recurring invoice, and refund match the pur
     });
     assert.equal(database.prepare("SELECT COUNT(*) AS n FROM entitlements WHERE purchase_id = 'month-purchase'")
       .get().n, 1);
+    const disputeOpened = Math.floor(Date.now() / 1000) - 10;
+    const disputeClosed = disputeOpened + 5;
     assert.equal((await send(event('evt_dispute_open', 'charge.dispute.created', {
-      object: 'dispute', payment_intent: 'pi_month', status: 'needs_response',
-    }))).status, 200);
+      id: 'dp_month', object: 'dispute', payment_intent: 'pi_month', status: 'needs_response',
+    }, disputeOpened))).status, 200);
     assert.notEqual(database.prepare("SELECT disputed_at FROM payment_periods WHERE purchase_id = 'month-purchase'")
       .get().disputed_at, null);
     assert.equal((await send(event('evt_dispute_won', 'charge.dispute.closed', {
-      object: 'dispute', payment_intent: 'pi_month', status: 'won',
-    }))).status, 200);
+      id: 'dp_month', object: 'dispute', payment_intent: 'pi_month', status: 'won',
+    }, disputeClosed))).status, 200);
+    assert.equal(database.prepare("SELECT disputed_at FROM payment_periods WHERE purchase_id = 'month-purchase'")
+      .get().disputed_at, null);
+    assert.equal((await send(event('evt_dispute_open_delayed', 'charge.dispute.created', {
+      id: 'dp_month', object: 'dispute', payment_intent: 'pi_month', status: 'needs_response',
+    }, disputeOpened))).status, 200);
+    assert.deepEqual(database.prepare(`SELECT open, terminal FROM payment_disputes
+      WHERE provider = 'stripe' AND provider_dispute_id = 'dp_month'`).get(), {
+      open: 0, terminal: 1,
+    });
     assert.equal(database.prepare("SELECT disputed_at FROM payment_periods WHERE purchase_id = 'month-purchase'")
       .get().disputed_at, null);
   } finally {
