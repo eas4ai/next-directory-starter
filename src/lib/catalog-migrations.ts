@@ -502,6 +502,158 @@ function migrateAgentImportPublications(): void {
   });
 }
 
+type HistoricalPaddleEvidence = {
+  mode: string; payload: string; received_at: string; processed_at: string | null;
+};
+
+type HistoricalPaddleRefund = {
+  refundId: string; paymentId: string; amountMinor: number; currency: string;
+  recordedAt: string;
+};
+
+type PaddleRefundPeriod = {
+  id: string; purchase_id: string; amount_minor: number; currency: string;
+  billing_mode: string;
+};
+
+function objectValue(value: unknown): Record<string, unknown> | null {
+  if (value === null || Array.isArray(value) || typeof value !== "object") return null;
+  return value as Record<string, unknown>;
+}
+
+function nonEmptyString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function historicalPaddleRefund(row: HistoricalPaddleEvidence): HistoricalPaddleRefund | null {
+  let saved: Record<string, unknown> | null;
+  try {
+    saved = objectValue(JSON.parse(row.payload));
+  } catch {
+    return null;
+  }
+  const effect = objectValue(saved?.effect);
+  if (effect?.kind !== "refund") return null;
+  const paymentId = nonEmptyString(effect.paymentId);
+  const currency = nonEmptyString(effect.currency)?.toLowerCase() ?? null;
+  const amountMinor = effect.amountMinor;
+  if (!paymentId || !currency || typeof amountMinor !== "number" ||
+      !Number.isSafeInteger(amountMinor) || amountMinor <= 0) return null;
+  const raw = objectValue(saved?.raw);
+  const data = objectValue(raw?.data);
+  let refundId = data?.action === "refund" && data.status === "approved"
+    ? nonEmptyString(data.id) : null;
+  const resource = nonEmptyString(raw?.resource);
+  if (!refundId && resource?.endsWith(":approved")) {
+    refundId = resource.slice(0, -":approved".length);
+  }
+  if (!refundId || refundId.length > 200) return null;
+  return {
+    refundId, paymentId, amountMinor, currency,
+    recordedAt: row.processed_at ?? row.received_at,
+  };
+}
+
+function importHistoricalPaddleRefund(mode: string, refund: HistoricalPaddleRefund): void {
+  const period = database.prepare(`SELECT pp.id, pp.purchase_id, pp.amount_minor,
+      pp.currency, p.billing_mode
+    FROM payment_periods pp JOIN purchases p ON p.id = pp.purchase_id
+    WHERE pp.provider = 'paddle' AND p.provider = 'paddle' AND p.plan_mode = ?
+      AND pp.provider_payment_id = ?`).get(mode, refund.paymentId) as
+      PaddleRefundPeriod | undefined;
+  if (!period || refund.currency !== period.currency ||
+      refund.amountMinor > period.amount_minor) return;
+  const prior = database.prepare(`SELECT payment_period_id, amount_minor, currency
+    FROM payment_refunds WHERE provider = 'paddle' AND provider_refund_id = ?`)
+    .get(refund.refundId) as { payment_period_id: string; amount_minor: number;
+      currency: string } | undefined;
+  if (prior && (prior.payment_period_id !== period.id ||
+      prior.amount_minor !== refund.amountMinor || prior.currency !== refund.currency)) {
+    throw new Error("Conflicting historical Paddle refund evidence");
+  }
+  if (prior) return;
+  database.prepare(`INSERT INTO payment_refunds
+    (provider, provider_refund_id, payment_period_id, amount_minor, currency, recorded_at)
+    VALUES ('paddle', ?, ?, ?, ?, ?)`).run(
+    refund.refundId, period.id, refund.amountMinor, refund.currency, refund.recordedAt,
+  );
+}
+
+function refundTotal(period: PaddleRefundPeriod): { amount: number; recordedAt: string | null } {
+  const refunds = database.prepare(`SELECT amount_minor, recorded_at
+    FROM payment_refunds WHERE payment_period_id = ?
+    ORDER BY recorded_at, provider_refund_id`).all(period.id) as
+      { amount_minor: number; recorded_at: string }[];
+  let amount = 0;
+  for (const refund of refunds) {
+    amount = Math.min(period.amount_minor, amount + refund.amount_minor);
+  }
+  return { amount, recordedAt: refunds.at(-1)?.recorded_at ?? null };
+}
+
+function applyHistoricalPaddleRefunds(): Set<string> {
+  const periods = database.prepare(`SELECT pp.id, pp.purchase_id, pp.amount_minor,
+      pp.currency, p.billing_mode
+    FROM payment_periods pp JOIN purchases p ON p.id = pp.purchase_id
+    WHERE pp.provider = 'paddle'
+      AND EXISTS (SELECT 1 FROM payment_refunds r WHERE r.payment_period_id = pp.id)`)
+    .all() as PaddleRefundPeriod[];
+  const affected = new Set<string>();
+  for (const period of periods) {
+    const total = refundTotal(period);
+    if (total.amount < period.amount_minor) continue;
+    database.prepare(`UPDATE payment_periods SET refunded_at = COALESCE(refunded_at, ?)
+      WHERE id = ?`).run(total.recordedAt ?? new Date().toISOString(), period.id);
+    if (period.billing_mode === "one-time") {
+      database.prepare("UPDATE purchases SET status = 'refunded' WHERE id = ?")
+        .run(period.purchase_id);
+    }
+    affected.add(period.purchase_id);
+  }
+  return affected;
+}
+
+function refreshHistoricalRefundEntitlements(purchaseIds: Set<string>): void {
+  const refresh = database.prepare(`UPDATE entitlements SET
+      starts_at = COALESCE((SELECT MIN(starts_at) FROM payment_periods
+        WHERE purchase_id = ? AND refunded_at IS NULL AND disputed_at IS NULL), starts_at),
+      ends_at = COALESCE((SELECT MAX(ends_at) FROM payment_periods
+        WHERE purchase_id = ? AND refunded_at IS NULL AND disputed_at IS NULL), ends_at),
+      revoked_at = CASE WHEN EXISTS (SELECT 1 FROM payment_periods
+        WHERE purchase_id = ? AND refunded_at IS NULL AND disputed_at IS NULL)
+        THEN NULL ELSE COALESCE(revoked_at, ?) END
+    WHERE purchase_id = ?`);
+  for (const purchaseId of purchaseIds) {
+    refresh.run(purchaseId, purchaseId, purchaseId, new Date().toISOString(), purchaseId);
+  }
+}
+
+function migratePaddleRefundLedger(): void {
+  applyCatalogMigration(24, () => {
+    database.exec(`CREATE TABLE payment_refunds (
+        provider TEXT NOT NULL,
+        provider_refund_id TEXT NOT NULL,
+        payment_period_id TEXT NOT NULL REFERENCES payment_periods(id) ON DELETE CASCADE,
+        amount_minor INTEGER NOT NULL CHECK (amount_minor > 0),
+        currency TEXT NOT NULL,
+        recorded_at TEXT NOT NULL,
+        PRIMARY KEY (provider, provider_refund_id)
+      );
+      CREATE INDEX payment_refunds_period
+        ON payment_refunds(payment_period_id, recorded_at, provider_refund_id);`);
+
+    const rows = database.prepare(`SELECT mode, payload, received_at, processed_at
+      FROM payment_evidence
+      WHERE provider = 'paddle' AND state = 'processed'
+      ORDER BY received_at, event_id`).all() as HistoricalPaddleEvidence[];
+    for (const row of rows) {
+      const refund = historicalPaddleRefund(row);
+      if (refund) importHistoricalPaddleRefund(row.mode, refund);
+    }
+    refreshHistoricalRefundEntitlements(applyHistoricalPaddleRefunds());
+  });
+}
+
 export function migrateCatalog(explicit = false): void {
   if (process.env.DIRECTORY_EXPLICIT_MIGRATIONS === "1" && !explicit) return;
   migrate.immediate();
@@ -533,6 +685,7 @@ export function migrateCatalog(explicit = false): void {
       CHECK (base_revision IS NULL OR base_revision > 0)`);
   });
   migrateAgentImportPublications();
+  migratePaddleRefundLedger();
 }
 
 export function seedCatalog(): void {

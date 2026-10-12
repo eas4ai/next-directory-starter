@@ -46,6 +46,7 @@ test('hosted checkout reserves one immutable purchase and never retries an ambig
     profile('stripe', [{ planKey: 'monthly-featured', priceId: 'price_monthly' }]);
     profile('paddle', [{ planKey: 'monthly-featured', priceId: 'pri_monthly' },
       { planKey: 'one-time-featured', priceId: 'pri_once' }]);
+    assert.deepEqual(checkoutProvidersForPlan(planByKey('one-time-featured')), ['paddle']);
     profile('nowpayments', []);
     assert.deepEqual(checkoutProvidersForPlan(planByKey('monthly-featured')), ['stripe', 'paddle']);
     assert.deepEqual(checkoutProvidersForPlan(planByKey('one-time-featured')), ['paddle', 'nowpayments']);

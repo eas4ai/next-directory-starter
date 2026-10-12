@@ -118,9 +118,11 @@ export function paddleEffect(payload: unknown): PaymentEffect {
     const amount = string(totals?.total);
     const amountMinor = amount && /^\d+$/.test(amount) ? Number(amount) : null;
     const currency = string(data?.currency_code);
+    const refundId = string(data?.id);
     return data?.action === "refund" && data.status === "approved" &&
-      amountMinor !== null && Number.isSafeInteger(amountMinor) && currency
-      ? { kind: "refund", paymentId, full: data.type === "full", amountMinor, currency }
+      amountMinor !== null && Number.isSafeInteger(amountMinor) && currency && refundId
+      ? { kind: "refund", paymentId, refundId,
+        full: data.type === "full", amountMinor, currency }
       : { kind: "noop" };
   }
   if (eventType === "subscription.updated" || eventType === "subscription.canceled") {

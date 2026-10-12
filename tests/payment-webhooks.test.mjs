@@ -117,8 +117,9 @@ test('Paddle and NOWPayments signatures authenticate the exact mode and purchase
     assert.equal(database.prepare('SELECT COUNT(*) AS n FROM payment_periods').get().n, 4);
     assert.equal(database.prepare('SELECT COUNT(*) AS n FROM entitlements').get().n, 4);
 
-    const adjustment = (id, type, amount) => ({ event_id: id, event_type: 'adjustment.updated',
-      data: { id, action: 'refund', status: 'approved', type,
+    const adjustment = (eventId, adjustmentId, type, amount) => ({
+      event_id: eventId, event_type: 'adjustment.updated',
+      data: { id: adjustmentId, action: 'refund', status: 'approved', type,
         transaction_id: 'txn_paddle', currency_code: 'USD', totals: { total: amount } } });
     const signedPaddle = async (payload) => {
       const body = JSON.stringify(payload);
@@ -127,10 +128,16 @@ test('Paddle and NOWPayments signatures authenticate the exact mode and purchase
         .update(`${ts}:${body}`).digest('hex')}`;
       return paddlePost(request('paddle', body, signature), context('test'));
     };
-    assert.equal((await signedPaddle(adjustment('adj_partial', 'partial', '300'))).status, 200);
+    assert.equal((await signedPaddle(adjustment('evt_partial_one', 'adj_partial_one',
+      'partial', '600'))).status, 200);
     assert.equal(database.prepare("SELECT refunded_at FROM payment_periods WHERE provider = 'paddle'")
       .get().refunded_at, null);
-    assert.equal((await signedPaddle(adjustment('adj_full', 'full', '1200'))).status, 200);
+    assert.equal((await signedPaddle(adjustment('evt_partial_one_replay', 'adj_partial_one',
+      'partial', '600'))).status, 200);
+    assert.equal(database.prepare("SELECT COUNT(*) AS n FROM payment_refunds WHERE provider = 'paddle'")
+      .get().n, 1);
+    assert.equal((await signedPaddle(adjustment('evt_partial_two', 'adj_partial_two',
+      'partial', '600'))).status, 200);
     assert.notEqual(database.prepare("SELECT refunded_at FROM payment_periods WHERE provider = 'paddle'")
       .get().refunded_at, null);
     const refundedNow = { ...nowPayload, payment_status: 'refunded' };
