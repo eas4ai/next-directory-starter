@@ -82,6 +82,21 @@ function formArticle(form: HTMLFormElement) {
   };
 }
 
+async function patchArticle(slug: string, input: Record<string, unknown>, fallback: string):
+Promise<{ article: Article } | { error: string }> {
+  try {
+    const response = await fetch(`/api/admin/articles/${encodeURIComponent(slug)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    const data = await response.json() as { article?: Article; error?: string };
+    return response.ok && data.article ? { article: data.article } : { error: data.error ?? fallback };
+  } catch {
+    return { error: "Could not connect to the server. Try again." };
+  }
+}
+
 function SavedArticles({ articles, pending, onEdit, onUnpublish }: {
   articles: Article[];
   pending: boolean;
@@ -116,6 +131,21 @@ export function ArticleEditor({ initialArticles, categories }: { initialArticles
   const [renameSlug, setRenameSlug] = useState("");
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
+
+  async function changeArticle(slug: string, input: Record<string, unknown>,
+    fallback: string, success: string): Promise<Article | undefined> {
+    setPending(true);
+    setMessage("");
+    const result = await patchArticle(slug, input, fallback);
+    setPending(false);
+    if ("error" in result) {
+      setMessage(result.error);
+      return undefined;
+    }
+    setMessage(success);
+    router.refresh();
+    return result.article;
+  }
 
   async function save(event: FormEvent<HTMLFormElement>, slug?: string) {
     event.preventDefault();
@@ -166,67 +196,28 @@ export function ArticleEditor({ initialArticles, categories }: { initialArticles
 
   async function publish() {
     if (!editing) return;
-    setPending(true);
-    setMessage("");
-    try {
-      const response = await fetch(`/api/admin/articles/${encodeURIComponent(editing.slug)}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "publish", version: editing.version }),
-      });
-      if (!response.ok) {
-        setMessage((await response.json()).error ?? "Could not publish the article.");
-        return;
-      }
-      setEditing((await response.json() as { article: Article }).article);
-      setMessage("Saved revision published.");
-      router.refresh();
-    } catch {
-      setMessage("Could not connect to the server. Try again.");
-    } finally {
-      setPending(false);
-    }
+    const article = await changeArticle(editing.slug,
+      { action: "publish", version: editing.version },
+      "Could not publish the article.", "Saved revision published.");
+    if (article) setEditing(article);
   }
 
   async function unpublish(article: Article) {
-    setPending(true);
-    setMessage("");
-    try {
-      const response = await fetch(`/api/admin/articles/${encodeURIComponent(article.slug)}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "unpublish", version: article.version }),
-      });
-      if (!response.ok) {
-        setMessage((await response.json()).error ?? "Could not unpublish the article.");
-        return;
-      }
-      const current = (await response.json() as { article: Article }).article;
-      if (editing?.slug === article.slug) setEditing(current);
-      setMessage("Article unpublished.");
-      router.refresh();
-    } catch {
-      setMessage("Could not connect to the server. Try again.");
-    } finally {
-      setPending(false);
-    }
+    const current = await changeArticle(article.slug,
+      { action: "unpublish", version: article.version },
+      "Could not unpublish the article.", "Article unpublished.");
+    if (current && editing?.slug === article.slug) setEditing(current);
   }
 
   async function rename() {
     if (!editing || renameSlug === editing.slug) return;
-    setPending(true);
-    setMessage("");
-    try {
-      const response = await fetch(`/api/admin/articles/${encodeURIComponent(editing.slug)}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "rename", newSlug: renameSlug, version: editing.version }),
-      });
-      if (!response.ok) { setMessage((await response.json()).error ?? "Could not rename article."); return; }
-      const article = (await response.json() as { article: Article }).article;
-      setEditing(article);
-      setRenameSlug(article.slug);
-      setMessage("Article slug changed. The old published address now redirects here.");
-      router.refresh();
-    } catch { setMessage("Could not connect to the server. Try again."); }
-    finally { setPending(false); }
+    const article = await changeArticle(editing.slug,
+      { action: "rename", newSlug: renameSlug, version: editing.version },
+      "Could not rename article.",
+      "Article slug changed. The old published address now redirects here.");
+    if (!article) return;
+    setEditing(article);
+    setRenameSlug(article.slug);
   }
 
   return (
