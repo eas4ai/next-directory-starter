@@ -32,6 +32,7 @@ export type PaymentEffect = PaidEffect | { kind: "noop" } | {
 } | {
   kind: "refund";
   paymentId: string;
+  refundId?: string;
   full: boolean;
   amountMinor: number;
   currency: string;
@@ -233,10 +234,12 @@ function refreshEntitlement(purchaseId: string): void {
   }
 }
 
-function matchingPeriod(evidence: VerifiedEvidence, paymentId: string): {
+type PaymentPeriod = {
   id: string; purchase_id: string; amount_minor: number; currency: string;
   billing_mode: string;
-} {
+};
+
+function matchingPeriod(evidence: VerifiedEvidence, paymentId: string): PaymentPeriod {
   if (!paymentId || paymentId.length > 200) throw new PaymentLifecycleError(400, "Invalid payment reference");
   const rows = database.prepare(`SELECT pp.id, pp.purchase_id, pp.amount_minor, pp.currency,
       p.billing_mode FROM payment_periods pp JOIN purchases p ON p.id = pp.purchase_id
@@ -249,6 +252,41 @@ function matchingPeriod(evidence: VerifiedEvidence, paymentId: string): {
   return rows[0];
 }
 
+function paddleRefundFullyRefunded(period: PaymentPeriod,
+  effect: Extract<PaymentEffect, { kind: "refund" }>): boolean {
+  if (!effect.refundId) {
+    if (effect.full) return true;
+    throw new PaymentLifecycleError(409, "Paddle partial refund has no stable adjustment ID");
+  }
+  if (effect.refundId.length > 200 || effect.amountMinor > period.amount_minor) {
+    throw new PaymentLifecycleError(409, "Paddle refund terms do not match the paid period");
+  }
+  const prior = database.prepare(`SELECT payment_period_id, amount_minor, currency
+    FROM payment_refunds WHERE provider = 'paddle' AND provider_refund_id = ?`)
+    .get(effect.refundId) as { payment_period_id: string; amount_minor: number;
+      currency: string } | undefined;
+  if (prior && (prior.payment_period_id !== period.id ||
+      prior.amount_minor !== effect.amountMinor || prior.currency !== period.currency)) {
+    throw new PaymentLifecycleError(409, "Paddle refund conflicts with prior evidence");
+  }
+  if (!prior) {
+    database.prepare(`INSERT INTO payment_refunds
+      (provider, provider_refund_id, payment_period_id, amount_minor, currency, recorded_at)
+      VALUES ('paddle', ?, ?, ?, ?, ?)`).run(
+      effect.refundId, period.id, effect.amountMinor, period.currency,
+      new Date().toISOString(),
+    );
+  }
+  const refunds = database.prepare(`SELECT amount_minor FROM payment_refunds
+    WHERE provider = 'paddle' AND payment_period_id = ?`).all(period.id) as
+      { amount_minor: number }[];
+  let total = 0;
+  for (const refund of refunds) {
+    total = Math.min(period.amount_minor, total + refund.amount_minor);
+  }
+  return effect.full || total >= period.amount_minor;
+}
+
 function refundPeriod(evidence: VerifiedEvidence,
   effect: Extract<PaymentEffect, { kind: "refund" }>): void {
   const period = matchingPeriod(evidence, effect.paymentId);
@@ -256,7 +294,10 @@ function refundPeriod(evidence: VerifiedEvidence,
       effect.currency.toLowerCase() !== period.currency) {
     throw new PaymentLifecycleError(409, "Refund terms do not match the paid period");
   }
-  if (!effect.full) return;
+  const fullyRefunded = evidence.provider === "paddle"
+    ? paddleRefundFullyRefunded(period, effect)
+    : effect.full;
+  if (!fullyRefunded) return;
   const changed = database.prepare("UPDATE payment_periods SET refunded_at = ? WHERE id = ? AND refunded_at IS NULL")
     .run(new Date().toISOString(), period.id);
   if (!changed.changes) return;

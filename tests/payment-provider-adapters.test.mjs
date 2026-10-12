@@ -44,6 +44,7 @@ test('provider SDK recovery reads existing payments and cancellation schedules o
       .run(id, `pending:${id}`, new Date().toISOString(), provider, resource, price);
     purchase('stripe-purchase', 'stripe', 'cs_stripe', 'price_once');
     purchase('paddle-purchase', 'paddle', 'txn_paddle', 'pri_once');
+    purchase('paddle-refunds', 'paddle', 'txn_paddle_refunds', 'pri_once');
     purchase('now-purchase', 'nowpayments', 'invoice_now', null);
     database.prepare(`INSERT INTO purchases
       (id, listing_slug, owner_user_id, plan_key, plan_mode, billing_mode, plan_name,
@@ -100,14 +101,25 @@ test('provider SDK recovery reads existing payments and cancellation schedules o
         url.searchParams.get('payment_intent') === 'pi_legacy'
           ? [{ id: 'dp_legacy', status: 'needs_response', created: 1 }]
           : [], has_more: false });
-      if (url.pathname === '/transactions/txn_paddle') return reply({ data: {
-        id: 'txn_paddle', status: 'completed', currency_code: 'USD',
+      if (url.pathname === '/transactions/txn_paddle' ||
+          url.pathname === '/transactions/txn_paddle_refunds') {
+        const withRefunds = url.pathname.endsWith('_refunds');
+        return reply({ data: {
+        id: withRefunds ? 'txn_paddle_refunds' : 'txn_paddle',
+        status: 'completed', currency_code: 'USD',
         created_at: new Date().toISOString(), items: [{ quantity: 1,
           price: { id: 'pri_once', unit_price: { amount: '1200', currency_code: 'USD' },
             quantity: { minimum: 1, maximum: 100 } } }],
         payments: [], details: { tax_rates_used: [], line_items: [],
           totals: { grand_total: '1200', currency_code: 'USD' } },
+        adjustments: withRefunds ? [
+          { id: 'adj_reconcile_one', action: 'refund', status: 'approved',
+            currency_code: 'USD', totals: { total: '600' }, items: [{ type: 'partial' }] },
+          { id: 'adj_reconcile_two', action: 'refund', status: 'approved',
+            currency_code: 'USD', totals: { total: '600' }, items: [{ type: 'partial' }] },
+        ] : [],
       } });
+      }
       if (url.pathname === '/v1/auth') return reply({ token: 'fixture.jwt.token' });
       if (url.pathname === '/v1/payment/') return reply({ data: [{
         payment_id: 12345, invoice_id: 'invoice_now', payment_status: 'finished',
@@ -120,6 +132,14 @@ test('provider SDK recovery reads existing payments and cancellation schedules o
         purchaseId: id, found: 1, processed: 1, unresolved: 0,
       });
     }
+    assert.deepEqual(await reconcilePurchase('paddle-refunds', 5), {
+      purchaseId: 'paddle-refunds', found: 3, processed: 3, unresolved: 0,
+    });
+    assert.equal(database.prepare("SELECT status FROM purchases WHERE id = 'paddle-refunds'")
+      .get().status, 'refunded');
+    assert.equal(database.prepare(`SELECT COUNT(*) AS n FROM payment_refunds r
+      JOIN payment_periods p ON p.id = r.payment_period_id
+      WHERE p.purchase_id = 'paddle-refunds'`).get().n, 2);
     assert.deepEqual(await reconcilePurchase('stripe-early', 5, undefined, 'cs_early'), {
       purchaseId: 'stripe-early', found: 1, processed: 1, unresolved: 0,
     });
@@ -144,7 +164,7 @@ test('provider SDK recovery reads existing payments and cancellation schedules o
     assert.deepEqual(database.prepare(`SELECT starts_at, ends_at, revoked_at IS NOT NULL AS revoked
       FROM entitlements WHERE purchase_id = 'stripe-legacy'`).get(),
     { starts_at: legacyStartsAt, ends_at: legacyEndsAt, revoked: 1 });
-    assert.equal(database.prepare('SELECT COUNT(*) AS n FROM payment_periods').get().n, 5);
+    assert.equal(database.prepare('SELECT COUNT(*) AS n FROM payment_periods').get().n, 6);
     assert.equal(requested.includes('GET /v1/checkout/sessions/cs_stripe'), true);
     assert.equal(requested.includes('GET /transactions/txn_paddle'), true);
     assert.equal(requested.includes('GET /v1/payment/'), true);

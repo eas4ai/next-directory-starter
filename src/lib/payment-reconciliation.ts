@@ -269,7 +269,7 @@ async function inspectPaddle(purchase: Purchase, limit: number): Promise<Verifie
         const amountMinor = Number(adjustment.totals?.total);
         if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0) continue;
         results.push(evidence(purchase, "refund", `${adjustment.id}:${adjustment.status}`, {
-          kind: "refund", paymentId: transaction.id,
+          kind: "refund", paymentId: transaction.id, refundId: adjustment.id,
           full: adjustment.items.length === 1 && adjustment.items[0].type === "full",
           amountMinor, currency: adjustment.currencyCode,
         }));

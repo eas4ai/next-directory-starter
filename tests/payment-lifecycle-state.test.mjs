@@ -63,7 +63,7 @@ test('paid periods honor cancellation, partial and full refunds, disputes, expir
     assert.equal(database.prepare("SELECT ends_at FROM entitlements WHERE purchase_id = 'purchase'").get().ends_at, ends);
 
     assert.deepEqual(send('partial-refund', { kind: 'refund', paymentId: 'txn_first',
-      full: false, amountMinor: 300, currency: 'usd' }), { processed: true });
+      refundId: 'adj_first', full: false, amountMinor: 300, currency: 'usd' }), { processed: true });
     assert.equal(activeFeaturedSlugs(['mine']).size, 1);
     assert.deepEqual(send('dispute-open', { kind: 'dispute', paymentId: 'txn_first', open: true }),
       { processed: true });
@@ -86,9 +86,16 @@ test('paid periods honor cancellation, partial and full refunds, disputes, expir
       subscriptionId: 'sub_first', state: 'canceled', occurredAt: new Date(Date.now() + 1000).toISOString() }),
       { processed: true });
     assert.equal(activeFeaturedSlugs(['mine']).size, 1);
-    assert.deepEqual(send('full-refund-first', { kind: 'refund', paymentId: 'txn_first',
-      full: true, amountMinor: 1200, currency: 'usd' }), { processed: true });
+    assert.deepEqual(send('partial-refund-replay', { kind: 'refund', paymentId: 'txn_first',
+      refundId: 'adj_first', full: false, amountMinor: 300, currency: 'usd' }), { processed: true });
+    assert.equal(database.prepare("SELECT COUNT(*) AS n FROM payment_refunds WHERE payment_period_id = (SELECT id FROM payment_periods WHERE provider_payment_id = 'txn_first')").get().n, 1);
+    assert.deepEqual(send('partial-refund-almost', { kind: 'refund', paymentId: 'txn_first',
+      refundId: 'adj_second', full: false, amountMinor: 899, currency: 'usd' }), { processed: true });
+    assert.equal(activeFeaturedSlugs(['mine']).size, 1);
+    assert.deepEqual(send('partial-refund-threshold', { kind: 'refund', paymentId: 'txn_first',
+      refundId: 'adj_third', full: false, amountMinor: 1, currency: 'usd' }), { processed: true });
     assert.equal(activeFeaturedSlugs(['mine']).size, 0);
+    assert.equal(database.prepare("SELECT COUNT(*) AS n FROM payment_refunds WHERE payment_period_id = (SELECT id FROM payment_periods WHERE provider_payment_id = 'txn_first')").get().n, 3);
     assert.equal(database.prepare("SELECT revoked_at FROM entitlements WHERE purchase_id = 'purchase'")
       .get().revoked_at !== null, true);
     assert.deepEqual(send('paid-later', paid('txn_third', 'txn_third', starts, ends)),
