@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: dispute-event-ordering
+Current: expired-hosted-checkout-blocks
 
 ## public-starter-and-theme
 
@@ -543,3 +543,9 @@ Delivers backlog item paddle-partial-refunds: Audit 2026-10-11 (M11, reported, n
 Requirements: COM-008
 
 Delivers backlog item dispute-event-ordering: Audit 2026-10-11 (M12, reported, not re-verified). Dispute effects keep only the payment reference and an open flag; disputePeriod (src/lib/payment-lifecycle.ts:243) toggles disputed_at without checking dispute id, event time, or terminal state. A delayed charge.dispute.created arriving after charge.dispute.closed (won) revokes placement again. Track each dispute's id and state and ignore older events.
+
+## expired-hosted-checkout-blocks
+
+Requirements: COM-006
+
+Delivers backlog item expired-hosted-checkout-blocks: Audit 2026-10-11 (M13, reported, not re-verified). Stripe checkout.session.expired is a noop (src/lib/payment-normalizers.ts:67), so the purchase stays pending. A new request with the same terms returns the expired URL (src/lib/hosted-checkout.ts:50); different terms get 'Another checkout is pending'; owners cannot cancel a pending purchase. Record confirmed expiry or cancellation and allow a replacement checkout.
