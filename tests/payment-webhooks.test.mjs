@@ -62,6 +62,17 @@ test('Paddle and NOWPayments signatures authenticate the exact mode and purchase
         [provider === 'paddle' ? 'paddle-signature' : 'x-nowpayments-sig']: signature,
       } : {},
     });
+    const oversized = (provider) => new Request(
+      `https://directory.example/api/webhooks/${provider}/test`, {
+        method: 'POST',
+        body: '{}',
+        headers: {
+          [provider === 'paddle' ? 'paddle-signature' : 'x-nowpayments-sig']: 'present',
+          'Content-Length': '1000001',
+        },
+      });
+    assert.equal((await paddlePost(oversized('paddle'), context('test'))).status, 413);
+    assert.equal((await nowPost(oversized('nowpayments'), context('test'))).status, 413);
     const paddlePayload = { event_id: 'evt_paddle', event_type: 'transaction.completed',
       data: { id: 'txn_paddle', status: 'completed', currency_code: 'USD',
         custom_data: { purchaseId: 'paddle-purchase' },

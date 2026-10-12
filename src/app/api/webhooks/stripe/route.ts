@@ -4,6 +4,7 @@ import { billingProfileErrorResponse, stripeWebhookCandidates } from "@/lib/bill
 import { database } from "@/lib/database";
 import { PaymentLifecycleError, paymentLifecycleErrorResponse, retainVerifiedEvidence } from "@/lib/payment-lifecycle";
 import { stripeEffect } from "@/lib/payment-normalizers";
+import { RequestTooLargeError, requestText } from "@/lib/request-json";
 
 function verifiedEvent(body: string, signature: string,
   candidates: ReturnType<typeof stripeWebhookCandidates>):
@@ -74,8 +75,15 @@ export async function POST(request: Request) {
   if (!candidates.length) return Response.json({ error: "Stripe webhook is not configured" }, { status: 503 });
   const signature = request.headers.get("stripe-signature");
   if (!signature) return Response.json({ error: "Missing Stripe signature" }, { status: 400 });
-  const body = await request.text();
-  if (body.length > 1_000_000) return Response.json({ error: "Webhook is too large" }, { status: 413 });
+  let body: string;
+  try {
+    body = await requestText(request, 1_000_000);
+  } catch (error) {
+    if (error instanceof RequestTooLargeError) {
+      return Response.json({ error: "Webhook is too large" }, { status: 413 });
+    }
+    throw error;
+  }
   const verified = verifiedEvent(body, signature, candidates);
   if (!verified) return Response.json({ error: "Invalid Stripe signature or mode" }, { status: 400 });
   try {

@@ -39,6 +39,10 @@ export async function requestJson(request: Request, maxBytes = 8192): Promise<un
   return JSON.parse(body) as unknown;
 }
 
+export async function requestText(request: Request, maxBytes: number): Promise<string> {
+  return new TextDecoder().decode(await requestBytes(request, maxBytes));
+}
+
 export async function requestWithBodyLimit(request: Request, maxBytes: number): Promise<Request> {
   const body = await requestBytes(request, maxBytes);
   return new Request(request.url, {

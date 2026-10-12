@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   RequestTooLargeError,
   requestJson,
+  requestText,
   requestWithBodyLimit,
 } from '../src/lib/request-json.ts';
 
@@ -54,6 +55,13 @@ test('requestWithBodyLimit preserves request metadata and exact body bytes', asy
   assert.equal(bounded.method, 'POST');
   assert.equal(bounded.headers.get('x-test'), 'preserved');
   assert.deepEqual(await bounded.json(), { ok: true });
+});
+
+test('requestText preserves signed payload bytes as text within the cap', async () => {
+  const encoder = new TextEncoder();
+  const { request } = streamedRequest([encoder.encode('{"currency":"€"}')]);
+
+  assert.equal(await requestText(request, 64), '{"currency":"€"}');
 });
 
 test('requestWithBodyLimit rejects a declared oversized body and cancels it', async () => {

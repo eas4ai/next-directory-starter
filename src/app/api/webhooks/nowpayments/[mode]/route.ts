@@ -1,6 +1,7 @@
 import { billingProfileErrorResponse, providerWebhookSecret, type BillingMode } from "@/lib/billing-profiles";
 import { paymentLifecycleErrorResponse, retainVerifiedEvidence } from "@/lib/payment-lifecycle";
 import { nowPaymentsEffect } from "@/lib/payment-normalizers";
+import { RequestTooLargeError, requestText } from "@/lib/request-json";
 
 export async function POST(request: Request, context: { params: Promise<{ mode: string }> }) {
   const { mode } = await context.params;
@@ -11,8 +12,15 @@ export async function POST(request: Request, context: { params: Promise<{ mode: 
   try { secret = providerWebhookSecret("nowpayments", mode as BillingMode); }
   catch (error) { return billingProfileErrorResponse(error); }
   if (!secret) return Response.json({ error: "NOWPayments webhook is not configured" }, { status: 503 });
-  const body = await request.text();
-  if (body.length > 1_000_000) return Response.json({ error: "Webhook is too large" }, { status: 413 });
+  let body: string;
+  try {
+    body = await requestText(request, 1_000_000);
+  } catch (error) {
+    if (error instanceof RequestTooLargeError) {
+      return Response.json({ error: "Webhook is too large" }, { status: 413 });
+    }
+    throw error;
+  }
   try {
     const payload = JSON.parse(body) as Record<string, unknown>;
     const { NowPaymentsSDK } = await import("@nowpaymentsio/nowpayments-sdk-nodejs");
