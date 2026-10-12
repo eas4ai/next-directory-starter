@@ -136,6 +136,12 @@ export function listAgentImports(): AgentImport[] {
     category: row.category, url: row.url, status: row.status }));
 }
 
+export function markAgentImportPublished(actorUserId: string, slug: string): void {
+  database.prepare(`UPDATE agent_imports SET published_at = ?, published_by = ?
+    WHERE slug = ? AND published_at IS NULL`)
+    .run(new Date().toISOString(), actorUserId, slug);
+}
+
 export function publishAgentImport(actorUserId: string, slug: string) {
   return database.transaction(() => {
     const row = database.prepare(`SELECT l.status FROM agent_imports i
@@ -143,11 +149,9 @@ export function publishAgentImport(actorUserId: string, slug: string) {
     if (!row) throw new Error("Import not found");
     if (row.status === "suspended") throw new Error("Suspended imports cannot be published");
     if (row.status === "published") return { slug, status: "published" };
-    const now = new Date().toISOString();
     database.prepare(`UPDATE listings SET status = 'published', revision = revision + 1
       WHERE slug = ?`).run(slug);
-    database.prepare(`UPDATE agent_imports SET published_at = ?, published_by = ?
-      WHERE slug = ?`).run(now, actorUserId, slug);
+    markAgentImportPublished(actorUserId, slug);
     recordAudit("catalog.publish", actorUserId, slug);
     return { slug, status: "published" };
   }).immediate();
@@ -168,8 +172,11 @@ export async function attachImportScreenshot(actorUserId: string, slug: string,
       metadata.width > 4096 || metadata.height > 4096) throw new Error("Screenshot content does not match its MIME type or dimensions");
   const sanitized = await image.rotate().png().toBuffer();
   if (sanitized.length > 5 * 1024 * 1024) throw new Error("Normalized screenshot exceeds 5 MiB");
-  const changed = database.prepare(`UPDATE agent_imports SET screenshot_bytes = ?, screenshot_mime = 'image/png'
-    WHERE slug = ? AND published_at IS NULL`).run(sanitized, slug).changes;
+  const changed = database.prepare(`UPDATE agent_imports
+    SET screenshot_bytes = ?, screenshot_mime = 'image/png'
+    WHERE slug = ? AND published_at IS NULL
+      AND EXISTS (SELECT 1 FROM listings l
+        WHERE l.slug = agent_imports.slug AND l.status = 'draft')`).run(sanitized, slug).changes;
   if (!changed) throw new Error("Private import not found");
   recordAudit("catalog.import.screenshot", actorUserId, slug);
   return { slug, mimeType: "image/png" };
