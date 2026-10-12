@@ -1,5 +1,6 @@
 import { canAdmin, sameOrigin, sessionUser } from "@/lib/admin";
 import { accountErrorResponse, changeAccountSuspension } from "@/lib/accounts";
+import { requestJson, requestJsonErrorResponse } from "@/lib/request-json";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -9,13 +10,11 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!sameOrigin(request)) return Response.json({ error: "Invalid origin" }, { status: 403 });
   let input: Record<string, unknown>;
   try {
-    const body = await request.text();
-    if (body.length > 1024) throw new Error("Request is too large");
-    const parsed: unknown = JSON.parse(body);
+    const parsed = await requestJson(request, 1024);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Invalid JSON");
     input = parsed as Record<string, unknown>;
-  } catch {
-    return Response.json({ error: "Invalid JSON or oversized request" }, { status: 400 });
+  } catch (error) {
+    return requestJsonErrorResponse(error);
   }
   try {
     return Response.json({ account: changeAccountSuspension(

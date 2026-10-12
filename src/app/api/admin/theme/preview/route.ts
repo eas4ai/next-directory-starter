@@ -1,4 +1,5 @@
 import { isAdmin } from "@/lib/admin";
+import { requestJson, requestJsonErrorResponse } from "@/lib/request-json";
 import { parseThemePreset, presetCss } from "@/lib/theme";
 
 export async function POST(request: Request) {
@@ -11,11 +12,9 @@ export async function POST(request: Request) {
   }
   let input: unknown;
   try {
-    const body = await request.text();
-    if (body.length > 8192) throw new Error("Theme request is too large");
-    input = JSON.parse(body);
-  } catch {
-    return Response.json({ error: "Invalid JSON" }, { status: 400 });
+    input = await requestJson(request, 8192);
+  } catch (error) {
+    return requestJsonErrorResponse(error);
   }
   const preset = parseThemePreset(input);
   if (!preset) {

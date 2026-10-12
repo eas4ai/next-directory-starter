@@ -1,5 +1,6 @@
 import { canManageCatalog, sameOrigin, sessionUser } from "@/lib/admin";
 import { AgentImportInputError, listAgentImports, stageAgentImports } from "@/lib/agent-imports";
+import { requestJson, requestJsonErrorResponse } from "@/lib/request-json";
 
 export async function GET(request: Request) {
   const user = await sessionUser(request.headers);
@@ -11,11 +12,15 @@ export async function POST(request: Request) {
   const user = await sessionUser(request.headers);
   if (!user || !canManageCatalog(user.role)) return Response.json({ error: "Forbidden" }, { status: 403 });
   if (!sameOrigin(request)) return Response.json({ error: "Invalid origin" }, { status: 403 });
-  const body = await request.text();
-  if (body.length > 240_000) return Response.json({ error: "Request is too large" }, { status: 413 });
   let input: unknown;
-  try { input = JSON.parse(body); }
-  catch { return Response.json({ error: "Invalid import batch" }, { status: 400 }); }
+  try {
+    input = await requestJson(request, 240_000);
+  } catch (error) {
+    const response = requestJsonErrorResponse(error);
+    return response.status === 413
+      ? response
+      : Response.json({ error: "Invalid import batch" }, { status: 400 });
+  }
   const items = typeof input === "object" && input !== null && "items" in input
     ? (input as { items: unknown }).items : null;
   try {

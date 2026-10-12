@@ -1,5 +1,6 @@
 import { canAdmin, sameOrigin, sessionUser } from "@/lib/admin";
 import { accountErrorResponse, changeAccountRole } from "@/lib/accounts";
+import { requestJson, requestJsonErrorResponse } from "@/lib/request-json";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -9,11 +10,9 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!sameOrigin(request)) return Response.json({ error: "Invalid origin" }, { status: 403 });
   let input: unknown;
   try {
-    const body = await request.text();
-    if (body.length > 1024) throw new Error("Request is too large");
-    input = JSON.parse(body);
-  } catch {
-    return Response.json({ error: "Invalid JSON or oversized request" }, { status: 400 });
+    input = await requestJson(request, 1024);
+  } catch (error) {
+    return requestJsonErrorResponse(error);
   }
   try {
     const role = input && typeof input === "object" && !Array.isArray(input)
