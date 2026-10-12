@@ -201,10 +201,10 @@ export function publishedArticleTerms(): { categories: string[]; tags: string[] 
   return { categories: categories.map((row) => row.name), tags: tags.map((row) => row.name) };
 }
 
-export function publishedArticleFeedRows(): IterableIterator<ArticleFeedRow> {
+export function publishedArticleFeedRows(): ArticleFeedRow[] {
   return database.prepare(`SELECT slug, title, summary, published_at FROM articles
     WHERE status = 'published' ORDER BY published_at DESC, slug`)
-    .iterate() as IterableIterator<ArticleFeedRow>;
+    .all() as ArticleFeedRow[];
 }
 
 export function createArticle(input: unknown, actorId: string): Article {
