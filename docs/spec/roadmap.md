@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: rss-cursor-blocks-writes
+Current: media-orphaned-files
 
 ## public-starter-and-theme
 
@@ -483,3 +483,9 @@ Delivers backlog item admin-actor-not-rechecked: Audit 2026-10-11 (M2, verified 
 Requirements: EDIT-003
 
 Delivers backlog item rss-cursor-blocks-writes: Audit 2026-10-11 (M1, reproduced). /feed.xml streams rows from publishedArticleFeedRows, a live better-sqlite3 iterator on the shared connection kept open across stream pulls. While an iterator is open every write on that connection throws 'This database connection is busy executing a query' (reads still work). A slow anonymous reader of a feed larger than socket and Next.js buffers blocks publication, sessions, audit and notification writes for the whole process. Read bounded rows with .all() before streaming, or use a separate read-only connection.
+
+## media-orphaned-files
+
+Requirements: MED-001
+
+Delivers backlog item media-orphaned-files: Audit 2026-10-11 (M3, verified). uploadPrivateImage (src/lib/media.ts) writes a new UUID file and media_assets row per upload and moves the draft assignment; superseded files and rows are never removed (unlinkSync runs only on a failed transaction). Branding replacement (src/lib/branding.ts:75) does the same. A verified owner re-uploading in a loop fills the volume that also holds SQLite. Reclaim unreferenced superseded assets inside the reassignment transaction and add a per-account upload quota or rate limit.
