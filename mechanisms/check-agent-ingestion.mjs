@@ -593,8 +593,9 @@ try {
         new Date().toISOString());
     } finally { db.close(); }
     const customHtml = await (await request(`/listings/${staged.second}`)).text();
-    assert(customHtml.includes('https://cdn.example.org/custom.png'),
-      'Published custom social image was replaced by the generated card.');
+      assert(customHtml.includes(`/social-card?path=%2Flistings%2F${staged.second}`) &&
+        !customHtml.includes(`/og/listings/${staged.second}.png`),
+      'Published custom social image did not select the guarded social-card renderer.');
     const suspend = await request(`/api/admin/listings/${staged.second}`,
       json({ ...second, slug: staged.second, status: 'suspended', expectedRevision: 2 },
         adminCookie, 'PATCH'));

@@ -27,3 +27,33 @@ test('SEO-002 production metadata requires a configured public origin', () => {
     }
   }
 });
+
+test('SEO-012 metadata exposes only the current generated PNG directly', () => {
+  const previousSiteUrl = process.env.SITE_URL;
+  process.env.SITE_URL = 'https://public.example';
+  try {
+    const generated = pageMetadata('/listings/imported-tool', 'Imported tool', 'Description',
+      undefined, { generated: '/og/listings/imported-tool.png' });
+    assert.equal(generated.openGraph.images[0].url,
+      'https://public.example/og/listings/imported-tool.png');
+    assert.equal(generated.twitter.images[0].url,
+      'https://public.example/og/listings/imported-tool.png');
+
+    const rendered = 'https://public.example/social-card?path=%2Flistings%2Fimported-tool';
+    const published = pageMetadata('/listings/imported-tool', 'Imported tool', 'Description',
+      undefined, { published: '/media/12345678-1234-4234-8234-123456789abc',
+        generated: '/og/listings/imported-tool.png' });
+    assert.equal(published.openGraph.images[0].url, rendered);
+    const overridden = pageMetadata('/listings/imported-tool', 'Imported tool', 'Description', {
+      title: null, description: null, socialImage: 'https://cdn.example.org/card.webp',
+      indexable: null,
+    }, { generated: '/og/listings/imported-tool.png' });
+    assert.equal(overridden.openGraph.images[0].url, rendered);
+    const mismatched = pageMetadata('/listings/imported-tool', 'Imported tool', 'Description',
+      undefined, { generated: '/og/listings/another-tool.png' });
+    assert.equal(mismatched.openGraph.images[0].url, rendered);
+  } finally {
+    if (previousSiteUrl === undefined) delete process.env.SITE_URL;
+    else process.env.SITE_URL = previousSiteUrl;
+  }
+});
