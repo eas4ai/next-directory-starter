@@ -19,6 +19,28 @@ const slotField: Record<BrandAssetSlot, "logoUrl" | "iconUrl" | "socialImage"> =
 const mimeFormat: Record<string, string> = {
   "image/jpeg": "jpeg", "image/png": "png", "image/webp": "webp",
 };
+const brandAssetPattern = /^\/brand-assets\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.webp$/;
+
+function brandAssetIds(branding: SiteConfig): Set<string> {
+  const ids = new Set<string>();
+  for (const url of [branding.logoUrl, branding.iconUrl, branding.socialImage]) {
+    const id = url ? brandAssetPattern.exec(url)?.[1] : undefined;
+    if (id) ids.add(id);
+  }
+  return ids;
+}
+
+function removeUnreferencedBrandAssets(previous: SiteConfig, current: SiteConfig): void {
+  const currentIds = brandAssetIds(current);
+  for (const id of brandAssetIds(previous)) {
+    if (currentIds.has(id)) continue;
+    try {
+      unlinkSync(mediaFilePath(id));
+    } catch (error) {
+      if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+    }
+  }
+}
 
 export function saveBranding(input: unknown, actorId: string): SiteConfig {
   let branding: SiteConfig;
@@ -28,23 +50,25 @@ export function saveBranding(input: unknown, actorId: string): SiteConfig {
   }
   for (const url of [branding.logoUrl, branding.iconUrl, branding.socialImage]) {
     if (!url?.startsWith("/brand-assets/")) continue;
-    const id = /^\/brand-assets\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.webp$/.exec(url)?.[1];
+    const id = brandAssetPattern.exec(url)?.[1];
     if (!id || !existsSync(mediaFilePath(id))) {
       throw new BrandingError(400, "Uploaded brand asset is missing");
     }
   }
-  database.transaction(() => {
-    const previousDescription = getSiteConfig().description;
+  const previous = database.transaction(() => {
+    const previousBranding = getSiteConfig();
     writeSiteSetting("site_branding", JSON.stringify(branding));
     // A saved SEO row that still has the old brand default should follow the brand.
     // A distinct SEO description is an intentional override and keeps its value.
-    if (branding.description !== previousDescription) {
+    if (branding.description !== previousBranding.description) {
       database.prepare(`UPDATE seo_settings SET description = ?, updated_at = ?
         WHERE id = 1 AND description = ?`).run(
-        branding.description, new Date().toISOString(), previousDescription);
+        branding.description, new Date().toISOString(), previousBranding.description);
     }
     recordAudit("site.brand.save", actorId, "site");
+    return previousBranding;
   }).immediate();
+  removeUnreferencedBrandAssets(previous, branding);
   return branding;
 }
 
@@ -76,17 +100,21 @@ export async function uploadBrandAsset(slot: BrandAssetSlot, bytes: Buffer,
   const file = mediaFilePath(id);
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(file, output, { flag: "wx" });
+  let update: { previous: SiteConfig; current: SiteConfig };
   try {
-    return database.transaction(() => {
-      const updated = parseSiteConfig({ ...getSiteConfig(), [field]: `/brand-assets/${id}.webp` });
-      writeSiteSetting("site_branding", JSON.stringify(updated));
+    update = database.transaction(() => {
+      const previous = getSiteConfig();
+      const current = parseSiteConfig({ ...previous, [field]: `/brand-assets/${id}.webp` });
+      writeSiteSetting("site_branding", JSON.stringify(current));
       recordAudit("site.brand.upload", actorId, slot);
-      return updated;
+      return { previous, current };
     }).immediate();
   } catch (error) {
     unlinkSync(file);
     throw error;
   }
+  removeUnreferencedBrandAssets(update.previous, update.current);
+  return update.current;
 }
 
 export function brandAssetResponse(filename: string): Response {
