@@ -1,0 +1,9 @@
+{
+  "command": "node mechanisms/check-first.mjs foundation",
+  "cwd": null,
+  "documents": [],
+  "identity": { "env": [], "image": null, "tools": { "node": "node --version", "npm": "npm --version" } },
+  "inputs": ["components.json", "mechanisms/check-first.mjs", "mechanisms/foundation-app.def.json", "package-lock.json", "package.json", "src"],
+  "requirements": ["FOUND-001"],
+  "results": "per-requirement"
+}
