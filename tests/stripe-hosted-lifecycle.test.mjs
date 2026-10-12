@@ -62,6 +62,11 @@ test('signed Stripe hosted checkout, recurring invoice, and refund match the pur
     saveBillingProfile({ provider: 'stripe', mode: 'test', version: 0, enabled: false,
       apiKey: 'sk_test_fixture', webhookSecret: 'whsec_hosted_fixture' }, 'admin');
     const stripe = new Stripe('sk_test_fixture');
+    const oversized = await POST(new Request('https://directory.example/api/webhooks/stripe', {
+      method: 'POST', body: '{}',
+      headers: { 'stripe-signature': 'present', 'Content-Length': '1000001' },
+    }));
+    assert.equal(oversized.status, 413);
     const send = async (event, secret = 'whsec_hosted_fixture') => {
       const body = JSON.stringify(event);
       const signature = stripe.webhooks.generateTestHeaderString({ payload: body, secret });

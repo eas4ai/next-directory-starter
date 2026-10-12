@@ -2,6 +2,7 @@ import { Paddle } from "@paddle/paddle-node-sdk";
 import { billingProfileErrorResponse, providerWebhookSecret, type BillingMode } from "@/lib/billing-profiles";
 import { paymentLifecycleErrorResponse, retainVerifiedEvidence } from "@/lib/payment-lifecycle";
 import { paddleEffect } from "@/lib/payment-normalizers";
+import { RequestTooLargeError, requestText } from "@/lib/request-json";
 
 export async function POST(request: Request, context: { params: Promise<{ mode: string }> }) {
   const { mode } = await context.params;
@@ -12,8 +13,15 @@ export async function POST(request: Request, context: { params: Promise<{ mode: 
   try { secret = providerWebhookSecret("paddle", mode as BillingMode); }
   catch (error) { return billingProfileErrorResponse(error); }
   if (!secret) return Response.json({ error: "Paddle webhook is not configured" }, { status: 503 });
-  const body = await request.text();
-  if (body.length > 1_000_000) return Response.json({ error: "Webhook is too large" }, { status: 413 });
+  let body: string;
+  try {
+    body = await requestText(request, 1_000_000);
+  } catch (error) {
+    if (error instanceof RequestTooLargeError) {
+      return Response.json({ error: "Webhook is too large" }, { status: 413 });
+    }
+    throw error;
+  }
   const paddle = new Paddle("webhook_verification_only");
   let verified = false;
   try { verified = await paddle.webhooks.isSignatureValid(body, secret, signature); }
