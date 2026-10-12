@@ -194,19 +194,12 @@ export function ArticleEditor({ initialArticles, categories }: { initialArticles
     }
   }
 
-  async function publish() {
-    if (!editing) return;
-    const article = await changeArticle(editing.slug,
-      { action: "publish", version: editing.version },
-      "Could not publish the article.", "Saved revision published.");
-    if (article) setEditing(article);
-  }
-
-  async function unpublish(article: Article) {
-    const current = await changeArticle(article.slug,
-      { action: "unpublish", version: article.version },
-      "Could not unpublish the article.", "Article unpublished.");
-    if (current && editing?.slug === article.slug) setEditing(current);
+  async function changePublication(article: Article, action: "publish" | "unpublish") {
+    const publishing = action === "publish";
+    const current = await changeArticle(article.slug, { action, version: article.version },
+      publishing ? "Could not publish the article." : "Could not unpublish the article.",
+      publishing ? "Saved revision published." : "Article unpublished.");
+    if (current && (publishing || editing?.slug === article.slug)) setEditing(current);
   }
 
   async function rename() {
@@ -228,7 +221,8 @@ export function ArticleEditor({ initialArticles, categories }: { initialArticles
         <Button type="submit" disabled={pending}>Create article</Button>
       </form>
       {message && <p role="status" className="text-sm text-muted-foreground">{message}</p>}
-      <SavedArticles articles={initialArticles} pending={pending} onEdit={edit} onUnpublish={unpublish} />
+      <SavedArticles articles={initialArticles} pending={pending} onEdit={edit}
+        onUnpublish={(article) => { void changePublication(article, "unpublish"); }} />
       {editing && (
         <form key={editing.slug} onSubmit={(event) => save(event, editing.slug)} className="space-y-4 rounded-lg border p-6">
           <div className="flex items-center justify-between gap-3">
@@ -249,7 +243,8 @@ export function ArticleEditor({ initialArticles, categories }: { initialArticles
             <Button type="submit" disabled={pending}>Save revision</Button>
             <Button type="button" variant="outline" asChild><Link href={`/admin/articles/${editing.slug}/preview`} target="_blank">Private preview</Link></Button>
             {(editing.status === "draft" || editing.staged) &&
-              <Button type="button" variant="secondary" disabled={pending} onClick={publish}>Publish saved revision</Button>}
+                <Button type="button" variant="secondary" disabled={pending}
+                  onClick={() => { void changePublication(editing, "publish"); }}>Publish saved revision</Button>}
           </div>
         </form>
       )}
