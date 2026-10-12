@@ -75,7 +75,12 @@ try {
     if (!dependencies['@nowpaymentsio/nowpayments-sdk-nodejs']) {
       throw new Error('The official NOWPayments Node SDK is not installed for hosted checkout.');
     }
-    nodeTests(['tests/hosted-checkout.test.mjs', 'tests/nowpayments-sdk.test.mjs']);
+    nodeTests([
+      'tests/hosted-checkout.test.mjs',
+      'tests/checkout-expiry.test.mjs',
+      'tests/payment-provider-adapters.test.mjs',
+      'tests/nowpayments-sdk.test.mjs',
+    ]);
   });
 
   await check('COM-007', async () => {

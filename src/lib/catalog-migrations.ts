@@ -856,6 +856,55 @@ function migrateDisputeLedger(): void {
   });
 }
 
+type HistoricalCheckoutTerminalEvidence = {
+  mode: string; payload: string; received_at: string; processed_at: string | null;
+};
+
+function migrateCheckoutTerminals(): void {
+  applyCatalogMigration(26, () => {
+    const columns = new Set((database.prepare("PRAGMA table_info(purchases)").all() as
+      { name: string }[]).map(({ name }) => name));
+    if (!columns.has("checkout_terminal_state")) {
+      database.exec(`ALTER TABLE purchases ADD COLUMN checkout_terminal_state TEXT
+        CHECK (checkout_terminal_state IS NULL OR checkout_terminal_state IN ('expired', 'canceled'))`);
+    }
+    if (!columns.has("checkout_terminal_at")) {
+      database.exec("ALTER TABLE purchases ADD COLUMN checkout_terminal_at TEXT");
+    }
+    database.exec(`CREATE INDEX IF NOT EXISTS purchases_active_checkout
+      ON purchases(owner_user_id, listing_slug, provider, created_at, id)
+      WHERE status = 'pending' AND billing_mode != 'free' AND checkout_terminal_state IS NULL`);
+
+    const rows = database.prepare(`SELECT mode, payload, received_at, processed_at
+      FROM payment_evidence
+      WHERE provider = 'stripe' AND event_type = 'checkout.session.expired'
+        AND state = 'processed'
+      ORDER BY received_at, event_id`).all() as HistoricalCheckoutTerminalEvidence[];
+    for (const row of rows) {
+      let saved: Record<string, unknown> | null;
+      try { saved = objectValue(JSON.parse(row.payload)); }
+      catch { continue; }
+      const raw = objectValue(saved?.raw);
+      const session = objectValue(objectValue(raw?.data)?.object);
+      const purchaseId = nonEmptyString(session?.client_reference_id) ??
+        nonEmptyString(objectValue(session?.metadata)?.purchaseId);
+      const resourceId = nonEmptyString(session?.id);
+      if (!purchaseId || !resourceId || resourceId.length > 200) continue;
+      const occurredAt = validDate(raw?.created, row.processed_at ?? row.received_at);
+      database.prepare(`UPDATE purchases SET
+          provider_resource_id = COALESCE(provider_resource_id, ?),
+          stripe_session_id = CASE WHEN provider_resource_id IS NULL THEN ? ELSE stripe_session_id END,
+          checkout_url = NULL, checkout_terminal_state = 'expired', checkout_terminal_at = ?
+        WHERE id = ? AND provider = 'stripe' AND plan_mode = ? AND status = 'pending'
+          AND checkout_terminal_state IS NULL
+          AND (provider_resource_id = ? OR (provider_resource_id IS NULL
+            AND checkout_request_id IS NOT NULL AND stripe_session_id = 'pending:' || id))`).run(
+        resourceId, resourceId, occurredAt, purchaseId, row.mode, resourceId,
+      );
+    }
+  });
+}
+
 export function migrateCatalog(explicit = false): void {
   if (process.env.DIRECTORY_EXPLICIT_MIGRATIONS === "1" && !explicit) return;
   migrate.immediate();
@@ -889,6 +938,7 @@ export function migrateCatalog(explicit = false): void {
   migrateAgentImportPublications();
   migratePaddleRefundLedger();
   migrateDisputeLedger();
+  migrateCheckoutTerminals();
 }
 
 export function seedCatalog(): void {

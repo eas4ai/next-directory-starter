@@ -40,7 +40,8 @@ export default async function OwnerBillingPage() {
         </p>}
         {purchase.status === "pending" && purchase.checkoutUrl &&
           <a className="mt-3 inline-block text-sm underline" href={purchase.checkoutUrl}>Continue hosted checkout</a>}
-        {purchase.canCancel && <div className="mt-4"><CancelButton purchaseId={purchase.id} /></div>}
+        {purchase.cancellationKind && <div className="mt-4"><CancelButton
+          purchaseId={purchase.id} kind={purchase.cancellationKind} /></div>}
       </article>)}
     </section>
     {purchases.length === 0 && <p className="mt-8 text-sm text-muted-foreground">No purchases yet.</p>}

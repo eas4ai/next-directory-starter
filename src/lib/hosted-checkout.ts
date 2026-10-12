@@ -15,9 +15,10 @@ type PurchaseRow = {
   accepted_duration_days: number | null; featured: number;
   provider: BillingProvider; provider_price_id: string | null;
   provider_resource_id: string | null; checkout_url: string | null; status: string;
+  checkout_terminal_state: "expired" | "canceled" | null;
 };
 
-type Reservation = { id: string; created: false; existingUrl: string | null } |
+type Reservation = { id: string; created: false; existingUrl: string | null; ended: boolean } |
   { id: string; purchase: HostedPurchase; configuration: CheckoutConfiguration; created: true };
 
 type CheckoutInput = { planKey: string; offerToken: string; provider: BillingProvider; requestId: string };
@@ -45,18 +46,22 @@ function reserve(ownerUserId: string, listingSlug: string, input: CheckoutInput)
           existing.provider !== provider || acceptedOffer(existing) !== offerToken) {
         throw new CheckoutError(409, "Checkout request was already used for different terms");
       }
-      return { id: existing.id, created: false, existingUrl: existing.checkout_url } as const;
+      return { id: existing.id, created: false,
+        existingUrl: existing.checkout_terminal_state === null ? existing.checkout_url : null,
+        ended: existing.checkout_terminal_state !== null } as const;
     }
     const pending = database.prepare(`SELECT * FROM purchases
       WHERE owner_user_id = ? AND listing_slug = ? AND provider = ? AND status = 'pending'
-        AND billing_mode != 'free' ORDER BY created_at, id LIMIT 2`)
+        AND billing_mode != 'free' AND checkout_terminal_state IS NULL
+      ORDER BY created_at, id LIMIT 2`)
       .all(ownerUserId, listingSlug, provider) as PurchaseRow[];
     if (pending.length > 1 || (pending[0] &&
         (pending[0].plan_key !== planKey || acceptedOffer(pending[0]) !== offerToken))) {
       throw new CheckoutError(409, "Another checkout is pending for this listing and provider");
     }
     if (pending[0]) {
-      return { id: pending[0].id, created: false, existingUrl: pending[0].checkout_url } as const;
+      return { id: pending[0].id, created: false,
+        existingUrl: pending[0].checkout_url, ended: false } as const;
     }
     const plan = planByKey(planKey);
     if (!plan || !plan.enabled || plan.mode !== checkoutMode() || plan.billingMode === "free" ||
@@ -103,6 +108,9 @@ export async function createHostedCheckout(ownerUserId: string, listingSlug: str
   }
   const reserved = reserve(ownerUserId, listingSlug, input);
   if (!reserved.created) {
+    if (reserved.ended) {
+      throw new CheckoutError(409, "This checkout request has ended. Start a new checkout request");
+    }
     if (reserved.existingUrl) return { purchaseId: reserved.id, url: reserved.existingUrl };
     throw new CheckoutError(409, "Checkout is pending. Contact the operator before retrying this purchase");
   }

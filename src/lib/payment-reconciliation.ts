@@ -182,6 +182,12 @@ async function inspectStripe(purchase: Purchase, limit: number): Promise<Verifie
       (purchase.provider_price_id && line[0].price?.id !== purchase.provider_price_id)) {
     throw new Error("Stripe checkout price does not match the reserved purchase");
   }
+  if (session.status === "expired") {
+    return [evidence(purchase, "session-expired", session.id, {
+      kind: "checkout-terminal", purchaseId: purchase.id, resourceId: session.id,
+      state: "expired", occurredAt: new Date(session.expires_at * 1000).toISOString(),
+    })];
+  }
   const results: VerifiedEvidence[] = [];
   if (purchase.billing_mode === "one-time" && session.payment_status === "paid" &&
       typeof session.payment_intent === "string" &&
