@@ -12,8 +12,18 @@ test('agent keys and migrated legacy keys default to staging-only access', async
   try {
     ({ database } = await import('../src/lib/database.ts'));
     const { migrateCatalog } = await import('../src/lib/catalog-migrations.ts');
-    const { issueAgentKey, listAgentKeys } = await import('../src/lib/agent-keys.ts');
     migrateCatalog();
+
+    database.exec(`DELETE FROM catalog_migrations WHERE version = 31;
+      ALTER TABLE agent_keys DROP COLUMN scope;`);
+    database.prepare(`INSERT INTO agent_keys
+      (id, user_id, name, token_hash, expires_at, revoked_at, created_at)
+      VALUES ('legacy-key', 'catalog-user', 'Legacy', 'legacy-hash', ?, NULL, ?)`)
+      .run(new Date(Date.now() + 86_400_000).toISOString(), new Date().toISOString());
+
+    const { issueAgentKey, listAgentKeys } = await import('../src/lib/agent-keys.ts');
+    assert.equal(database.prepare('SELECT scope FROM agent_keys WHERE id = ?')
+      .get('legacy-key').scope, 'stage');
 
     const staged = issueAgentKey('catalog-user', 'Collector', 30);
     assert.equal(staged.scope, 'stage');
@@ -24,10 +34,6 @@ test('agent keys and migrated legacy keys default to staging-only access', async
     assert.equal(publisher.scope, 'publish');
     assert.throws(() => issueAgentKey('catalog-user', 'Invalid', 30, 'admin'));
 
-    database.prepare(`INSERT INTO agent_keys
-      (id, user_id, name, token_hash, expires_at, revoked_at, created_at)
-      VALUES ('legacy-key', 'catalog-user', 'Legacy', 'legacy-hash', ?, NULL, ?)`)
-      .run(new Date(Date.now() + 86_400_000).toISOString(), new Date().toISOString());
     const keys = listAgentKeys('catalog-user');
     assert.equal(keys.find((key) => key.id === staged.id)?.scope, 'stage');
     assert.equal(keys.find((key) => key.id === publisher.id)?.scope, 'publish');
