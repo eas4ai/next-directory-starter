@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import Stripe from "stripe";
-import { Environment, Paddle, type TransactionAdjustment } from "@paddle/paddle-node-sdk";
+import { Environment, Paddle, type Transaction, type TransactionAdjustment } from "@paddle/paddle-node-sdk";
 import { database } from "@/lib/database";
 import { migrateCatalog } from "@/lib/catalog-migrations";
 import { providerRecoveryConfiguration, type BillingMode, type BillingProvider } from "@/lib/billing-profiles";
@@ -15,6 +15,12 @@ type Purchase = {
   provider_price_id: string | null; amount_minor: number; currency: string;
   checkout_request_id: string | null; stripe_session_id: string;
   stripe_payment_intent_id: string | null; status: string;
+};
+
+type CursorUpdate = { stream: string; from: string | null; to: string | null };
+export type ProviderInspection = {
+  evidence: VerifiedEvidence[];
+  cursorUpdates: CursorUpdate[];
 };
 
 function bound(limit: number): number {
@@ -56,6 +62,72 @@ function evidence(purchase: Purchase, source: string, resource: string,
     eventType: `reconcile.${source}`, raw: { purchaseId: purchase.id, resource }, effect };
 }
 
+function reconciliationCursor(purchaseId: string, stream: string): string | null {
+  const row = database.prepare(`SELECT cursor FROM payment_reconciliation_cursors
+    WHERE purchase_id = ? AND stream = ?`).get(purchaseId, stream) as
+    { cursor: string } | undefined;
+  return row?.cursor ?? null;
+}
+
+function evidencePayload(item: VerifiedEvidence): string {
+  return JSON.stringify({ raw: item.raw, effect: item.effect });
+}
+
+function appendUnretained(target: VerifiedEvidence[], candidates: VerifiedEvidence[],
+  limit: number): boolean {
+  const selected = new Map(target.map((item) => [item.eventId, evidencePayload(item)]));
+  const remaining: VerifiedEvidence[] = [];
+  for (const item of candidates) {
+    const payload = evidencePayload(item);
+    const current = selected.get(item.eventId);
+    if (current !== undefined) {
+      if (current !== payload) {
+        selected.set(item.eventId, payload);
+        remaining.push(item);
+      }
+      continue;
+    }
+    const retained = database.prepare(`SELECT payload FROM payment_evidence
+      WHERE provider = ? AND mode = ? AND event_id = ?`)
+      .get(item.provider, item.mode, item.eventId) as { payload: string } | undefined;
+    if (retained?.payload === payload) continue;
+    selected.set(item.eventId, payload);
+    remaining.push(item);
+  }
+  const available = Math.max(0, limit - target.length);
+  target.push(...remaining.slice(0, available));
+  return remaining.length <= available;
+}
+
+function saveCursorUpdates(purchaseId: string, updates: CursorUpdate[]): void {
+  if (!updates.length) return;
+  database.transaction(() => {
+    const now = new Date().toISOString();
+    for (const update of updates) {
+      if (update.from === null) {
+        if (update.to !== null) {
+          database.prepare(`INSERT INTO payment_reconciliation_cursors
+            (purchase_id, stream, cursor, updated_at) VALUES (?, ?, ?, ?)
+            ON CONFLICT(purchase_id, stream) DO NOTHING`).run(
+            purchaseId, update.stream, update.to, now,
+          );
+        }
+      } else if (update.to === null) {
+        database.prepare(`DELETE FROM payment_reconciliation_cursors
+          WHERE purchase_id = ? AND stream = ? AND cursor = ?`).run(
+          purchaseId, update.stream, update.from,
+        );
+      } else {
+        database.prepare(`UPDATE payment_reconciliation_cursors
+          SET cursor = ?, updated_at = ?
+          WHERE purchase_id = ? AND stream = ? AND cursor = ?`).run(
+          update.to, now, purchaseId, update.stream, update.from,
+        );
+      }
+    }
+  }).immediate();
+}
+
 async function stripeOutcomes(purchase: Purchase, stripe: Stripe,
   paymentIntentId: string): Promise<{ chargeId?: string; evidence: VerifiedEvidence[] }> {
   const found: VerifiedEvidence[] = [];
@@ -95,6 +167,31 @@ async function stripeInvoiceAssociations(purchase: Purchase, stripe: Stripe,
   const names = [paymentIntentId && "payment-intent", chargeId && "charge"].filter(Boolean);
   return { source: names.length ? `invoice-${names.join("-")}` : "invoice",
     paymentIntentId, chargeId, evidence: linked.evidence };
+}
+
+async function stripeInvoiceEvidence(purchase: Purchase, stripe: Stripe,
+  subscriptionId: string, invoice: Stripe.Invoice): Promise<VerifiedEvidence[]> {
+  if (invoice.status !== "paid" || !invoice.currency || !invoice.amount_paid ||
+      invoice.amount_paid < purchase.amount_minor || invoice.lines.data.length !== 1) return [];
+  const line = invoice.lines.data[0];
+  const legacy = (line as unknown as {
+    price?: { id?: string; unit_amount?: number | null };
+  }).price;
+  const price = line.pricing?.type === "price_details"
+    ? line.pricing.price_details?.price : legacy?.id;
+  const unit = line.pricing?.type === "price_details" ? line.amount : legacy?.unit_amount;
+  if (price !== purchase.provider_price_id || unit !== purchase.amount_minor ||
+      !line.period?.start || !line.period?.end) return [];
+  const associations = await stripeInvoiceAssociations(purchase, stripe, invoice);
+  return [evidence(purchase, associations.source, invoice.id, {
+    kind: "paid", purchaseId: purchase.id, resourceId: invoice.id,
+    paymentId: invoice.id, subscriptionId,
+    paymentIntentId: associations.paymentIntentId, chargeId: associations.chargeId,
+    priceId: price ?? undefined, amountMinor: purchase.amount_minor,
+    currency: invoice.currency,
+    periodStart: new Date(line.period.start * 1000).toISOString(),
+    periodEnd: new Date(line.period.end * 1000).toISOString(),
+  }), ...associations.evidence];
 }
 
 function recoverableLegacyStripePurchase(purchase: Purchase, resourceId?: string): boolean {
@@ -174,7 +271,7 @@ function adoptLegacyStripePeriod(purchase: Purchase, resourceId: string,
   }).immediate();
 }
 
-async function inspectStripe(purchase: Purchase, limit: number): Promise<VerifiedEvidence[]> {
+async function inspectStripe(purchase: Purchase, limit: number): Promise<ProviderInspection> {
   const config = providerRecoveryConfiguration("stripe", purchase.plan_mode);
   if (!config) throw new Error("Stripe recovery credentials are unavailable");
   const stripe = new Stripe(config.apiKey, { timeout: 15_000, maxNetworkRetries: 1,
@@ -189,61 +286,49 @@ async function inspectStripe(purchase: Purchase, limit: number): Promise<Verifie
       (purchase.provider_price_id && line[0].price?.id !== purchase.provider_price_id)) {
     throw new Error("Stripe checkout price does not match the reserved purchase");
   }
+  const result: ProviderInspection = { evidence: [], cursorUpdates: [] };
   if (session.status === "expired") {
-    return [evidence(purchase, "session-expired", session.id, {
+    appendUnretained(result.evidence, [evidence(purchase, "session-expired", session.id, {
       kind: "checkout-terminal", purchaseId: purchase.id, resourceId: session.id,
       state: "expired", occurredAt: new Date(session.expires_at * 1000).toISOString(),
-    })];
+    })], limit);
+    return result;
   }
-  const results: VerifiedEvidence[] = [];
   if (purchase.billing_mode === "one-time" && session.payment_status === "paid" &&
       typeof session.payment_intent === "string" &&
       session.amount_total !== null && session.currency) {
-      const linked = await stripeOutcomes(purchase, stripe, session.payment_intent);
-    results.push(evidence(purchase, "session", session.id, {
+    const linked = await stripeOutcomes(purchase, stripe, session.payment_intent);
+    appendUnretained(result.evidence, [evidence(purchase, "session", session.id, {
       kind: "paid", purchaseId: purchase.id, resourceId: session.id,
       paymentId: session.payment_intent, paymentIntentId: session.payment_intent,
       chargeId: linked.chargeId,
       priceId: purchase.provider_price_id ?? undefined,
       amountMinor: session.amount_total, currency: session.currency,
-    }));
-    results.push(...linked.evidence);
+    }), ...linked.evidence], limit);
+    return result;
   }
   if ((purchase.billing_mode === "monthly" || purchase.billing_mode === "annual") &&
       typeof session.subscription === "string") {
-    results.push(evidence(purchase, "subscription-link", session.id, {
+    const linkComplete = appendUnretained(result.evidence, [evidence(
+      purchase, "subscription-link", session.id, {
       kind: "subscription-linked", purchaseId: purchase.id, resourceId: session.id,
       subscriptionId: session.subscription,
-    }));
-    const invoices = await stripe.invoices.list({ subscription: session.subscription,
-      limit: Math.min(limit, 10) });
-    for (const invoice of invoices.data.reverse()) {
-      if (invoice.status !== "paid" || !invoice.id || !invoice.currency ||
-          !invoice.amount_paid || invoice.amount_paid < purchase.amount_minor ||
-          invoice.lines.data.length !== 1) continue;
-      const line = invoice.lines.data[0];
-      const legacy = (line as unknown as {
-        price?: { id?: string; unit_amount?: number | null };
-      }).price;
-      const price = line.pricing?.type === "price_details" ? line.pricing.price_details?.price :
-        legacy?.id;
-      const unit = line.pricing?.type === "price_details" ? line.amount : legacy?.unit_amount;
-      if (price !== purchase.provider_price_id || unit !== purchase.amount_minor ||
-          !line.period?.start || !line.period?.end) continue;
-      const associations = await stripeInvoiceAssociations(purchase, stripe, invoice);
-      results.push(evidence(purchase, associations.source, invoice.id, {
-        kind: "paid", purchaseId: purchase.id, resourceId: invoice.id,
-        paymentId: invoice.id, subscriptionId: session.subscription,
-        paymentIntentId: associations.paymentIntentId, chargeId: associations.chargeId,
-        priceId: price ?? undefined, amountMinor: purchase.amount_minor,
-        currency: invoice.currency,
-        periodStart: new Date(line.period.start * 1000).toISOString(),
-        periodEnd: new Date(line.period.end * 1000).toISOString(),
-      }));
-      results.push(...associations.evidence);
-    }
+    })], limit);
+    if (!linkComplete || result.evidence.length >= limit) return result;
+
+    const stream = "stripe:invoices";
+    const from = reconciliationCursor(purchase.id, stream);
+    const invoices = await stripe.invoices.list({ subscription: session.subscription, limit: 1,
+      ...(from ? { starting_after: from } : {}) });
+    const invoice = invoices.data[0];
+    const candidates = invoice
+      ? await stripeInvoiceEvidence(purchase, stripe, session.subscription, invoice) : [];
+    if (appendUnretained(result.evidence, candidates, limit)) {
+      result.cursorUpdates.push({ stream, from,
+        to: invoice && invoices.has_more ? invoice.id : null });
   }
-  return results;
+  }
+  return result;
 }
 
 const paddleDisputeActions = new Set([
@@ -272,7 +357,31 @@ function paddleAdjustmentEvidence(purchase: Purchase, paymentId: string,
   });
 }
 
-async function inspectPaddle(purchase: Purchase, limit: number): Promise<VerifiedEvidence[]> {
+function paddleTransactionEvidence(purchase: Purchase,
+  transaction: Transaction): VerifiedEvidence[] {
+  const item = transaction.items.length === 1 ? transaction.items[0] : null;
+  const amount = Number(item?.price?.unitPrice.amount);
+  const paid = Number(transaction.details?.totals?.grandTotal);
+  if (transaction.status !== "completed" || !item || item.quantity !== 1 ||
+      item.price?.id !== purchase.provider_price_id ||
+      !Number.isSafeInteger(amount) || amount !== purchase.amount_minor ||
+      !Number.isSafeInteger(paid) || paid < amount) return [];
+  const results = [evidence(purchase, "transaction", transaction.id, {
+    kind: "paid", purchaseId: purchase.id, resourceId: transaction.id,
+    paymentId: transaction.id, subscriptionId: transaction.subscriptionId ?? undefined,
+    priceId: item.price.id, amountMinor: amount,
+    currency: transaction.currencyCode,
+    periodStart: transaction.billingPeriod?.startsAt,
+    periodEnd: transaction.billingPeriod?.endsAt,
+  })];
+  for (const adjustment of transaction.adjustments ?? []) {
+    const outcome = paddleAdjustmentEvidence(purchase, transaction.id, adjustment);
+    if (outcome) results.push(outcome);
+  }
+  return results;
+}
+
+async function inspectPaddle(purchase: Purchase, limit: number): Promise<ProviderInspection> {
   const config = providerRecoveryConfiguration("paddle", purchase.plan_mode);
   if (!config) throw new Error("Paddle recovery credentials are unavailable");
   const paddle = new Paddle(config.apiKey, {
@@ -281,39 +390,30 @@ async function inspectPaddle(purchase: Purchase, limit: number): Promise<Verifie
   const first = await paddle.transactions.get(purchase.provider_resource_id!,
     { include: ["adjustment"] });
   if (first.id !== purchase.provider_resource_id) throw new Error("Paddle transaction changed");
-  const transactions = [first];
+  const result: ProviderInspection = { evidence: [], cursorUpdates: [] };
+  const firstComplete = appendUnretained(result.evidence,
+    paddleTransactionEvidence(purchase, first), limit);
+  if (!firstComplete || result.evidence.length >= limit) return result;
+
   const subscriptionId = purchase.provider_subscription_id ?? first.subscriptionId;
   if (subscriptionId && purchase.billing_mode !== "one-time") {
-    const page = await paddle.transactions.list({ subscriptionId: [subscriptionId],
+    const stream = "paddle:transactions";
+    const from = reconciliationCursor(purchase.id, stream);
+    const collection = paddle.transactions.list({ subscriptionId: [subscriptionId],
       status: ["completed"], include: ["adjustment"],
-      perPage: Math.min(limit, 10) }).next();
-    for (const item of page) if (item.id !== first.id) transactions.push(item);
-  }
-  return transactions.sort((a, b) => a.createdAt.localeCompare(b.createdAt)).flatMap((transaction) => {
-    const item = transaction.items.length === 1 ? transaction.items[0] : null;
-    const amount = Number(item?.price?.unitPrice.amount);
-    const paid = Number(transaction.details?.totals?.grandTotal);
-    if (transaction.status !== "completed" || !item || item.quantity !== 1 ||
-        item.price?.id !== purchase.provider_price_id ||
-        !Number.isSafeInteger(amount) || amount !== purchase.amount_minor ||
-        !Number.isSafeInteger(paid) || paid < amount) return [];
-    const results = [evidence(purchase, "transaction", transaction.id, {
-      kind: "paid", purchaseId: purchase.id, resourceId: transaction.id,
-      paymentId: transaction.id, subscriptionId: transaction.subscriptionId ?? undefined,
-      priceId: item.price.id, amountMinor: amount,
-      currency: transaction.currencyCode,
-      periodStart: transaction.billingPeriod?.startsAt,
-      periodEnd: transaction.billingPeriod?.endsAt,
-    })];
-    for (const adjustment of transaction.adjustments ?? []) {
-      const outcome = paddleAdjustmentEvidence(purchase, transaction.id, adjustment);
-      if (outcome) results.push(outcome);
+      perPage: 1, orderBy: "created_at[DESC]", ...(from ? { after: from } : {}) });
+    const page = await collection.next();
+    const transaction = page[0];
+    const candidates = transaction ? paddleTransactionEvidence(purchase, transaction) : [];
+    if (appendUnretained(result.evidence, candidates, limit)) {
+      result.cursorUpdates.push({ stream, from,
+        to: transaction && collection.hasMore ? transaction.id : null });
     }
-    return results;
-  });
+  }
+  return result;
 }
 
-async function inspectNowPayments(purchase: Purchase, limit: number): Promise<VerifiedEvidence[]> {
+async function inspectNowPayments(purchase: Purchase, limit: number): Promise<ProviderInspection> {
   const config = providerRecoveryConfiguration("nowpayments", purchase.plan_mode);
   if (!config) throw new Error("NOWPayments recovery credentials are unavailable");
   const email = process.env.NOWPAYMENTS_EMAIL;
@@ -325,21 +425,41 @@ async function inspectNowPayments(purchase: Purchase, limit: number): Promise<Ve
   const sdk = new NowPaymentsSDK({ apiKey: config.apiKey, email, password,
     baseUrl: purchase.plan_mode === "test" ? "https://api-sandbox.nowpayments.io" :
       "https://api.nowpayments.io", timeoutMs: 15_000 });
+  const stream = "nowpayments:payments";
+  const from = reconciliationCursor(purchase.id, stream);
+  const pageNumber = from === null ? 0 : Number(from);
+  if (!Number.isSafeInteger(pageNumber) || pageNumber < 0) {
+    throw new Error("NOWPayments reconciliation cursor is invalid");
+  }
   const page = await sdk.listPayments({ invoiceId: purchase.provider_resource_id!,
-    limit: Math.min(limit, 50), page: 0 });
-  return page.data.flatMap((payment) => {
+    limit: 1, page: pageNumber, sortBy: "created_at", orderBy: "desc" });
+  const candidates = page.data.flatMap((payment) => {
     if (payment.invoice_id !== purchase.provider_resource_id ||
         payment.order_id !== purchase.id || !payment.payment_id) return [];
     const effect = nowPaymentsEffect(payment);
     return effect.kind === "noop" ? [] : [evidence(purchase,
       `payment-${payment.payment_status}`, payment.payment_id, effect)];
   });
+  const result: ProviderInspection = { evidence: [], cursorUpdates: [] };
+  if (appendUnretained(result.evidence, candidates, limit)) {
+    const hasMore = page.pagesCount !== null
+      ? pageNumber + 1 < page.pagesCount
+      : page.total !== null && Number.isSafeInteger(page.total)
+        ? pageNumber + page.data.length < page.total : page.data.length === 1;
+    result.cursorUpdates.push({ stream, from, to: hasMore ? String(pageNumber + 1) : null });
+  }
+  return result;
 }
 
-export type ProviderInspector = (purchase: Purchase, limit: number) => Promise<VerifiedEvidence[]>;
+export type ProviderInspector = (purchase: Purchase, limit: number) =>
+  Promise<VerifiedEvidence[] | ProviderInspection>;
 const inspectProvider: ProviderInspector = (purchase, limit) => purchase.provider === "stripe"
   ? inspectStripe(purchase, limit) : purchase.provider === "paddle"
     ? inspectPaddle(purchase, limit) : inspectNowPayments(purchase, limit);
+
+function normalizeInspection(value: VerifiedEvidence[] | ProviderInspection): ProviderInspection {
+  return Array.isArray(value) ? { evidence: value, cursorUpdates: [] } : value;
+}
 
 export async function reconcilePurchase(purchaseId: string, limit: number,
   inspect: ProviderInspector = inspectProvider, resourceId?: string): Promise<{
@@ -361,9 +481,16 @@ export async function reconcilePurchase(purchaseId: string, limit: number,
       purchase.stripe_session_id !== `pending:${purchase.id}`)) {
     throw new Error("Resource-less checkout needs its provider resource ID for bounded recovery");
   }
-  const found = await inspect({ ...purchase,
-    provider_resource_id: purchase.provider_resource_id ?? resourceId! }, limit);
+  const inspection = normalizeInspection(await inspect({ ...purchase,
+    provider_resource_id: purchase.provider_resource_id ?? resourceId! }, limit));
+  const found = inspection.evidence;
   if (found.length > limit) throw new Error("Provider inspection exceeded the requested limit");
+  if (inspection.cursorUpdates.length > 3 || inspection.cursorUpdates.some((update) =>
+    !/^[a-z0-9:-]{1,100}$/.test(update.stream) ||
+    update.from !== null && update.from.length > 200 ||
+    update.to !== null && update.to.length > 200)) {
+    throw new Error("Provider inspection returned an invalid cursor update");
+  }
   for (const item of found) {
     if (item.provider !== purchase.provider || item.mode !== purchase.plan_mode) {
       throw new Error("Provider inspection returned a different payment mode");
@@ -387,5 +514,21 @@ export async function reconcilePurchase(purchaseId: string, limit: number,
     }
     if (retainVerifiedEvidence(item).processed) processed += 1;
   }
+  saveCursorUpdates(purchase.id, inspection.cursorUpdates);
   return { purchaseId, found: found.length, processed, unresolved: found.length - processed };
+}
+
+export async function reconcileBilling(limit: number, purchaseId: string | null = null,
+  resourceId?: string, inspect: ProviderInspector = inspectProvider): Promise<{
+    retained: ReturnType<typeof retryRetainedEvidence>;
+    purchase: Awaited<ReturnType<typeof reconcilePurchase>> | null;
+    purchaseDeferred: boolean;
+  }> {
+  const budget = bound(limit);
+  const retained = retryRetainedEvidence(budget);
+  const remaining = budget - retained.attempted;
+  const purchaseDeferred = purchaseId !== null && remaining === 0;
+  const purchase = purchaseId !== null && remaining > 0
+    ? await reconcilePurchase(purchaseId, remaining, inspect, resourceId) : null;
+  return { retained, purchase, purchaseDeferred };
 }
