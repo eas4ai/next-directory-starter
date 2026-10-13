@@ -121,6 +121,18 @@ async function signIn(email, secret = password) {
   throw new Error('Sign-in rate limit persisted.');
 }
 
+async function signUp(body) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const response = await request('/api/auth/sign-up/email', json(body));
+    if (response.status === 429 && attempt < 4) {
+      await new Promise((resolve) => setTimeout(resolve, 2_500));
+      continue;
+    }
+    return response;
+  }
+  throw new Error('Sign-up rate limit persisted.');
+}
+
 async function provision(email, role = 'user', markVerified = true) {
   requireCommand(['run', 'account:provision', '--', '--email', email,
     '--password', password, '--role', role, '--yes']);
@@ -169,15 +181,13 @@ try {
   await check('ACC-001', async () => {
     const email = 'verify-owner@example.invalid';
     const before = messages.length;
-    const signup = await request('/api/auth/sign-up/email',
-      json({ name: 'Verify Owner', email, password }));
+    const signup = await signUp({ name: 'Verify Owner', email, password });
     if (!signup.ok) throw new Error(`Public sign-up returned ${signup.status}.`);
     const signupBody = await signup.text();
     const signupCookie = cookieFrom(signup);
     const signupSession = await request('/api/auth/get-session', { headers: { Cookie: signupCookie } });
     if ((await signupSession.json())?.user) throw new Error('Public sign-up establishes a session before email verification.');
-    const duplicateSignup = await request('/api/auth/sign-up/email',
-      json({ name: 'Verify Owner', email, password }));
+    const duplicateSignup = await signUp({ name: 'Verify Owner', email, password });
     const duplicateBody = await duplicateSignup.text();
     if (duplicateSignup.status !== signup.status || duplicateBody !== signupBody || cookieFrom(duplicateSignup)) {
       throw new Error('Public sign-up response reveals whether the email is already registered.');
@@ -195,8 +205,7 @@ try {
     }
     const expiredEmail = 'expired-verify@example.invalid';
     const beforeExpired = messages.length;
-    const expiredSignup = await request('/api/auth/sign-up/email',
-      json({ name: 'Expired Verify', email: expiredEmail, password }));
+    const expiredSignup = await signUp({ name: 'Expired Verify', email: expiredEmail, password });
     if (!expiredSignup.ok) throw new Error('Second verification fixture failed.');
     const expiredLink = await mailLink(expiredEmail, beforeExpired);
     await new Promise((resolve) => setTimeout(resolve, 4_000));
@@ -208,8 +217,7 @@ try {
     if (!admin.cookie) throw new Error('First host-provisioned administrator cannot sign in.');
     const failureEmail = 'delivery-failure@example.invalid';
     mailFailure = true;
-    const failedDeliverySignup = await request('/api/auth/sign-up/email',
-      json({ name: 'Delivery Failure', email: failureEmail, password }));
+    const failedDeliverySignup = await signUp({ name: 'Delivery Failure', email: failureEmail, password });
     if (!failedDeliverySignup.ok) throw new Error('Configured sender could not open public signup.');
     let deliveryAudit;
     for (let attempt = 0; attempt < 60; attempt += 1) {
@@ -308,8 +316,7 @@ try {
     if (cookieFrom(expired)) throw new Error('Expired unused magic link established a session.');
     const unverifiedEmail = 'unverified-magic@example.invalid';
     const beforeSignup = messages.length;
-    const unverifiedSignup = await request('/api/auth/sign-up/email',
-      json({ name: 'Unverified Magic', email: unverifiedEmail, password }));
+    const unverifiedSignup = await signUp({ name: 'Unverified Magic', email: unverifiedEmail, password });
     if (!unverifiedSignup.ok) throw new Error('Unverified magic-link fixture could not sign up.');
     await mailLink(unverifiedEmail, beforeSignup);
     const beforeUnverifiedMagic = messages.length;
