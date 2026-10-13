@@ -6,7 +6,8 @@ type KeyScope = "stage" | "publish";
 type Key = { id: string; name: string; expiresAt: string; revokedAt: string | null;
   scope: KeyScope };
 type Import = { slug: string; name: string; summary: string; description: string;
-  category: string; url: string; sourceUrl: string; sourceExcerpt: string; status: string };
+  category: string; url: string; sourceUrl: string; sourceExcerpt: string; status: string;
+  revision: number; browserApprovedAt: string | null; browserApprovedRevision: number | null };
 type BrowserTool = { name: string; description: string; inputSchema?: Record<string, unknown>;
   execute: (args: Record<string, unknown>) => Promise<unknown> };
 type ModelContext = { registerTool: (tool: BrowserTool, options?: { signal: AbortSignal }) => Promise<void> };
@@ -71,10 +72,10 @@ export function ImportWorkspace({ initialKeys, initialImports, categories }: {
           await refresh(); return result; } },
       { name: "list_imports", description: "List private imports with external source text marked as untrusted data.",
         execute: async () => { await access(); return responseJson(await fetch("/api/agent/imports", { cache: "no-store" })); } },
-      { name: "publish_import", description: "Publish a reviewed import explicitly.",
+      { name: "publish_import", description: "Publish a current import revision after a person approves it in this workspace.",
         inputSchema: object({ slug: string }, ["slug"]),
         execute: async ({ slug }) => { await access(); const result = await post(
-          `/api/agent/imports/${encodeURIComponent(String(slug))}/publish`, {});
+          `/api/agent/imports/${encodeURIComponent(String(slug))}/browser-publish`, {});
           await refresh(); return result; } },
       { name: "attach_screenshot", description: "Attach an agent-browser screenshot to a private import.",
         inputSchema: object({ slug: string, mimeType: string, base64: string },
@@ -133,6 +134,14 @@ export function ImportWorkspace({ initialKeys, initialImports, categories }: {
       await refresh();
       setMessage(`${slug} published.`);
     } catch (error) { setMessage(error instanceof Error ? error.message : "Publication failed"); }
+  }
+
+  async function approveBrowserPublication(slug: string) {
+    try {
+      await post(`/api/agent/imports/${encodeURIComponent(slug)}/approve`, {});
+      await refresh();
+      setMessage(`${slug} approved for browser WebMCP publication.`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Approval failed"); }
   }
 
   return <div className="mt-8 space-y-8">
@@ -198,8 +207,14 @@ export function ImportWorkspace({ initialKeys, initialImports, categories }: {
             <a href={`/api/agent/imports/${encodeURIComponent(item.slug)}/card`} target="_blank" rel="noopener noreferrer">Preview social card</a>
             {item.status === "published" && <a href={`/listings/${item.slug}`}>Public listing</a>}
           </div>
-          {item.status === "draft" && <button type="button" onClick={() => publish(item.slug)}
-            className="mt-4 rounded-md bg-primary px-4 py-2 text-primary-foreground">Publish reviewed import</button>}
+          {item.status === "draft" && <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button type="button" onClick={() => publish(item.slug)}
+              className="rounded-md bg-primary px-4 py-2 text-primary-foreground">Publish reviewed import</button>
+            {item.browserApprovedRevision === item.revision
+              ? <span className="text-sm text-muted-foreground">Current revision approved for browser WebMCP</span>
+              : <button type="button" onClick={() => approveBrowserPublication(item.slug)}
+                className="rounded-md border px-4 py-2">Approve for browser WebMCP</button>}
+          </div>}
         </article>)}
       </div>
     </section>

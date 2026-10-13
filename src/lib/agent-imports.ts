@@ -18,10 +18,14 @@ type ItemResult = { status: "created" | "existing" | "duplicate" | "invalid" | "
   slug?: string; error?: string };
 type ImportRow = { slug: string; source_url: string; source_excerpt: string;
   actor_user_id: string; created_at: string; published_at: string | null;
+  browser_approved_at: string | null; browser_approved_by: string | null;
+  browser_approved_revision: number | null; revision: number;
   name: string; summary: string; description: string; category: string; url: string;
   status: string };
 export type AgentImport = { slug: string; sourceUrl: string; sourceExcerpt: string;
   actorUserId: string; createdAt: string; publishedAt: string | null;
+  browserApprovedAt: string | null; browserApprovedBy: string | null;
+  browserApprovedRevision: number | null; revision: number;
   name: string; summary: string; description: string; category: string;
   url: string; status: string };
 
@@ -195,13 +199,16 @@ export function stageAgentImports(actorUserId: string, principal: AgentStagingPr
 
 export function listAgentImports(): AgentImport[] {
   const rows = database.prepare(`SELECT i.slug, i.source_url, i.source_excerpt,
-    i.actor_user_id, i.created_at, i.published_at,
-    l.name, l.summary, l.description, l.category, l.url, l.status
+    i.actor_user_id, i.created_at, i.published_at, i.browser_approved_at,
+    i.browser_approved_by, i.browser_approved_revision,
+    l.name, l.summary, l.description, l.category, l.url, l.status, l.revision
     FROM agent_imports i JOIN listings l ON l.slug = i.slug
     ORDER BY i.created_at DESC, i.slug LIMIT 100`).all() as ImportRow[];
   return rows.map((row) => ({ slug: row.slug, sourceUrl: row.source_url,
     sourceExcerpt: row.source_excerpt, actorUserId: row.actor_user_id,
     createdAt: row.created_at, publishedAt: row.published_at,
+    browserApprovedAt: row.browser_approved_at, browserApprovedBy: row.browser_approved_by,
+    browserApprovedRevision: row.browser_approved_revision, revision: row.revision,
     name: row.name, summary: row.summary, description: row.description,
     category: row.category, url: row.url, status: row.status }));
 }
@@ -219,18 +226,53 @@ export function markAgentImportPublished(actorUserId: string, slug: string): voi
     .run(new Date().toISOString(), actorUserId, slug);
 }
 
+function publishAgentImportNow(actorUserId: string, slug: string) {
+  const row = database.prepare(`SELECT l.status FROM agent_imports i
+    JOIN listings l ON l.slug = i.slug WHERE i.slug = ?`).get(slug) as { status: string } | undefined;
+  if (!row) throw new Error("Import not found");
+  if (row.status === "suspended") throw new Error("Suspended imports cannot be published");
+  if (row.status === "published") return { slug, status: "published" };
+  database.prepare(`UPDATE listings SET status = 'published', revision = revision + 1
+    WHERE slug = ?`).run(slug);
+  markAgentImportPublished(actorUserId, slug);
+  recordAudit("catalog.publish", actorUserId, slug);
+  return { slug, status: "published" };
+}
+
 export function publishAgentImport(actorUserId: string, slug: string) {
+  return database.transaction(() => publishAgentImportNow(actorUserId, slug)).immediate();
+}
+
+export function approveAgentImportForBrowser(actorUserId: string, slug: string) {
   return database.transaction(() => {
-    const row = database.prepare(`SELECT l.status FROM agent_imports i
-      JOIN listings l ON l.slug = i.slug WHERE i.slug = ?`).get(slug) as { status: string } | undefined;
+    const row = database.prepare(`SELECT l.status, l.revision FROM agent_imports i
+      JOIN listings l ON l.slug = i.slug WHERE i.slug = ?`).get(slug) as
+      { status: string; revision: number } | undefined;
     if (!row) throw new Error("Import not found");
-    if (row.status === "suspended") throw new Error("Suspended imports cannot be published");
+    if (row.status !== "draft") throw new Error("Only draft imports can be approved");
+    const approvedAt = new Date().toISOString();
+    database.prepare(`UPDATE agent_imports SET browser_approved_at = ?,
+      browser_approved_by = ?, browser_approved_revision = ? WHERE slug = ?`)
+      .run(approvedAt, actorUserId, row.revision, slug);
+    recordAudit("catalog.import.browser-approve", actorUserId, slug);
+    return { slug, status: "approved", approvedAt, approvedRevision: row.revision };
+  }).immediate();
+}
+
+export function publishBrowserApprovedAgentImport(actorUserId: string, slug: string) {
+  return database.transaction(() => {
+    const row = database.prepare(`SELECT l.status, l.revision,
+        i.browser_approved_at, i.browser_approved_by, i.browser_approved_revision
+      FROM agent_imports i JOIN listings l ON l.slug = i.slug WHERE i.slug = ?`).get(slug) as
+      { status: string; revision: number; browser_approved_at: string | null;
+        browser_approved_by: string | null; browser_approved_revision: number | null } | undefined;
+    if (!row) throw new Error("Import not found");
     if (row.status === "published") return { slug, status: "published" };
-    database.prepare(`UPDATE listings SET status = 'published', revision = revision + 1
-      WHERE slug = ?`).run(slug);
-    markAgentImportPublished(actorUserId, slug);
-    recordAudit("catalog.publish", actorUserId, slug);
-    return { slug, status: "published" };
+    if (!row.browser_approved_at || !row.browser_approved_by ||
+        row.browser_approved_revision !== row.revision) {
+      throw new Error("Current import revision needs human approval");
+    }
+    return publishAgentImportNow(actorUserId, slug);
   }).immediate();
 }
 

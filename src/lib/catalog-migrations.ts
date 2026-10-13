@@ -982,6 +982,15 @@ function migrateAgentKeyScopes(): void {
   });
 }
 
+function migrateAgentBrowserApprovals(): void {
+  applyCatalogMigration(32, () => {
+    database.exec(`ALTER TABLE agent_imports ADD COLUMN browser_approved_at TEXT;
+      ALTER TABLE agent_imports ADD COLUMN browser_approved_by TEXT;
+      ALTER TABLE agent_imports ADD COLUMN browser_approved_revision INTEGER
+        CHECK (browser_approved_revision IS NULL OR browser_approved_revision > 0);`);
+  });
+}
+
 export function migrateCatalog(explicit = false): void {
   if (process.env.DIRECTORY_EXPLICIT_MIGRATIONS === "1" && !explicit) return;
   migrate.immediate();
@@ -1021,6 +1030,7 @@ export function migrateCatalog(explicit = false): void {
   migrateAgentStagingLimits();
   migrateListingDestinationKeys();
     migrateAgentKeyScopes();
+    migrateAgentBrowserApprovals();
 }
 
 export function seedCatalog(): void {
