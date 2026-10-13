@@ -1,6 +1,21 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { pageMetadata } from '../src/lib/page-metadata.ts';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const databaseDirectory = mkdtempSync(join(tmpdir(), 'directory-page-metadata-'));
+const previousDatabaseUrl = process.env.DATABASE_URL;
+process.env.DATABASE_URL = `file:${join(databaseDirectory, 'directory.db')}`;
+const { pageMetadata } = await import('../src/lib/page-metadata.ts');
+const { database } = await import('../src/lib/database.ts');
+
+after(() => {
+  database.close();
+  if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+  else process.env.DATABASE_URL = previousDatabaseUrl;
+  rmSync(databaseDirectory, { recursive: true, force: true });
+});
 
 test('SEO-002 production metadata requires a configured public origin', () => {
   const names = ['NODE_ENV', 'SITE_URL', 'NEXT_PUBLIC_SITE_URL', 'BETTER_AUTH_URL'];

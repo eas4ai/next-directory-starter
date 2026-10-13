@@ -10,6 +10,11 @@ import { chromium } from 'playwright-core';
 import sharp from 'sharp';
 import Database from 'better-sqlite3';
 
+const testDatabaseDirectory = mkdtempSync(join(tmpdir(), 'directory-theme-sdk-process-'));
+const previousDatabaseUrl = process.env.DATABASE_URL;
+process.env.DATABASE_URL = `file:${join(testDatabaseDirectory, 'directory.db')}`;
+const { database: testDatabase } = await import('../src/lib/database.ts');
+
 let runtime;
 
 async function freePort() {
@@ -91,10 +96,15 @@ function selectionRequest(origin, cookie, selection) {
 }
 
 after(() => {
-  if (!runtime) return;
-  try { if (runtime.process) process.kill(-runtime.process.pid, 'SIGTERM'); }
-  catch { /* already exited */ }
-  rmSync(runtime.directory, { recursive: true, force: true });
+  if (runtime) {
+    try { if (runtime.process) process.kill(-runtime.process.pid, 'SIGTERM'); }
+    catch { /* already exited */ }
+    rmSync(runtime.directory, { recursive: true, force: true });
+  }
+  testDatabase.close();
+  if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+  else process.env.DATABASE_URL = previousDatabaseUrl;
+  rmSync(testDatabaseDirectory, { recursive: true, force: true });
 });
 
 function sourceFiles(directory) {

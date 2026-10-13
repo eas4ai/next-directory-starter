@@ -6,8 +6,6 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright-core';
-import { defaultThemePreset, themeOptions } from '../src/lib/theme.ts';
-import { installedThemes, renderThemeCss } from '../src/lib/theme-sdk.ts';
 
 function run(env, args) {
   const result = spawnSync('npm', args, { env, encoding: 'utf8', timeout: 180_000 });
@@ -50,7 +48,14 @@ let passed = false;
 let directory;
 let server;
 let browser;
+let database;
+const previousDatabaseUrl = process.env.DATABASE_URL;
 try {
+  directory = mkdtempSync(join(tmpdir(), 'directory-font-loading-'));
+  process.env.DATABASE_URL = `file:${join(directory, 'directory.db')}`;
+  ({ database } = await import('../src/lib/database.ts'));
+  const { defaultThemePreset, themeOptions } = await import('../src/lib/theme.ts');
+  const { installedThemes, renderThemeCss } = await import('../src/lib/theme-sdk.ts');
   const names = new Set();
   for (const font of themeOptions.font) {
     const css = renderThemeCss({ ...defaultThemePreset, font }, 'preset', ':root');
@@ -77,7 +82,6 @@ try {
   assert.ok(customCss.includes(`--preset-body-font: ${installedThemes.studio.typography.body};`));
   assert.ok(customCss.includes(`--preset-heading-font: ${installedThemes.studio.typography.heading};`));
 
-  directory = mkdtempSync(join(tmpdir(), 'directory-font-loading-'));
   const origin = `http://127.0.0.1:${await freePort()}`;
   const password = randomBytes(20).toString('hex');
   const env = { ...process.env, CI: '1', DATABASE_URL: `file:${join(directory, 'directory.db')}`,
@@ -173,6 +177,9 @@ try {
   if (server) {
     try { process.kill(-server.pid, 'SIGTERM'); } catch { /* already exited */ }
   }
+  database?.close();
+  if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+  else process.env.DATABASE_URL = previousDatabaseUrl;
   if (directory) rmSync(directory, { recursive: true, force: true });
   process.stdout.write(`sudus: THM-005: ${passed ? 'pass' : 'fail'}\n`);
 }

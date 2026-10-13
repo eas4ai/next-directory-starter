@@ -1,11 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 test('official NOWPayments SDK creates one mode-specific hosted invoice from saved terms', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'directory-nowpayments-sdk-'));
   const previousFetch = globalThis.fetch;
+  const previousDatabase = process.env.DATABASE_URL;
   const previousSite = process.env.SITE_URL;
+  process.env.DATABASE_URL = `file:${join(directory, 'directory.db')}`;
   process.env.SITE_URL = 'https://directory.example';
   const calls = [];
+  let database;
   globalThis.fetch = async (url, options) => {
     calls.push({ url: String(url), options });
     return Response.json({
@@ -15,6 +22,7 @@ test('official NOWPayments SDK creates one mode-specific hosted invoice from sav
     });
   };
   try {
+    ({ database } = await import('../src/lib/database.ts'));
     const { createHostedSession } = await import('../src/lib/payment-provider.ts');
     const purchase = {
       id: 'purchase-123', listingSlug: 'mine', ownerUserId: 'owner',
@@ -42,8 +50,12 @@ test('official NOWPayments SDK creates one mode-specific hosted invoice from sav
       plan: { ...purchase.plan, billingMode: 'monthly' } }, configuration), /one-time only/);
     assert.equal(calls.length, 1);
   } finally {
+    database?.close();
     globalThis.fetch = previousFetch;
+    if (previousDatabase === undefined) delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL = previousDatabase;
     if (previousSite === undefined) delete process.env.SITE_URL;
     else process.env.SITE_URL = previousSite;
+    rmSync(directory, { recursive: true, force: true });
   }
 });
