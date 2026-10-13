@@ -21,7 +21,7 @@ Each section links to the application code or executable script that supports it
    export DATABASE_URL='file:/absolute/path/to/other.db'
    ```
 
-   A mode-specific file such as `.env.production.local` takes precedence when `NODE_ENV=production`; an unset `NODE_ENV` uses the development file order. Set `NODE_ENV=production` for production migrations and jobs, and check which file supplies the database path. Set the working directory for scheduled jobs to the repository root, or provide their environment explicitly. See [CLI environment loading](../scripts/load-env.mjs), [package scripts](../package.json), and [database connection](../src/lib/database.ts).
+   A mode-specific file such as `.env.production.local` takes precedence when its mode is selected. Operational commands use the production file order when `NODE_ENV` is unset, matching `next build` and `next start`. Set `NODE_ENV=development` or `NODE_ENV=test` to select those file orders explicitly; test mode follows Next.js behavior and does not load `.env.local`. Check which file supplies the database path, and set the working directory for scheduled jobs to the repository root or provide their environment explicitly. See [CLI environment loading](../scripts/load-env.mjs), [package scripts](../package.json), and [database connection](../src/lib/database.ts).
 
 4. Create the authentication and catalog tables, add repeatable sample listings, and create the first administrator:
 
