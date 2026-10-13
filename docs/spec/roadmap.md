@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: reconciliation-batching
+Current: cli-env-mode-mismatch
 
 ## public-starter-and-theme
 
@@ -555,3 +555,9 @@ Delivers backlog item expired-hosted-checkout-blocks: Audit 2026-10-11 (M13, rep
 Requirements: COM-009
 
 Delivers backlog item reconciliation-batching: Audit 2026-10-11 (M14 and M15, reported by two reviewers independently). (1) Reconciliation selects the oldest unresolved rows every run and passes retryExhausted: true, bypassing the 8-attempt limit (src/lib/payment-reconciliation.ts:28); permanently invalid rows fill every batch and newer recoverable events are never selected. (2) Stripe inspection emits a subscription-link effect plus up to limit invoices plus outcomes, and reconcilePurchase rejects the whole batch when its length exceeds limit (lines 96, 239), so --limit 1 with one paid invoice fails. Quarantine exhausted events, schedule retries with backoff, and apply one budget to inspection and processing.
+
+## cli-env-mode-mismatch
+
+Requirements: FOUND-006
+
+Delivers backlog item cli-env-mode-mismatch: Audit 2026-10-11 (M17, verified). scripts/load-env.mjs calls loadEnvConfig(cwd, NODE_ENV !== 'production'), so with NODE_ENV unset the CLI jobs load development env files while next build and next start load production ones. With different databases in .env.development and .env.production, db:migrate, ops:backup and the delivery jobs act on the development database while the app serves production. Require an explicit mode for operational scripts or default them to production, and document it.
