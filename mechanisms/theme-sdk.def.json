@@ -6,7 +6,9 @@
     ".agents/skills/create-directory-theme",
     ".env.example", "README.md",
     "mechanisms/theme-sdk.def.json", "mechanisms/check-theme-sdk.mjs",
-    "package.json", "package-lock.json", "src", "tests/theme-sdk.test.mjs"
+    "mechanisms/tap-results.mjs",
+    "package.json", "package-lock.json", "scripts/ops-common.mjs", "src",
+    "tests/theme-sdk.test.mjs"
   ],
   "identity": {
     "env": [],

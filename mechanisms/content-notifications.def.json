@@ -4,7 +4,8 @@
   "results": "per-requirement",
   "inputs": [
     ".env.example", "README.md", "mechanisms/content-notifications.def.json",
-    "mechanisms/check-content-notifications.mjs", "package.json", "package-lock.json",
+    "mechanisms/check-content-notifications.mjs", "mechanisms/tap-results.mjs",
+    "package.json", "package-lock.json",
     "scripts", "src", "tests"
   ],
   "identity": {
