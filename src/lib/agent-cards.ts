@@ -90,7 +90,7 @@ async function renderSnapshot({ row, brand, palette }: CardSnapshot): Promise<So
   const siteName = escapeXml(brand.name.slice(0, 42));
   const heading = lines(row.name, withScreenshot ? 24 : 42, 3);
   const summary = lines(row.summary, withScreenshot ? 38 : 74, 3);
-  const category = escapeXml(row.category.slice(0, 80));
+  const category = escapeXml(row.category.slice(0, 80).toUpperCase());
   const textWidth = withScreenshot ? 620 : 1070;
   const logoId = /^\/brand-assets\/([0-9a-f-]{36})\.webp$/.exec(brand.logoUrl ?? "")?.[1];
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
@@ -101,7 +101,7 @@ async function renderSnapshot({ row, brand, palette }: CardSnapshot): Promise<So
     <rect x="48" y="48" width="1104" height="534" rx="28" fill="${palette.foreground}" fill-opacity="0.06" stroke="${palette.foreground}" stroke-opacity="0.2"/>
     <rect x="80" y="88" width="9" height="38" rx="4" fill="${palette.accent}"/>
     <g fill="${palette.foreground}" font-family="sans-serif" font-size="24" font-weight="600"><text x="105" y="116">${siteName}</text></g>
-    <g fill="${palette.accent}" font-family="sans-serif" font-size="20" font-weight="600"><text x="80" y="182">${category.toUpperCase()}</text></g>
+    <g fill="${palette.accent}" font-family="sans-serif" font-size="20" font-weight="600"><text x="80" y="182">${category}</text></g>
     <g fill="${palette.foreground}" font-family="sans-serif" font-size="${withScreenshot ? 48 : 60}" font-weight="700">${textLines(heading, 80, 255, withScreenshot ? 58 : 72)}</g>
     <g fill="${palette.muted}" font-family="sans-serif" font-size="${withScreenshot ? 23 : 26}">${textLines(summary, 80, withScreenshot ? 463 : 490, 34)}</g>
     <rect x="80" y="545" width="${textWidth}" height="2" fill="${palette.accent}" fill-opacity="0.75"/>
