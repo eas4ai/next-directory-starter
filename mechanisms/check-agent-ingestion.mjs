@@ -24,6 +24,7 @@ let adminCookie;
 let staffCookie;
 let ownerCookie;
 let token;
+let keyId;
 let staged;
 let browser;
 
@@ -92,8 +93,8 @@ async function mcp(method, params = {}, bearer = token) {
   return result.result;
 }
 
-async function tool(name, args = {}) {
-  const result = await mcp('tools/call', { name, arguments: args });
+async function tool(name, args = {}, bearer = token) {
+  const result = await mcp('tools/call', { name, arguments: args }, bearer);
   assert(!result.isError, `Tool ${name} failed: ${JSON.stringify(result.content).slice(0, 220)}`);
   const content = result.content?.find((part) => part.type === 'text')?.text;
   assert(content, `Tool ${name} returned no text result`);
@@ -155,6 +156,7 @@ try {
     assert(created.status === 201, `Admin credential creation returned ${created.status}`);
     const body = await created.json();
     token = body.secret;
+      keyId = body.id;
     assert(typeof token === 'string' && token.length >= 32, 'Credential was not returned once.');
     const unauthenticated = await request('/api/mcp', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
@@ -405,6 +407,19 @@ try {
     'Import provenance is absent from the private listing.');
     const storage = new Database(databasePath);
     try {
+        const destinationRows = storage.prepare(`SELECT slug, destination_key FROM listings
+          WHERE slug IN (?, ?, ?, ?) ORDER BY slug`).all(
+          'example-tool', staged.first, singleResult.items[0].slug, 'legacy-mixed-host');
+        assert(destinationRows.length === 4 && destinationRows.every((row) => row.destination_key),
+          'Migration or a staging writer left a listing without a normalized destination key.');
+        assert(destinationRows.find((row) => row.slug === 'legacy-mixed-host')?.destination_key ===
+          'https://example.org/LegacyPath',
+        'Legacy duplicate lookup did not repair the normalized destination key.');
+        const destinationPlan = storage.prepare(`EXPLAIN QUERY PLAN
+          SELECT slug FROM listings WHERE destination_key = ? LIMIT 1`)
+          .all(first.url).map((row) => row.detail).join('\n');
+        assert(destinationPlan.includes('USING INDEX listings_destination_key'),
+          `Destination lookup is not indexed: ${destinationPlan}`);
       storage.exec(`CREATE TRIGGER agent_import_storage_probe BEFORE INSERT ON agent_imports
         WHEN NEW.idempotency_key LIKE 'force-db-failure-%'
         BEGIN SELECT RAISE(ABORT, 'injected storage failure'); END`);
@@ -425,6 +440,97 @@ try {
       storage.exec('DROP TRIGGER IF EXISTS agent_import_storage_probe');
       storage.close();
     }
+
+      const quotaResponse = await request('/api/agent/keys',
+        json({ name: 'quota-check', expiresInDays: 7 }, adminCookie));
+      assert(quotaResponse.status === 201, 'Could not create the quota-check credential.');
+      const quotaKey = await quotaResponse.json();
+      const quotaItem = { ...first, idempotencyKey: 'quota-first',
+        url: 'https://example.org/quota-first', name: 'Quota First' };
+      const quotaFirst = await tool('stage_links', { items: [quotaItem] }, quotaKey.secret);
+      assert(quotaFirst.items?.[0]?.status === 'created',
+        'Fresh credential could not stage its first quota item.');
+
+      const limits = new Database(databasePath);
+      let adminId;
+      try {
+        adminId = limits.prepare('SELECT id FROM "user" WHERE email = ?')
+          .get('agent-admin@example.invalid')?.id;
+        assert(adminId, 'Admin account ID is unavailable for browser quota checks.');
+        assert(limits.prepare(`SELECT lifetime_created AS count FROM agent_staging_usage
+          WHERE principal = ?`).get(`key:${keyId}`)?.count === 4,
+        'Retries, duplicates, invalid items, or failed writes consumed remote staging allowance.');
+        assert(limits.prepare(`SELECT lifetime_created AS count FROM agent_staging_usage
+          WHERE principal = ?`).get(`account:${adminId}`)?.count === 2,
+        'Invalid browser items consumed staging allowance.');
+        assert(limits.prepare(`SELECT staging_principal FROM agent_imports WHERE slug = ?`)
+          .get(quotaFirst.items[0].slug)?.staging_principal === `key:${quotaKey.id}`,
+        'A remote import was not attributed to its credential.');
+        limits.prepare(`UPDATE agent_staging_usage SET lifetime_created = 500
+          WHERE principal = ?`).run(`key:${quotaKey.id}`);
+      } finally { limits.close(); }
+
+      const quotaRetry = await tool('stage_links', { items: [quotaItem] }, quotaKey.secret);
+      assert(quotaRetry.items?.[0]?.status === 'existing' &&
+        quotaRetry.items[0].slug === quotaFirst.items[0].slug,
+      'An idempotent retry consumed quota or stopped working at the limit.');
+      const quotaBlocked = await tool('stage_links', { items: [{ ...quotaItem,
+        idempotencyKey: 'quota-blocked', url: 'https://example.org/quota-blocked',
+        name: 'Quota Blocked' }] }, quotaKey.secret);
+      assert(quotaBlocked.items?.[0]?.status === 'limited',
+        'A credential exceeded its 500-draft lifetime quota.');
+
+      const rateResponse = await request('/api/agent/keys',
+        json({ name: 'rate-check', expiresInDays: 7 }, adminCookie));
+      assert(rateResponse.status === 201, 'Could not create the rate-check credential.');
+      const rateKey = await rateResponse.json();
+      const rateFirst = await tool('stage_links', { items: [{ ...first,
+        idempotencyKey: 'rate-first', url: 'https://example.org/rate-first',
+        name: 'Rate First' }] }, rateKey.secret);
+      assert(rateFirst.items?.[0]?.status === 'created',
+        'A separate credential did not receive an independent allowance.');
+      const currentWindow = `${new Date().toISOString().slice(0, 13)}:00:00.000Z`;
+      const rateSetup = new Database(databasePath);
+      try {
+        rateSetup.prepare(`UPDATE agent_staging_usage
+          SET lifetime_created = 20, window_started_at = ?, window_created = 100
+          WHERE principal = ?`).run(currentWindow, `key:${rateKey.id}`);
+      } finally { rateSetup.close(); }
+      const rateBlocked = await tool('stage_links', { items: [{ ...first,
+        idempotencyKey: 'rate-blocked', url: 'https://example.org/rate-blocked',
+        name: 'Rate Blocked' }] }, rateKey.secret);
+      assert(rateBlocked.items?.[0]?.status === 'limited' &&
+        rateBlocked.items[0].error?.includes('Hourly'),
+      'A credential exceeded 100 created drafts in one UTC hour.');
+      const rateRollover = new Database(databasePath);
+      try {
+        rateRollover.prepare(`UPDATE agent_staging_usage SET window_started_at = ?
+          WHERE principal = ?`).run('2026-01-01T00:00:00.000Z', `key:${rateKey.id}`);
+      } finally { rateRollover.close(); }
+      const afterRollover = await tool('stage_links', { items: [{ ...first,
+        idempotencyKey: 'rate-rollover', url: 'https://example.org/rate-rollover',
+        name: 'Rate Rollover' }] }, rateKey.secret);
+      assert(afterRollover.items?.[0]?.status === 'created',
+        'A prior UTC-hour window did not reset.');
+      const rolloverCheck = new Database(databasePath, { readonly: true });
+      try {
+        const usage = rolloverCheck.prepare(`SELECT lifetime_created, window_created
+          FROM agent_staging_usage WHERE principal = ?`).get(`key:${rateKey.id}`);
+        assert(usage?.lifetime_created === 21 && usage.window_created === 1,
+          'Rate-window rollover did not preserve lifetime use and reset the hourly count.');
+      } finally { rolloverCheck.close(); }
+
+      const browserLimit = new Database(databasePath);
+      try {
+        browserLimit.prepare(`UPDATE agent_staging_usage SET lifetime_created = 500
+          WHERE principal = ?`).run(`account:${adminId}`);
+      } finally { browserLimit.close(); }
+      const browserBlocked = await request('/api/agent/imports', json({ items: [{ ...first,
+        idempotencyKey: 'browser-quota-blocked', url: 'https://example.org/browser-quota-blocked',
+        name: 'Browser Quota Blocked' }] }, adminCookie));
+      const browserBlockedBody = await browserBlocked.json();
+      assert(browserBlocked.ok && browserBlockedBody.items?.[0]?.status === 'limited',
+        'Browser staging did not enforce its account-scoped lifetime quota.');
   });
 
   await check('ING-003', async () => {
