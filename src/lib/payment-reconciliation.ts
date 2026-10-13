@@ -25,11 +25,15 @@ function bound(limit: number): number {
 }
 
 export function retryRetainedEvidence(limit: number): {
-  attempted: number; processed: number; unresolved: number;
+  attempted: number; processed: number; unresolved: number; quarantined: number;
 } {
+  const now = new Date().toISOString();
   const rows = database.prepare(`SELECT provider, mode, event_id, event_type, payload
-    FROM payment_evidence WHERE state = 'unresolved'
-    ORDER BY received_at, event_id LIMIT ?`).all(bound(limit)) as
+    FROM payment_evidence
+    WHERE state = 'unresolved' AND attempts < 8 AND quarantined_at IS NULL
+      AND COALESCE(next_attempt_at, received_at) <= ?
+    ORDER BY COALESCE(next_attempt_at, received_at), received_at, event_id
+    LIMIT ?`).all(now, bound(limit)) as
       (Omit<VerifiedEvidence, "raw" | "effect"> & { event_id: string;
         event_type: string; payload: string })[];
   let processed = 0;
@@ -37,9 +41,12 @@ export function retryRetainedEvidence(limit: number): {
     const saved = JSON.parse(row.payload) as Pick<VerifiedEvidence, "raw" | "effect">;
     if (retainVerifiedEvidence({ provider: row.provider, mode: row.mode,
       eventId: row.event_id, eventType: row.event_type,
-      raw: saved.raw, effect: saved.effect }, { retryExhausted: true }).processed) processed += 1;
+      raw: saved.raw, effect: saved.effect }).processed) processed += 1;
   }
-  return { attempted: rows.length, processed, unresolved: rows.length - processed };
+  const quarantined = (database.prepare(`SELECT COUNT(*) AS count FROM payment_evidence
+    WHERE state = 'unresolved' AND (quarantined_at IS NOT NULL OR attempts >= 8)`)
+    .get() as { count: number }).count;
+  return { attempted: rows.length, processed, unresolved: rows.length - processed, quarantined };
 }
 
 function evidence(purchase: Purchase, source: string, resource: string,
@@ -378,7 +385,7 @@ export async function reconcilePurchase(purchaseId: string, limit: number,
         throw new Error("Provider outcome belongs to a different purchase");
       }
     }
-    if (retainVerifiedEvidence(item, { retryExhausted: true }).processed) processed += 1;
+    if (retainVerifiedEvidence(item).processed) processed += 1;
   }
   return { purchaseId, found: found.length, processed, unresolved: found.length - processed };
 }

@@ -47,8 +47,14 @@ test('bounded reconciliation replays retained evidence and reads one existing pu
     assert.deepEqual(retainVerifiedEvidence(evidence('link', { kind: 'subscription-linked',
       purchaseId: 'purchase', resourceId: 'txn_first', subscriptionId: 'sub_one' })),
     { processed: true });
-    assert.deepEqual(retryRetainedEvidence(5), { attempted: 1, processed: 1, unresolved: 0 });
-    assert.deepEqual(retryRetainedEvidence(5), { attempted: 0, processed: 0, unresolved: 0 });
+    database.prepare("UPDATE payment_evidence SET next_attempt_at = received_at WHERE event_id = 'missed-renewal'")
+      .run();
+    assert.deepEqual(retryRetainedEvidence(5), {
+      attempted: 1, processed: 1, unresolved: 0, quarantined: 0,
+    });
+    assert.deepEqual(retryRetainedEvidence(5), {
+      attempted: 0, processed: 0, unresolved: 0, quarantined: 0,
+    });
     assert.equal(database.prepare('SELECT COUNT(*) AS n FROM payment_periods').get().n, 1);
     let inspected = 0;
     const fakeReadOnlyInspector = async (purchase, limit) => {

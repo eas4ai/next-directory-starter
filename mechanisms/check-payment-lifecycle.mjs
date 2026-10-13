@@ -142,6 +142,7 @@ try {
     nodeTests([
       'tests/owner-billing.test.mjs',
       'tests/payment-reconciliation.test.mjs',
+      'tests/reconciliation-batching.test.mjs',
       'tests/payment-provider-adapters.test.mjs',
     ]);
   });
