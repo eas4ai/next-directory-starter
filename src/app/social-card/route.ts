@@ -9,7 +9,7 @@ export async function GET(request: Request) {
     const card = await renderSocialCard(path);
     if (!card) return new Response("Not Found", { status: 404,
       headers: { "Cache-Control": "no-store" } });
-    const etag = `"${card.revision}"`;
+    const etag = card.etag;
     const headers = { "Cache-Control": cacheControl, ETag: etag,
       "X-Content-Type-Options": "nosniff" };
     if (request.headers.get("if-none-match")?.split(",").map((value) => value.trim())

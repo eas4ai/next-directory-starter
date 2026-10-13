@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   SocialCardCapacityError,
   SocialCardRenderCache,
+  socialCardEntityTag,
   socialCardRevision,
 } from '../src/lib/social-card-cache.ts';
 
@@ -106,4 +107,12 @@ test('SEO-012 social card revision changes with content, branding, or theme', ()
     socialCardRevision('page:/', { ...base, branding: { name: 'Catalog' } }));
   assert.notEqual(socialCardRevision('page:/', base),
     socialCardRevision('page:/', { ...base, theme: { id: 'studio' } }));
+});
+
+test('SEO-012 social card entity tags identify the final PNG bytes', () => {
+  assert.equal(socialCardEntityTag(Buffer.from('first')),
+    socialCardEntityTag(Buffer.from('first')));
+  assert.notEqual(socialCardEntityTag(Buffer.from('first')),
+    socialCardEntityTag(Buffer.from('second')));
+  assert.match(socialCardEntityTag(Buffer.from('first')), /^"[0-9a-f]{64}"$/);
 });

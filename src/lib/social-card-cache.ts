@@ -110,3 +110,7 @@ export function socialCardRevision(scope: string, value: unknown): string {
   return createHash("sha256").update(scope).update("\0")
     .update(JSON.stringify(value)).digest("hex");
 }
+
+export function socialCardEntityTag(bytes: Uint8Array): string {
+  return `"${createHash("sha256").update(bytes).digest("hex")}"`;
+}
