@@ -1,9 +1,0 @@
-{
-  "command": "node mechanisms/check-operator-catalog.mjs",
-  "cwd": null,
-  "documents": [],
-  "identity": { "env": [], "image": null, "tools": { "node": "node --version", "npm": "npm --version" } },
-  "inputs": [".env.example", "Dockerfile", "README.md", "fixtures/sample-listings.json", "mechanisms/check-operator-catalog.mjs", "mechanisms/operator-catalog.def.json", "package-lock.json", "package.json", "public", "scripts/migrate-catalog.ts", "scripts/seed-catalog.ts", "src"],
-  "requirements": ["FOUND-002", "FOUND-003", "FOUND-004", "DIR-003", "DIR-004"],
-  "results": "per-requirement"
-}
