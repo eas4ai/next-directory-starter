@@ -905,6 +905,31 @@ function migrateCheckoutTerminals(): void {
   });
 }
 
+function migratePaymentEvidenceRetries(): void {
+  applyCatalogMigration(27, () => {
+    const columns = new Set((database.prepare("PRAGMA table_info(payment_evidence)").all() as
+      { name: string }[]).map(({ name }) => name));
+    if (!columns.has("next_attempt_at")) {
+      database.exec("ALTER TABLE payment_evidence ADD COLUMN next_attempt_at TEXT");
+    }
+    if (!columns.has("quarantined_at")) {
+      database.exec("ALTER TABLE payment_evidence ADD COLUMN quarantined_at TEXT");
+    }
+    const now = new Date().toISOString();
+    database.prepare(`UPDATE payment_evidence
+      SET quarantined_at = ?, next_attempt_at = NULL
+      WHERE state = 'unresolved' AND attempts >= 8 AND quarantined_at IS NULL`).run(now);
+    database.exec(`UPDATE payment_evidence
+      SET next_attempt_at = received_at
+      WHERE state = 'unresolved' AND attempts < 8
+        AND quarantined_at IS NULL AND next_attempt_at IS NULL;
+      DROP INDEX IF EXISTS payment_evidence_unresolved;
+      CREATE INDEX payment_evidence_unresolved
+        ON payment_evidence(next_attempt_at, received_at, event_id)
+        WHERE state = 'unresolved' AND quarantined_at IS NULL AND attempts < 8;`);
+  });
+}
+
 export function migrateCatalog(explicit = false): void {
   if (process.env.DIRECTORY_EXPLICIT_MIGRATIONS === "1" && !explicit) return;
   migrate.immediate();
@@ -939,6 +964,7 @@ export function migrateCatalog(explicit = false): void {
   migratePaddleRefundLedger();
   migrateDisputeLedger();
   migrateCheckoutTerminals();
+  migratePaymentEvidenceRetries();
 }
 
 export function seedCatalog(): void {

@@ -510,8 +510,12 @@ function applyEffect(evidence: VerifiedEvidence): void {
   }
 }
 
-export function retainVerifiedEvidence(evidence: VerifiedEvidence,
-  options: { retryExhausted?: boolean } = {}): { processed: boolean } {
+function nextEvidenceAttempt(attempts: number, now: number): string {
+  const delay = Math.min(60 * 60_000, 60_000 * 2 ** Math.max(0, attempts - 1));
+  return new Date(now + delay).toISOString();
+}
+
+export function retainVerifiedEvidence(evidence: VerifiedEvidence): { processed: boolean } {
   if (!evidence.eventId || evidence.eventId.length > 200 || !evidence.eventType ||
       evidence.eventType.length > 200) {
     throw new PaymentLifecycleError(400, "Invalid payment event envelope");
@@ -526,25 +530,35 @@ export function retainVerifiedEvidence(evidence: VerifiedEvidence,
       evidence.provider, evidence.mode, evidence.eventId, evidence.eventType,
       payload, new Date().toISOString(),
     );
-    const current = database.prepare(`SELECT payload, state, attempts FROM payment_evidence
+    const current = database.prepare(`SELECT payload, state, attempts, quarantined_at
+      FROM payment_evidence
       WHERE provider = ? AND mode = ? AND event_id = ?`)
       .get(evidence.provider, evidence.mode, evidence.eventId) as
-        { payload: string; state: string; attempts: number };
+        { payload: string; state: string; attempts: number; quarantined_at: string | null };
     if (current.payload !== payload) throw new PaymentLifecycleError(409, "Event ID has conflicting evidence");
     if (current.state === "processed") return { processed: true };
-    if (current.attempts >= 8 && !options.retryExhausted) return { processed: false };
+    const now = Date.now();
+    if (current.quarantined_at || current.attempts >= 8) {
+      return { processed: false };
+    }
     try {
       database.transaction(() => applyEffect(evidence))();
       database.prepare(`UPDATE payment_evidence SET state = 'processed', attempts = attempts + 1,
-        processed_at = ?, error = NULL WHERE provider = ? AND mode = ? AND event_id = ?`).run(
-        new Date().toISOString(), evidence.provider, evidence.mode, evidence.eventId,
+        processed_at = ?, error = NULL, next_attempt_at = NULL, quarantined_at = NULL
+        WHERE provider = ? AND mode = ? AND event_id = ?`).run(
+        new Date(now).toISOString(), evidence.provider, evidence.mode, evidence.eventId,
       );
       return { processed: true };
     } catch (error) {
       const reason = error instanceof PaymentLifecycleError ? error.message : "Payment evidence processing failed";
+      const attempts = current.attempts + 1;
+      const quarantinedAt = attempts >= 8 ? new Date(now).toISOString() : null;
+      const nextAttemptAt = quarantinedAt ? null : nextEvidenceAttempt(attempts, now);
       database.prepare(`UPDATE payment_evidence SET state = 'unresolved', attempts = attempts + 1,
-        error = ? WHERE provider = ? AND mode = ? AND event_id = ?`).run(
-        reason, evidence.provider, evidence.mode, evidence.eventId,
+        error = ?, next_attempt_at = ?, quarantined_at = ?
+        WHERE provider = ? AND mode = ? AND event_id = ?`).run(
+        reason, nextAttemptAt, quarantinedAt,
+        evidence.provider, evidence.mode, evidence.eventId,
       );
       return { processed: false };
     }
