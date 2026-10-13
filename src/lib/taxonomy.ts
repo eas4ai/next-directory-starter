@@ -45,8 +45,13 @@ export function listTaxa(kind: TaxonKind): Taxon[] {
       LEFT JOIN used ON used.category = c.name GROUP BY c.name ORDER BY c.name COLLATE NOCASE`)
       .all() as Taxon[];
   }
-  return database.prepare(`SELECT t.name, COUNT(a.article_slug) AS usageCount FROM tags t
-    LEFT JOIN article_tags a ON a.tag_name = t.name GROUP BY t.name ORDER BY t.name COLLATE NOCASE`)
+  return database.prepare(`WITH used AS (
+      SELECT article_slug AS slug, tag_name FROM article_tags
+      UNION
+      SELECT r.slug, staged.value FROM article_revisions r, json_each(r.tags_json) staged
+    )
+    SELECT t.name, COUNT(used.slug) AS usageCount FROM tags t
+    LEFT JOIN used ON used.tag_name = t.name GROUP BY t.name ORDER BY t.name COLLATE NOCASE`)
     .all() as Taxon[];
 }
 
@@ -79,6 +84,14 @@ export function renameTaxon(kind: TaxonKind, original: string, input: unknown): 
       database.prepare("UPDATE article_revisions SET category = ? WHERE category = ?").run(next, prior);
     } else {
       database.prepare("UPDATE article_tags SET tag_name = ? WHERE tag_name = ?").run(next, prior);
+      const revisions = database.prepare(`SELECT slug, tags_json FROM article_revisions
+        WHERE EXISTS (SELECT 1 FROM json_each(article_revisions.tags_json) WHERE value = ?)`)
+        .all(prior) as { slug: string; tags_json: string }[];
+      const updateRevision = database.prepare("UPDATE article_revisions SET tags_json = ? WHERE slug = ?");
+      for (const revision of revisions) {
+        const tags = JSON.parse(revision.tags_json) as string[];
+        updateRevision.run(JSON.stringify(tags.map((tag) => tag === prior ? next : tag)), revision.slug);
+      }
     }
     database.prepare(`DELETE FROM ${table[kind]} WHERE name = ?`).run(prior);
   }).immediate();
@@ -100,7 +113,11 @@ export function deleteTaxon(kind: TaxonKind, original: string): void {
         ? (database.prepare(`SELECT EXISTS(SELECT 1 FROM articles WHERE category = ?) OR
           EXISTS(SELECT 1 FROM article_revisions WHERE category = ?) AS used`)
           .get(name, name) as { used: number }).used
-        : Boolean(database.prepare("SELECT 1 FROM article_tags WHERE tag_name = ? LIMIT 1").get(name));
+          : (database.prepare(`SELECT
+            EXISTS(SELECT 1 FROM article_tags WHERE tag_name = ?) OR
+            EXISTS(SELECT 1 FROM article_revisions r, json_each(r.tags_json) staged
+              WHERE staged.value = ?) AS used`)
+            .get(name, name) as { used: number }).used;
     if (used) {
       throw new TaxonomyError(409, "Remove this name from content before deleting it");
     }
