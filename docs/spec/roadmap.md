@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: cli-env-mode-mismatch
+Current: tag-rename-orphans-revisions
 
 ## public-starter-and-theme
 
@@ -561,3 +561,9 @@ Delivers backlog item reconciliation-batching: Audit 2026-10-11 (M14 and M15, re
 Requirements: FOUND-006
 
 Delivers backlog item cli-env-mode-mismatch: Audit 2026-10-11 (M17, verified). scripts/load-env.mjs calls loadEnvConfig(cwd, NODE_ENV !== 'production'), so with NODE_ENV unset the CLI jobs load development env files while next build and next start load production ones. With different databases in .env.development and .env.production, db:migrate, ops:backup and the delivery jobs act on the development database while the app serves production. Require an explicit mode for operational scripts or default them to production, and document it.
+
+## tag-rename-orphans-revisions
+
+Requirements: EDIT-002
+
+Delivers backlog item tag-rename-orphans-revisions: Audit 2026-10-11 (M18, reviewer reproduced: 400 Unknown tag: Old). Tag rename (src/lib/taxonomy.ts:80) updates article_tags but not article_revisions.tags_json, and tag delete checks only article_tags (line 102). Publishing a saved revision that uses a renamed or deleted tag then fails in setTags. Update or check staged revision tags in the same transaction.
