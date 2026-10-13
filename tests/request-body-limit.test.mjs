@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import {
   RequestTooLargeError,
@@ -73,21 +76,36 @@ test('requestWithBodyLimit rejects a declared oversized body and cancels it', as
 });
 
 test('Better Auth rejects an oversized body before dispatch', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'directory-request-body-limit-'));
+  const names = ['DATABASE_URL', 'BETTER_AUTH_SECRET', 'BETTER_AUTH_URL', 'SITE_URL'];
+  const previous = Object.fromEntries(names.map((name) => [name, process.env[name]]));
+  process.env.DATABASE_URL = `file:${join(directory, 'directory.db')}`;
   process.env.BETTER_AUTH_SECRET = 'request-body-limit-test-secret-that-is-long-enough';
   process.env.BETTER_AUTH_URL = 'http://localhost';
   process.env.SITE_URL = 'http://localhost';
-  const { POST } = await import('../src/app/api/auth/[...all]/route.ts');
-  const request = new Request('http://localhost/api/auth/sign-in/email', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Content-Length': String(64 * 1024 + 1),
-    },
-    body: '{}',
-  });
+  let database;
+  try {
+    ({ database } = await import('../src/lib/database.ts'));
+    const { POST } = await import('../src/app/api/auth/[...all]/route.ts');
+    const request = new Request('http://localhost/api/auth/sign-in/email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': String(64 * 1024 + 1),
+      },
+      body: '{}',
+    });
 
-  const response = await POST(request);
+    const response = await POST(request);
 
-  assert.equal(response.status, 413);
-  assert.deepEqual(await response.json(), { error: 'Request body is too large' });
+    assert.equal(response.status, 413);
+    assert.deepEqual(await response.json(), { error: 'Request body is too large' });
+  } finally {
+    database?.close();
+    for (const name of names) {
+      if (previous[name] === undefined) delete process.env[name];
+      else process.env[name] = previous[name];
+    }
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
