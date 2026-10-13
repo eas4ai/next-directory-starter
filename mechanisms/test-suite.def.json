@@ -3,7 +3,7 @@
   "cwd": null,
   "documents": [],
   "identity": { "env": [], "image": null, "tools": { "node": "node --version", "npm": "npm --version" } },
-  "inputs": [".agents/skills/create-directory-theme", "README.md", "fixtures", "mechanisms/account-test-mail.mjs", "mechanisms/check-test-suite.mjs", "mechanisms/test-suite.def.json", "next.config.ts", "package-lock.json", "package.json", "public", "scripts", "src", "tests", "tsconfig.json"],
+  "inputs": [".agents/skills/create-directory-theme", "README.md", "fixtures", "mechanisms/account-test-mail.mjs", "mechanisms/check-test-suite.mjs", "mechanisms/tap-results.mjs", "mechanisms/test-suite.def.json", "next.config.ts", "package-lock.json", "package.json", "public", "scripts", "src", "tests", "tsconfig.json"],
   "requirements": ["FOUND-007"],
   "results": "per-requirement"
 }

@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { tapRunPassed } from './tap-results.mjs';
 
 const cases = [
   ['MED-001', 'tests/private-media.test.mjs'],
@@ -15,10 +16,11 @@ for (const [requirement, file] of cases) {
   if (!existsSync(file)) {
     process.stderr.write(`${requirement}: ${file} is absent.\n`);
   } else {
-    const result = spawnSync(process.execPath, ['--import', 'tsx', '--test', file], {
+    const result = spawnSync(process.execPath,
+      ['--import', 'tsx', '--test', '--test-reporter=tap', file], {
       encoding: 'utf8', timeout: 90_000,
     });
-    passed = result.status === 0;
+    passed = tapRunPassed(result.status, result.stdout ?? '');
     if (!passed) {
       process.stderr.write(`${requirement}: ${file} failed: ${
         (result.stdout ?? '').slice(-900)} ${(result.stderr ?? '').slice(-400)}\n`);
