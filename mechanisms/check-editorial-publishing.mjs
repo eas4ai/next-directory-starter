@@ -329,10 +329,56 @@ try {
     const tag = await request('/api/admin/tags', json({ name: 'Release Notes' }, adminCookie));
     if (tag.status !== 201) throw new Error(`Article tag creation returned ${tag.status}.`);
     await ensureEditor();
-    await createArticle('tagged-article', 'published', ['Release Notes']);
+    const { article: taggedArticle } = await createArticle('tagged-article', 'published', ['Release Notes']);
     const detail = await request('/articles/tagged-article');
     if (!detail.ok || !contains(await detail.text(), 'Release Notes')) {
       throw new Error('An operator-managed tag is absent from its published article.');
+    }
+    const { article: renameStage } = await updateArticle('tagged-article', {
+      action: 'save', version: taggedArticle.version,
+      body: 'A saved revision whose renamed tag must remain publishable.', tags: ['Release Notes'],
+    });
+    const renamedTag = await request('/api/admin/tags/Release%20Notes',
+      json({ name: 'Product Updates' }, adminCookie, 'PATCH'));
+    if (!renamedTag.ok) throw new Error(`Article tag rename returned ${renamedTag.status}.`);
+    const renamedPublication = await patchArticle('tagged-article', {
+      status: 'published', version: renameStage.version,
+    });
+    if (!renamedPublication.ok) {
+      const payload = await renamedPublication.json();
+      throw new Error(`A tag rename blocked its saved revision: ${renamedPublication.status} ${payload.error ?? ''}`);
+    }
+    const { article: renamedArticle } = await renamedPublication.json();
+    const renamedDetail = await request('/articles/tagged-article');
+    const renamedHtml = await renamedDetail.text();
+    if (!renamedDetail.ok || !contains(renamedHtml, 'Product Updates') ||
+        !contains(renamedHtml, 'renamed tag must remain publishable')) {
+      throw new Error('Publishing after a tag rename lost the renamed tag or saved revision.');
+    }
+
+    const stagedTag = await request('/api/admin/tags', json({ name: 'Staged Only' }, adminCookie));
+    if (stagedTag.status !== 201) throw new Error(`Staged-only tag creation returned ${stagedTag.status}.`);
+    const { article: deleteStage } = await updateArticle('tagged-article', {
+      action: 'save', version: renamedArticle.version,
+      body: 'A saved revision whose staged-only tag must remain publishable.',
+      tags: ['Product Updates', 'Staged Only'],
+    });
+    const tagsResponse = await request('/api/admin/tags', { headers: { Cookie: adminCookie } });
+    const tagItems = tagsResponse.ok ? (await tagsResponse.json()).items : [];
+    const stagedOnlyUsage = tagItems.find((item) => item.name === 'Staged Only')?.usageCount;
+    const deleteStagedTag = await request('/api/admin/tags/Staged%20Only',
+      { method: 'DELETE', headers: adminHeaders });
+    if (stagedOnlyUsage !== 1 || deleteStagedTag.status !== 409) {
+      throw new Error('A staged-only tag is shown as unused or can be deleted.');
+    }
+    const stagedPublication = await patchArticle('tagged-article', {
+      status: 'published', version: deleteStage.version,
+    });
+    const stagedDetail = await request('/articles/tagged-article');
+    const stagedHtml = await stagedDetail.text();
+    if (!stagedPublication.ok || !stagedDetail.ok || !contains(stagedHtml, 'Staged Only') ||
+        !contains(stagedHtml, 'staged-only tag must remain publishable')) {
+      throw new Error('A rejected staged-only tag deletion did not preserve publication.');
     }
   });
 
