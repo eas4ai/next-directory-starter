@@ -19,13 +19,17 @@ export function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (new URL(request.url).pathname.replace(/\/+$/, "").endsWith("/sign-up/email") &&
-      !accountMailConfigured()) {
+  const isEmailSignup = new URL(request.url).pathname.replace(/\/+$/, "").endsWith("/sign-up/email");
+  if (isEmailSignup && !accountMailConfigured()) {
     return Response.json({ message: "Signup is temporarily unavailable. Contact the site operator." },
       { status: 503 });
   }
   try {
-    return handler.POST(await requestWithBodyLimit(request, AUTH_REQUEST_MAX_BYTES));
+    const response = await handler.POST(await requestWithBodyLimit(request, AUTH_REQUEST_MAX_BYTES));
+    if (isEmailSignup && response.ok) {
+      return Response.json({ message: "Check your email for a verification link." });
+    }
+    return response;
   } catch (error) {
     if (error instanceof RequestTooLargeError) return requestJsonErrorResponse(error);
     throw error;
