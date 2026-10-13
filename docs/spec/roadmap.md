@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: auth-rate-limit-forwarded-for
+Current: agent-staging-quota
 
 ## public-starter-and-theme
 
@@ -579,3 +579,9 @@ Delivers backlog item signup-email-enumeration: Audit 2026-10-11 (M19, reviewer 
 Requirements: ACC-002
 
 Delivers backlog item auth-rate-limit-forwarded-for: Audit 2026-10-11 (M20, plausible, depends on the deployment proxy). src/lib/auth.ts configures no trusted client-IP policy, so Better Auth keys rate limits on a client-supplied X-Forwarded-For. If the reverse proxy passes the header through, an attacker rotates it per request for password guessing or reset and magic-link email floods. Confirm the proxy behavior, configure trusted IP extraction, and have the proxy overwrite the header.
+
+## agent-staging-quota
+
+Requirements: ING-002
+
+Delivers backlog item agent-staging-quota: Audit 2026-10-11 (M21, reported, not re-verified). Agent staging limits only 20 items per call (src/lib/agent-imports.ts:92-119); each new item parses every stored listing URL inside an immediate write transaction. A leaked catalog key can stage without limit while each duplicate scan blocks the event loop longer. Add per-key quotas and rate limits and store an indexed normalized destination key.
