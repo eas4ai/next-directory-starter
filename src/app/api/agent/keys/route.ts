@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       : Response.json({ error: "Invalid key request" }, { status: 400 });
   }
   try {
-    return Response.json(issueAgentKey(user.id, input.name, input.expiresInDays), { status: 201,
+    return Response.json(issueAgentKey(user.id, input.name, input.expiresInDays, input.scope), { status: 201,
       headers: { "Cache-Control": "no-store" } });
   } catch {
     return Response.json({ error: "Invalid key request" }, { status: 400 });
