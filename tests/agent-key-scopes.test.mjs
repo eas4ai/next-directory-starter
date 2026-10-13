@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-test('agent keys default to staging and preserve explicit publication access', async () => {
+test('agent keys and migrated legacy keys default to staging-only access', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'directory-agent-key-scopes-'));
   const previousDatabase = process.env.DATABASE_URL;
   process.env.DATABASE_URL = `file:${join(directory, 'catalog.db')}`;
@@ -31,7 +31,7 @@ test('agent keys default to staging and preserve explicit publication access', a
     const keys = listAgentKeys('catalog-user');
     assert.equal(keys.find((key) => key.id === staged.id)?.scope, 'stage');
     assert.equal(keys.find((key) => key.id === publisher.id)?.scope, 'publish');
-    assert.equal(keys.find((key) => key.id === 'legacy-key')?.scope, 'publish');
+    assert.equal(keys.find((key) => key.id === 'legacy-key')?.scope, 'stage');
   } finally {
     database?.close();
     if (previousDatabase === undefined) delete process.env.DATABASE_URL;

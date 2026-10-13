@@ -977,7 +977,7 @@ function migrateListingDestinationKeys(): void {
 
 function migrateAgentKeyScopes(): void {
   applyCatalogMigration(31, () => {
-    database.exec(`ALTER TABLE agent_keys ADD COLUMN scope TEXT NOT NULL DEFAULT 'publish'
+    database.exec(`ALTER TABLE agent_keys ADD COLUMN scope TEXT NOT NULL DEFAULT 'stage'
       CHECK (scope IN ('stage', 'publish'))`);
   });
 }
