@@ -12,6 +12,8 @@ export type SocialCardCacheOptions = {
   maxWaiting: number;
 };
 
+export type SocialCardRenderResult = { bytes: Buffer; cacheable: boolean };
+
 export class SocialCardCapacityError extends Error {
   constructor() {
     super("Social card renderer is busy");
@@ -40,7 +42,7 @@ export class SocialCardRenderCache {
     }
   }
 
-  get(key: string, render: () => Promise<Buffer>): Promise<Buffer> {
+  get(key: string, render: () => Promise<SocialCardRenderResult>): Promise<Buffer> {
     const cached = this.values.get(key);
     if (cached) {
       this.values.delete(key);
@@ -50,9 +52,9 @@ export class SocialCardRenderCache {
     const existing = this.inFlight.get(key);
     if (existing) return existing;
 
-    const pending = this.run(render).then((card) => {
-      this.store(key, card);
-      return card;
+    const pending = this.run(render).then((result) => {
+      if (result.cacheable) this.store(key, result.bytes);
+      return result.bytes;
     }).finally(() => {
       this.inFlight.delete(key);
     });
@@ -60,7 +62,7 @@ export class SocialCardRenderCache {
     return pending;
   }
 
-  private async run(render: () => Promise<Buffer>): Promise<Buffer> {
+  private async run(render: () => Promise<SocialCardRenderResult>): Promise<SocialCardRenderResult> {
     await this.acquire();
     try {
       return await render();

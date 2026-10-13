@@ -6,6 +6,8 @@ import {
   socialCardRevision,
 } from '../src/lib/social-card-cache.ts';
 
+const rendered = (value) => ({ bytes: Buffer.from(value), cacheable: true });
+
 test('SEO-012 social card cache coalesces work and keeps a bounded LRU', async () => {
   const cache = new SocialCardRenderCache({
     maxEntries: 2,
@@ -19,7 +21,7 @@ test('SEO-012 social card cache coalesces work and keeps a bounded LRU', async (
   const render = async () => {
     renders += 1;
     await gate;
-    return Buffer.from('same');
+    return rendered('same');
   };
 
   const requests = Array.from({ length: 8 }, () => cache.get('same', render));
@@ -30,9 +32,9 @@ test('SEO-012 social card cache coalesces work and keeps a bounded LRU', async (
   assert.ok(cards.every((card) => card.equals(Buffer.from('same'))));
   assert.equal(await cache.get('same', async () => { throw new Error('cache miss'); }), cards[0]);
 
-  await cache.get('second', async () => Buffer.from('two'));
-  await cache.get('third', async () => Buffer.from('three'));
-  await cache.get('same', async () => { renders += 1; return Buffer.from('new'); });
+  await cache.get('second', async () => rendered('two'));
+  await cache.get('third', async () => rendered('three'));
+  await cache.get('same', async () => { renders += 1; return rendered('new'); });
   assert.equal(renders, 2, 'least recently used card must be evicted at the entry bound');
 });
 
@@ -50,7 +52,7 @@ test('SEO-012 social card cache bounds active renders and queued unique work', a
     maximumActive = Math.max(maximumActive, active);
     await new Promise((resolve) => setTimeout(resolve, 20));
     active -= 1;
-    return Buffer.from('card');
+    return rendered('card');
   };
 
   const accepted = ['a', 'b', 'c', 'd'].map((key) => cache.get(key, render));
@@ -67,8 +69,32 @@ test('SEO-012 social card cache releases capacity after render failure', async (
     maxWaiting: 0,
   });
   await assert.rejects(cache.get('broken', async () => { throw new Error('bad image'); }), /bad image/);
-  const recovered = await cache.get('working', async () => Buffer.from('ok'));
+  const recovered = await cache.get('working', async () => rendered('ok'));
   assert.equal(recovered.toString(), 'ok');
+});
+
+test('SEO-012 social card cache retries a source after serving a generated fallback', async () => {
+  const cache = new SocialCardRenderCache({
+    maxEntries: 2,
+    maxBytes: 128,
+    maxConcurrent: 1,
+    maxWaiting: 1,
+  });
+  let renders = 0;
+  const fallback = await cache.get('published-source', async () => {
+    renders += 1;
+    return { bytes: Buffer.from('fallback'), cacheable: false };
+  });
+  assert.equal(fallback.toString(), 'fallback');
+  const recovered = await cache.get('published-source', async () => {
+    renders += 1;
+    return { bytes: Buffer.from('published'), cacheable: true };
+  });
+  assert.equal(recovered.toString(), 'published');
+  assert.equal(renders, 2, 'a fallback must not hide a recovered published source');
+  assert.equal((await cache.get('published-source', async () => {
+    throw new Error('recovered result was not cached');
+  })).toString(), 'published');
 });
 
 test('SEO-012 social card revision changes with content, branding, or theme', () => {

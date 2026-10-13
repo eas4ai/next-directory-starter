@@ -14,7 +14,8 @@ import { getThemePreset } from "@/lib/theme";
 import { getThemeSelection } from "@/lib/theme-selection";
 import { socialPaletteForSelection } from "@/lib/theme-sdk";
 import { MAX_SOURCE_BYTES, requestPinnedImage } from "@/lib/pinned-image-request";
-import { SocialCardRenderCache, socialCardRevision } from "@/lib/social-card-cache";
+import { SocialCardRenderCache, socialCardRevision,
+  type SocialCardRenderResult } from "@/lib/social-card-cache";
 
 const WIDTH = 1200;
 const HEIGHT = 630;
@@ -169,8 +170,9 @@ function lines(value: string, maxLength: number, maxLines: number): string[] {
   return result.map((part) => xml(part.slice(0, maxLength + 8)));
 }
 
-async function renderSnapshot({ content, site, palette }: CardSnapshot): Promise<Buffer> {
+async function renderSnapshot({ content, site, palette }: CardSnapshot): Promise<SocialCardRenderResult> {
   let photo: Buffer | null = null;
+  let cacheable = !content.source;
   try {
     const input = await sourceImage(content.source);
     if (input && input.length <= MAX_SOURCE_BYTES) {
@@ -180,6 +182,7 @@ async function renderSnapshot({ content, site, palette }: CardSnapshot): Promise
           (info.pages ?? 1) === 1) {
         photo = await image.rotate().resize(436, 400, { fit: "contain",
           background: palette.background }).png().toBuffer();
+        cacheable = true;
       }
     }
   } catch { /* Invalid or unavailable source uses the generated card. */ }
@@ -200,7 +203,8 @@ async function renderSnapshot({ content, site, palette }: CardSnapshot): Promise
     <rect x="80" y="545" width="${photo ? 620 : 1040}" height="2" fill="${palette.accent}" fill-opacity="0.75"/>
   </svg>`;
   const overlays = photo ? [{ input: photo, left: 700, top: 112 }] : [];
-  return sharp(Buffer.from(svg)).composite(overlays).png().toBuffer();
+  const bytes = await sharp(Buffer.from(svg)).composite(overlays).png().toBuffer();
+  return { bytes, cacheable };
 }
 
 export async function renderSocialCard(path: string): Promise<RenderedSocialCard | null> {
