@@ -1,5 +1,5 @@
 import "./load-env.mjs";
-import { reconcilePurchase, retryRetainedEvidence } from "../src/lib/payment-reconciliation";
+import { reconcileBilling } from "../src/lib/payment-reconciliation";
 
 function options(args: string[]): { limit: number; purchaseId: string | null; resourceId: string | null } {
   let limit = 10;
@@ -24,10 +24,8 @@ function options(args: string[]): { limit: number; purchaseId: string | null; re
 
 async function main() {
   const { limit, purchaseId, resourceId } = options(process.argv.slice(2));
-  const retained = retryRetainedEvidence(limit);
-  const purchase = purchaseId ? await reconcilePurchase(purchaseId, limit,
-    undefined, resourceId ?? undefined) : null;
-  process.stdout.write(`${JSON.stringify({ retained, purchase })}\n`);
+  const result = await reconcileBilling(limit, purchaseId, resourceId ?? undefined);
+  process.stdout.write(`${JSON.stringify(result)}\n`);
 }
 
 main().catch((error) => {

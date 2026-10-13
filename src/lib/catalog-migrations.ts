@@ -930,6 +930,18 @@ function migratePaymentEvidenceRetries(): void {
   });
 }
 
+function migratePaymentReconciliationCursors(): void {
+  applyCatalogMigration(28, () => {
+    database.exec(`CREATE TABLE payment_reconciliation_cursors (
+        purchase_id TEXT NOT NULL REFERENCES purchases(id) ON DELETE CASCADE,
+        stream TEXT NOT NULL,
+        cursor TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (purchase_id, stream)
+      );`);
+  });
+}
+
 export function migrateCatalog(explicit = false): void {
   if (process.env.DIRECTORY_EXPLICIT_MIGRATIONS === "1" && !explicit) return;
   migrate.immediate();
@@ -965,6 +977,7 @@ export function migrateCatalog(explicit = false): void {
   migrateDisputeLedger();
   migrateCheckoutTerminals();
   migratePaymentEvidenceRetries();
+  migratePaymentReconciliationCursors();
 }
 
 export function seedCatalog(): void {
