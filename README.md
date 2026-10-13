@@ -50,7 +50,7 @@ Public pages emit canonical URLs and per-page metadata. The app publishes a site
 
 ### Agent-assisted imports
 
-An authenticated remote MCP endpoint lets a catalog agent list categories, stage observed links with source evidence, attach a validated screenshot, preview a card, and explicitly publish a reviewed import. Authorized catalog staff can also open `/admin/import` in a supported browser to expose WebMCP tools for the same import workflow. Staged links stay private until publication; duplicate destinations and repeated requests are handled before insertion. See the [remote MCP tools](src/app/api/mcp/route.ts), [browser WebMCP registration](src/app/admin/import/import-workspace.tsx), [import workflow](src/lib/agent-imports.ts), and [agent key management](src/lib/agent-keys.ts).
+An authenticated remote MCP endpoint lets a catalog agent list categories, stage observed links with source evidence, attach a validated screenshot, preview a card, and, when deliberately granted publish access, publish an import. Agent keys default to staging only; **Stage and publish** keys delegate publication without another review. Authorized catalog staff can also open `/admin/import` in a supported browser to expose keyless WebMCP tools against their signed-in session. Browser WebMCP publication requires a person to approve the current import revision in the workspace first. External source excerpts are returned as untrusted data, and staged links stay private until publication. See the [remote MCP tools](src/app/api/mcp/route.ts), [browser WebMCP registration](src/app/admin/import/import-workspace.tsx), [import workflow](src/lib/agent-imports.ts), and [agent key management](src/lib/agent-keys.ts).
 
 ### Optional billing
 
