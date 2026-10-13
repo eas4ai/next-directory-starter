@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { database } from "@/lib/database";
+import { normalizeListingDestination } from "@/lib/listing-destinations";
 import { migrateCatalog } from "@/lib/catalog-migrations";
 import { parseListing } from "@/lib/catalog-input";
 import type { Listing } from "@/lib/listings";
@@ -135,10 +136,10 @@ export function createOwnerListing(userId: string, input: unknown): Listing {
       }
       listing.category = existingCategory(listing.category);
       database.prepare(`INSERT INTO listings
-        (slug, name, summary, description, category, url, status, owner_user_id)
-        VALUES (?, ?, ?, ?, ?, ?, 'draft', ?)`).run(
+        (slug, name, summary, description, category, url, destination_key, status, owner_user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', ?)`).run(
         listing.slug, listing.name, listing.summary, listing.description,
-        listing.category, listing.url, userId,
+        listing.category, listing.url, normalizeListingDestination(listing.url), userId,
       );
       const seo = listingSeoInput(input);
       if (seo !== undefined) saveDraftSeo("listing", listing.slug, seo);
@@ -167,10 +168,11 @@ export function updateOwnerListing(userId: string, slug: string, changes: unknow
     listing.revision = current.revision;
     listing.category = existingCategory(listing.category);
     if (current.status === "draft") {
-      database.prepare(`UPDATE listings SET name = ?, summary = ?, description = ?, category = ?, url = ?,
-        revision = revision + 1
+        database.prepare(`UPDATE listings SET name = ?, summary = ?, description = ?, category = ?,
+          url = ?, destination_key = ?, revision = revision + 1
         WHERE slug = ? AND owner_user_id = ?`).run(listing.name, listing.summary,
-        listing.description, listing.category, listing.url, slug, userId);
+          listing.description, listing.category, listing.url,
+          normalizeListingDestination(listing.url), slug, userId);
       listing.revision = current.revision + 1;
     } else {
       database.prepare(`INSERT INTO owner_drafts (slug, owner_user_id, payload, updated_at)
@@ -240,9 +242,10 @@ export function decideSubmission(id: string, actorId: string, decision: "approve
       const proposed = JSON.parse(row.payload) as Listing;
       proposed.category = existingCategory(proposed.category, 409);
       database.prepare(`UPDATE listings SET name = ?, summary = ?, description = ?, category = ?,
-          url = ?, status = 'published', revision = revision + 1 WHERE slug = ? AND owner_user_id = ?`).run(
+            url = ?, destination_key = ?, status = 'published', revision = revision + 1
+            WHERE slug = ? AND owner_user_id = ?`).run(
         proposed.name, proposed.summary, proposed.description, proposed.category,
-        proposed.url, row.slug, row.owner_user_id,
+          proposed.url, normalizeListingDestination(proposed.url), row.slug, row.owner_user_id,
       );
       promoteDraftMedia("listing", row.slug);
       if (row.seo_json) {

@@ -6,6 +6,7 @@ import { redirectForPath } from "@/lib/seo-redirects";
 import { HttpError } from "@/lib/http-error";
 import { canAdmin, canManageCatalog, canModerate } from "@/lib/admin";
 import { markAgentImportPublished } from "@/lib/agent-imports";
+import { normalizeListingDestination } from "@/lib/listing-destinations";
 
 export type Listing = {
   slug: string;
@@ -117,10 +118,10 @@ export function createListing(listing: Listing, actorUserId: string): Listing {
     }
     database.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)").run(listing.category);
     database.prepare(`INSERT INTO listings
-      (slug, name, summary, description, category, url, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
+      (slug, name, summary, description, category, url, destination_key, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
       listing.slug, listing.name, listing.summary, listing.description,
-      listing.category, listing.url, listing.status,
+      listing.category, listing.url, normalizeListingDestination(listing.url), listing.status,
     );
     recordAudit(listing.status === "published" ? "catalog.publish" : "catalog.create", actorUserId, listing.slug);
     return listingBySlug(listing.slug)!;
@@ -153,9 +154,10 @@ export function updateListing(listing: Listing, actorUserId: string, expectedRev
     }
     database.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)").run(listing.category);
     database.prepare(`UPDATE listings SET name = ?, summary = ?, description = ?,
-      category = ?, url = ?, status = ?, revision = revision + 1 WHERE slug = ?`).run(
+        category = ?, url = ?, destination_key = ?, status = ?, revision = revision + 1
+        WHERE slug = ?`).run(
       listing.name, listing.summary, listing.description, listing.category,
-      listing.url, listing.status, listing.slug,
+        listing.url, normalizeListingDestination(listing.url), listing.status, listing.slug,
     );
     const action = listing.status === "published" && current.status !== "published"
       ? "catalog.publish" : current.status === "published" && listing.status === "draft"
