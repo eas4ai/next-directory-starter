@@ -86,6 +86,19 @@ test('Paddle and NOWPayments signatures authenticate the exact mode and purchase
     assert.equal((await paddlePost(request('paddle', paddleBody), context('test'))).status, 400);
     assert.equal((await paddlePost(request('paddle', paddleBody, paddleSignature), context('live'))).status, 503);
     assert.equal((await paddlePost(request('paddle', paddleBody, 'ts=1;h1=bad'), context('test'))).status, 400);
+    const expiredTimestamp = timestamp - 600;
+    const expiredSignature = `ts=${expiredTimestamp};h1=${createHmac('sha256', 'paddle_secret')
+      .update(`${expiredTimestamp}:${paddleBody}`).digest('hex')}`;
+    const evidenceBeforeExpired = database.prepare('SELECT COUNT(*) AS count FROM payment_evidence')
+      .get().count;
+    const purchaseBeforeExpired = database.prepare(`SELECT status, provider_resource_id
+      FROM purchases WHERE id = 'paddle-purchase'`).get();
+    assert.equal((await paddlePost(request('paddle', paddleBody, expiredSignature), context('test'))).status, 400);
+    assert.equal(database.prepare('SELECT COUNT(*) AS count FROM payment_evidence').get().count,
+      evidenceBeforeExpired, 'an expired authentic Paddle signature must not retain evidence');
+    assert.deepEqual(database.prepare(`SELECT status, provider_resource_id
+      FROM purchases WHERE id = 'paddle-purchase'`).get(), purchaseBeforeExpired,
+      'an expired authentic Paddle signature must not change its purchase');
     assert.equal((await paddlePost(request('paddle', paddleBody, paddleSignature), context('test'))).status, 200);
     const earlyPaddle = { ...paddlePayload, event_id: 'evt_paddle_early', data: {
       ...paddlePayload.data, id: 'txn_paddle_early', custom_data: { purchaseId: 'paddle-early' },

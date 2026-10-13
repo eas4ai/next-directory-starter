@@ -10,6 +10,7 @@ import Database from 'better-sqlite3';
 
 const workspace = mkdtempSync(join(tmpdir(), 'directory-content-http-'));
 let app;
+let stateDatabase;
 
 async function freePort() {
   const server = createServer();
@@ -74,6 +75,8 @@ try {
   const database = new Database(join(workspace, 'directory.db'));
   const ownerId = database.prepare('SELECT id FROM "user" WHERE email = ?')
     .get('http-owner@example.invalid').id;
+  const adminId = database.prepare('SELECT id FROM "user" WHERE email = ?')
+    .get('http-admin@example.invalid').id;
   const failedNotice = database.prepare(`INSERT INTO owner_notifications
     (id, owner_user_id, kind, source_key, subject, body, created_at,
      email_state, email_attempts, email_last_error)
@@ -94,6 +97,7 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
   assert.ok(ready, 'Production server did not start');
+  stateDatabase = new Database(join(workspace, 'directory.db'));
   const owner = await login('http-owner@example.invalid');
   const editor = await login('http-editor@example.invalid');
   const moderator = await login('http-moderator@example.invalid');
@@ -120,6 +124,48 @@ try {
     name: 'HTTP Media', summary: 'A checked listing', description: 'HTTP media test',
     category: 'Tools', url: 'https://example.org/http-media' }, owner));
   await expectStatus(created, 201);
+  const checkout = { planKey: 'unreached', offerToken: 'unreached',
+    requestId: 'route-rejection', provider: 'stripe' };
+  const purchaseCountBeforeCheckout = stateDatabase.prepare('SELECT COUNT(*) AS count FROM purchases')
+    .get().count;
+  assert.equal((await request('/api/owner/listings/http-media/hosted-checkout',
+    json(checkout, null))).status, 401);
+  assert.equal((await request('/api/owner/listings/http-media/hosted-checkout', {
+    ...json(checkout, owner),
+    headers: { ...json(checkout, owner).headers, Origin: 'https://forged.invalid' },
+  })).status, 403);
+  assert.equal(stateDatabase.prepare('SELECT COUNT(*) AS count FROM purchases').get().count,
+    purchaseCountBeforeCheckout, 'rejected checkout routes must not reserve a purchase');
+
+  stateDatabase.prepare(`INSERT OR IGNORE INTO publishing_plans
+    (key, name, description, mode, billing_mode, amount_minor, currency,
+      duration_days, featured, enabled, updated_at)
+    VALUES ('route-monthly', 'Route monthly', '', 'test', 'monthly', 1200, 'usd',
+      NULL, 1, 1, ?)`).run(new Date().toISOString());
+  const insertPurchase = stateDatabase.prepare(`INSERT INTO purchases
+    (id, listing_slug, owner_user_id, plan_key, plan_mode, billing_mode, plan_name,
+      plan_description, amount_minor, currency, duration_days, accepted_duration_days,
+      featured, stripe_session_id, status, created_at, provider, provider_subscription_id)
+    VALUES (?, 'http-media', ?, 'route-monthly', 'test', 'monthly', 'Route monthly', '',
+      1200, 'usd', 0, NULL, 1, ?, 'paid', ?, 'stripe', ?)`);
+  insertPurchase.run('route-owner-cancel', ownerId, 'pending:route-owner-cancel',
+    new Date().toISOString(), 'sub_route_owner');
+  insertPurchase.run('route-other-cancel', adminId, 'pending:route-other-cancel',
+    new Date().toISOString(), 'sub_route_other');
+  const cancellationState = () => stateDatabase.prepare(`SELECT p.id, p.status,
+      COALESCE(s.state, '') AS subscription_state
+    FROM purchases p LEFT JOIN subscription_states s ON s.purchase_id = p.id
+    WHERE p.id IN ('route-owner-cancel', 'route-other-cancel') ORDER BY p.id`).all();
+  const cancellationBefore = cancellationState();
+  assert.equal((await request('/api/owner/billing/route-owner-cancel/cancel', {
+    method: 'POST', headers: { Cookie: owner, Origin: 'https://forged.invalid' },
+  })).status, 403);
+  assert.equal((await request('/api/owner/billing/route-other-cancel/cancel', {
+    method: 'POST', headers: { Cookie: owner, Origin: origin },
+  })).status, 404);
+  assert.deepEqual(cancellationState(), cancellationBefore,
+    'rejected cancellation routes must not change purchase state');
+
   const image = await sharp({ create: { width: 12, height: 8, channels: 3,
     background: '#ff8800' } }).png().toBuffer();
   assert.equal((await request('/api/owner/listings/http-media/media',
@@ -156,6 +202,18 @@ try {
     status: 'published', category: '', tags: [] }, editor));
   await expectStatus(published, 201);
   const article = (await published.json()).article;
+  const articleMediaCount = () => stateDatabase.prepare(`SELECT COUNT(*) AS count
+    FROM media_assets WHERE target_kind = 'article' AND target_slug = 'http-article'`).get().count;
+  const articleMediaBefore = articleMediaCount();
+  const articleUpload = (session, requestOrigin = origin) => request(
+    '/api/admin/articles/http-article/media', { method: 'POST', body: image,
+      headers: { Origin: requestOrigin, 'Content-Type': 'image/png',
+        'X-Image-Alt': 'Rejected article upload', ...(session ? { Cookie: session } : {}) } });
+  assert.equal((await articleUpload(null)).status, 401);
+  assert.equal((await articleUpload(owner)).status, 403);
+  assert.equal((await articleUpload(editor, 'https://forged.invalid')).status, 403);
+  assert.equal(articleMediaCount(), articleMediaBefore,
+    'rejected article-media routes must not create media state');
   const staged = await request('/api/admin/articles/http-article', json({ action: 'save',
     version: article.version, title: 'HTTP Revised', summary: 'Revised summary',
     body: 'Private **revision**', category: '', tags: [] }, editor, 'PATCH'));
@@ -176,8 +234,20 @@ try {
   const hidden = await request('/articles?q=Revised');
   assert.equal(hidden.status, 200);
   assert.doesNotMatch(await hidden.text(), /HTTP Revised/);
+
+  const publicAssignment = () => stateDatabase.prepare(`SELECT COUNT(*) AS count
+    FROM media_assignments WHERE asset_id = ? AND slot = 'public'`).get(first).count;
+  assert.equal(publicAssignment(), 1);
+  stateDatabase.prepare('UPDATE "user" SET banned = 1 WHERE id = ?').run(ownerId);
+  assert.equal(stateDatabase.prepare("SELECT status FROM listings WHERE slug = 'http-media'")
+    .get().status, 'published');
+  assert.equal((await request(`/media/${first}`)).status, 404);
+  assert.equal(stateDatabase.prepare("SELECT status FROM listings WHERE slug = 'http-media'")
+    .get().status, 'published', 'media denial must not rewrite the listing');
+  assert.equal(publicAssignment(), 1, 'media denial must not delete the public assignment');
   process.stdout.write('Content HTTP routes: pass\n');
 } finally {
+  stateDatabase?.close();
   if (app) { try { process.kill(-app.pid, 'SIGTERM'); } catch { /* stopped */ } }
   rmSync(workspace, { recursive: true, force: true });
 }
