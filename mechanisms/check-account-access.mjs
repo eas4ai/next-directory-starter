@@ -172,9 +172,16 @@ try {
     const signup = await request('/api/auth/sign-up/email',
       json({ name: 'Verify Owner', email, password }));
     if (!signup.ok) throw new Error(`Public sign-up returned ${signup.status}.`);
+    const signupBody = await signup.text();
     const signupCookie = cookieFrom(signup);
     const signupSession = await request('/api/auth/get-session', { headers: { Cookie: signupCookie } });
     if ((await signupSession.json())?.user) throw new Error('Public sign-up establishes a session before email verification.');
+    const duplicateSignup = await request('/api/auth/sign-up/email',
+      json({ name: 'Verify Owner', email, password }));
+    const duplicateBody = await duplicateSignup.text();
+    if (duplicateSignup.status !== signup.status || duplicateBody !== signupBody || cookieFrom(duplicateSignup)) {
+      throw new Error('Public sign-up response reveals whether the email is already registered.');
+    }
     const denied = await request('/owner/listings', { headers: { Cookie: signupCookie } });
     if (denied.ok) throw new Error('Unverified account reached its private workspace.');
     const link = await mailLink(email, before);
