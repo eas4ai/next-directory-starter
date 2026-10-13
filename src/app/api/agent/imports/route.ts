@@ -24,7 +24,9 @@ export async function POST(request: Request) {
   const items = typeof input === "object" && input !== null && "items" in input
     ? (input as { items: unknown }).items : null;
   try {
-    return Response.json({ items: stageAgentImports(user.id, items) }, { status: 201 });
+    return Response.json({
+      items: stageAgentImports(user.id, { kind: "account", id: user.id }, items),
+    }, { status: 201 });
   } catch (error) {
     if (error instanceof AgentImportInputError) {
       return Response.json({ error: error.message }, { status: 400 });

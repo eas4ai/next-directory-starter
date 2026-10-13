@@ -12,7 +12,8 @@ type StagedInput = {
   idempotencyKey: string; url: string; sourceUrl: string; sourceExcerpt: string;
   name: string; summary: string; description: string; category: string;
 };
-type ItemResult = { status: "created" | "existing" | "duplicate" | "invalid";
+export type AgentStagingPrincipal = { kind: "key" | "account"; id: string };
+type ItemResult = { status: "created" | "existing" | "duplicate" | "invalid" | "limited";
   slug?: string; error?: string };
 type ImportRow = { slug: string; source_url: string; source_excerpt: string;
   actor_user_id: string; created_at: string; published_at: string | null;
@@ -24,6 +25,53 @@ export type AgentImport = { slug: string; sourceUrl: string; sourceExcerpt: stri
   url: string; status: string };
 
 export class AgentImportInputError extends Error {}
+
+export const AGENT_STAGING_LIFETIME_QUOTA = 500;
+export const AGENT_STAGING_HOURLY_LIMIT = 100;
+
+function principalKey(principal: AgentStagingPrincipal): string {
+  const id = principal.id.trim();
+  if (!id || id.length > 200 || !["key", "account"].includes(principal.kind)) {
+    throw new AgentImportInputError("Invalid staging principal");
+  }
+  return `${principal.kind}:${id}`;
+}
+
+function hourStart(now: Date): string {
+  return new Date(Math.floor(now.getTime() / 3_600_000) * 3_600_000).toISOString();
+}
+
+type StagingUsage = {
+  lifetime_created: number; window_started_at: string; window_created: number;
+};
+
+function stagingLimit(principal: string, windowStartedAt: string): ItemResult | null {
+  const usage = database.prepare(`SELECT lifetime_created, window_started_at, window_created
+    FROM agent_staging_usage WHERE principal = ?`).get(principal) as StagingUsage | undefined;
+  if (usage && usage.lifetime_created >= AGENT_STAGING_LIFETIME_QUOTA) {
+    return { status: "limited", error: "Staging quota reached for this credential" };
+  }
+  if (usage?.window_started_at === windowStartedAt &&
+      usage.window_created >= AGENT_STAGING_HOURLY_LIMIT) {
+    return { status: "limited", error: "Hourly staging limit reached; try again next hour" };
+  }
+  return null;
+}
+
+function recordStagingUse(principal: string, windowStartedAt: string, now: string): void {
+  database.prepare(`INSERT INTO agent_staging_usage
+    (principal, lifetime_created, window_started_at, window_created, updated_at)
+    VALUES (?, 1, ?, 1, ?)
+    ON CONFLICT(principal) DO UPDATE SET
+      lifetime_created = agent_staging_usage.lifetime_created + 1,
+      window_started_at = excluded.window_started_at,
+      window_created = CASE
+        WHEN agent_staging_usage.window_started_at = excluded.window_started_at
+          THEN agent_staging_usage.window_created + 1
+        ELSE 1
+      END,
+      updated_at = excluded.updated_at`).run(principal, windowStartedAt, now);
+}
 
 function publicUrl(value: string): string | null {
   try {
@@ -79,7 +127,7 @@ function availableSlug(name: string): string {
   return `${root}-${randomUUID().slice(0, 8)}`;
 }
 
-function stageOne(actorUserId: string, value: unknown): ItemResult {
+function stageOne(actorUserId: string, stagingPrincipal: string, value: unknown): ItemResult {
   const parsed = inputFrom(value);
   if (!parsed.data) return { status: "invalid", error: parsed.error };
   const item = parsed.data;
@@ -102,25 +150,34 @@ function stageOne(actorUserId: string, value: unknown): ItemResult {
     const slug = availableSlug(item.name);
     const listing = parseListing({ ...item, slug, status: "draft" });
     if (!listing) return { status: "invalid", error: "Invalid listing fields" };
+    const now = new Date();
+    const nowText = now.toISOString();
+    const windowStartedAt = hourStart(now);
+    const limited = stagingLimit(stagingPrincipal, windowStartedAt);
+    if (limited) return limited;
     database.prepare(`INSERT INTO listings
       (slug, name, summary, description, category, url, status)
       VALUES (?, ?, ?, ?, ?, ?, 'draft')`).run(
       slug, listing.name, listing.summary, listing.description, listing.category, listing.url);
     database.prepare(`INSERT INTO agent_imports
-      (slug, actor_user_id, idempotency_key, source_url, source_excerpt, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)`).run(
+      (slug, actor_user_id, idempotency_key, source_url, source_excerpt, created_at,
+        staging_principal)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
       slug, actorUserId, item.idempotencyKey, item.sourceUrl,
-      item.sourceExcerpt, new Date().toISOString());
+      item.sourceExcerpt, nowText, stagingPrincipal);
+    recordStagingUse(stagingPrincipal, windowStartedAt, nowText);
     recordAudit("catalog.import.stage", actorUserId, slug);
     return { status: "created", slug };
   }).immediate();
 }
 
-export function stageAgentImports(actorUserId: string, items: unknown): ItemResult[] {
+export function stageAgentImports(actorUserId: string, principal: AgentStagingPrincipal,
+  items: unknown): ItemResult[] {
   if (!Array.isArray(items) || items.length < 1 || items.length > 20) {
     throw new AgentImportInputError("Provide 1 to 20 observed links.");
   }
-  return items.map((item) => stageOne(actorUserId, item));
+  const stagingPrincipal = principalKey(principal);
+  return items.map((item) => stageOne(actorUserId, stagingPrincipal, item));
 }
 
 export function listAgentImports(): AgentImport[] {
