@@ -68,6 +68,10 @@ try {
   expect(manual.includes('client_max_body_size 8m;') && manual.includes('7,100,000 bytes') &&
     manual.includes('413 Request Entity Too Large'),
     'Manual omits a verified reverse-proxy request-body limit');
+  expect(manual.includes('proxy_set_header X-Real-IP $remote_addr;') &&
+    manual.includes('proxy_set_header X-Forwarded-For $remote_addr;') &&
+    !manual.includes('$proxy_add_x_forwarded_for'),
+    'Manual does not overwrite caller-controlled forwarding headers');
   expect(manual.includes('BILLING_ENCRYPTION_KEY') && manual.includes('Isolated restore verified.') &&
     manual.includes('Backup created and verified.'), 'Manual omits backup recovery boundaries');
   passed = true;
