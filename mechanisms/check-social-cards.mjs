@@ -70,17 +70,31 @@ try {
       const response = await fetch(og, { headers: { 'User-Agent': userAgent } });
       expect(response.status === 200 && response.headers.get('content-type')?.startsWith('image/png'),
         label + ' image was unavailable as PNG');
+      const etag = response.headers.get('etag');
+      const cacheControl = response.headers.get('cache-control') ?? '';
+      expect(etag && cacheControl.includes('must-revalidate') && !cacheControl.includes('no-store'),
+        label + ' image did not advertise revision-aware caching');
       const bytes = Buffer.from(await response.arrayBuffer());
       const info = await sharp(bytes).metadata();
       expect(info.format === 'png' && info.width === 1200 && info.height === 630,
         label + ' image pixels were not 1200 by 630');
-      images.push({ url: og, bytes });
+      const revalidated = await fetch(og, { headers: {
+        'User-Agent': userAgent, 'If-None-Match': etag,
+      } });
+      expect(revalidated.status === 304,
+        label + ' image did not revalidate its current revision');
+      images.push({ url: og, bytes, etag });
     }
     expect(images[0].url === images[1].url &&
       images[0].bytes.equals(images[1].bytes), label + ' changed between crawlers');
     return images[0];
   }
 
+  const cacheCheck = spawnSync(process.execPath,
+    ['--import', 'tsx', '--test', 'tests/social-card-cache.test.mjs'],
+    { env, encoding: 'utf8', timeout: 30_000 });
+  expect(cacheCheck.status === 0,
+    'Social card cache controls failed: ' + (cacheCheck.stderr || cacheCheck.stdout));
   command(['run', 'db:migrate']);
   command(['run', 'db:seed']);
   const password = randomBytes(20).toString('hex');
@@ -146,6 +160,7 @@ try {
     action: 'publish', version: (await saved.json()).article.version,
   }, cookie, 'PATCH');
   expect(published.ok, 'Article publication failed: HTTP ' + published.status);
+  const publishedVersion = (await published.json()).article.version;
   const publishedCard = await card('/articles/social-article', 'Article after publication');
   expect(stagedCard.url === publishedCard.url &&
     !stagedCard.bytes.equals(publishedCard.bytes),
@@ -167,8 +182,9 @@ try {
   await card('/', 'Private-network fallback');
   expect(privateHits === 0, 'The social card server fetched a private-network URL');
 
-  const unpublished = await write('/api/admin/articles/social-article',
-    { status: 'draft' }, cookie, 'PATCH');
+  const unpublished = await write('/api/admin/articles/social-article', {
+    action: 'unpublish', version: publishedVersion,
+  }, cookie, 'PATCH');
   expect(unpublished.ok, 'Article unpublication failed: HTTP ' + unpublished.status);
   expect((await request('/articles/social-article')).status === 404 &&
     (await fetch(publishedCard.url)).status === 404,
