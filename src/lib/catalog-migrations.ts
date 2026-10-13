@@ -1,20 +1,21 @@
 import records from "../../fixtures/sample-listings.json";
 import { parseListing } from "@/lib/catalog-input";
 import { database } from "@/lib/database";
+import { normalizeListingDestination } from "@/lib/listing-destinations";
 
 function insertSampleRows(): void {
   const category = database.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)");
   const existing = database.prepare("SELECT 1 FROM listings WHERE slug = ?");
   const listing = database.prepare(`INSERT INTO listings
-    (slug, name, summary, description, category, url, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?)`);
+    (slug, name, summary, description, category, url, destination_key, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
   for (const [index, record] of records.entries()) {
     const value = parseListing({ ...record, name: record.title });
     if (!value) throw new Error(`Invalid sample listing at index ${index}.`);
     if (existing.get(value.slug)) continue;
     category.run(value.category);
     listing.run(value.slug, value.name, value.summary, value.description,
-      value.category, value.url, value.status);
+      value.category, value.url, normalizeListingDestination(value.url), value.status);
   }
 }
 
@@ -955,6 +956,25 @@ function migrateAgentStagingLimits(): void {
   });
 }
 
+function migrateListingDestinationKeys(): void {
+  applyCatalogMigration(30, () => {
+    const columns = new Set((database.prepare("PRAGMA table_info(listings)").all() as
+      { name: string }[]).map(({ name }) => name));
+    if (!columns.has("destination_key")) {
+      database.exec("ALTER TABLE listings ADD COLUMN destination_key TEXT");
+    }
+    const rows = database.prepare(`SELECT slug, url FROM listings
+      WHERE destination_key IS NULL`).all() as { slug: string; url: string }[];
+    const update = database.prepare("UPDATE listings SET destination_key = ? WHERE slug = ?");
+    for (const row of rows) {
+      try { update.run(normalizeListingDestination(row.url), row.slug); }
+      catch { /* Invalid legacy URLs cannot collide with a validated agent destination. */ }
+    }
+    database.exec(`CREATE INDEX IF NOT EXISTS listings_destination_key
+      ON listings(destination_key)`);
+  });
+}
+
 export function migrateCatalog(explicit = false): void {
   if (process.env.DIRECTORY_EXPLICIT_MIGRATIONS === "1" && !explicit) return;
   migrate.immediate();
@@ -992,6 +1012,7 @@ export function migrateCatalog(explicit = false): void {
   migratePaymentEvidenceRetries();
   migratePaymentReconciliationCursors();
   migrateAgentStagingLimits();
+  migrateListingDestinationKeys();
 }
 
 export function seedCatalog(): void {

@@ -4,6 +4,7 @@ import { recordAudit } from "@/lib/audit";
 import { migrateCatalog } from "@/lib/catalog-migrations";
 import { parseListing } from "@/lib/catalog-input";
 import { database } from "@/lib/database";
+import { normalizeListingDestination } from "@/lib/listing-destinations";
 import { redirectForPath } from "@/lib/seo-redirects";
 
 migrateCatalog();
@@ -83,8 +84,7 @@ function publicUrl(value: string): string | null {
         hostname.endsWith(".localhost") || hostname.endsWith(".local") ||
         hostname.endsWith(".internal") || /^\d+(?:\.\d+){3}$/.test(hostname) ||
         hostname.startsWith("[") || url.port === "0") return null;
-    url.hash = "";
-    return url.href;
+    return normalizeListingDestination(url.href);
   } catch { return null; }
 }
 
@@ -136,16 +136,8 @@ function stageOne(actorUserId: string, stagingPrincipal: string, value: unknown)
       WHERE actor_user_id = ? AND idempotency_key = ?`)
       .get(actorUserId, item.idempotencyKey) as { slug: string } | undefined;
     if (priorKey) return { status: "existing", slug: priorKey.slug };
-    let duplicate: { slug: string } | undefined;
-    for (const row of database.prepare("SELECT slug, url FROM listings")
-      .iterate() as Iterable<{ slug: string; url: string }>) {
-      const existing = new URL(row.url);
-      existing.hash = "";
-      if (existing.href === item.url) {
-        duplicate = row;
-        break;
-      }
-    }
+    const duplicate = database.prepare(`SELECT slug FROM listings
+      WHERE destination_key = ? LIMIT 1`).get(item.url) as { slug: string } | undefined;
     if (duplicate) return { status: "duplicate", slug: duplicate.slug };
     const slug = availableSlug(item.name);
     const listing = parseListing({ ...item, slug, status: "draft" });
@@ -156,9 +148,10 @@ function stageOne(actorUserId: string, stagingPrincipal: string, value: unknown)
     const limited = stagingLimit(stagingPrincipal, windowStartedAt);
     if (limited) return limited;
     database.prepare(`INSERT INTO listings
-      (slug, name, summary, description, category, url, status)
-      VALUES (?, ?, ?, ?, ?, ?, 'draft')`).run(
-      slug, listing.name, listing.summary, listing.description, listing.category, listing.url);
+      (slug, name, summary, description, category, url, destination_key, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'draft')`).run(
+      slug, listing.name, listing.summary, listing.description, listing.category, listing.url,
+      normalizeListingDestination(listing.url));
     database.prepare(`INSERT INTO agent_imports
       (slug, actor_user_id, idempotency_key, source_url, source_excerpt, created_at,
         staging_principal)
