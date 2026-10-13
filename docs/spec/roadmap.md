@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: agent-publish-untrusted-text
+Current: tests-open-shared-database
 
 ## public-starter-and-theme
 
@@ -597,3 +597,9 @@ Delivers backlog item social-card-render-cache: Audit 2026-10-11 (M22, reported,
 Requirements: ING-003
 
 Delivers backlog item agent-publish-untrusted-text: Audit 2026-10-11 (M23, plausible, depends on the consuming model). MCP list_imports returns excerpts taken from external pages, and the same key can call publish_import with no recorded human approval (src/app/api/mcp/route.ts:30). Injected text could steer an agent to publish. ING-003 permits agent publication, so this is a delegation risk, not an auth bypass. Offer staging-only keys and require recorded approval when review is intended; mark external text as untrusted in tool output.
+
+## tests-open-shared-database
+
+Requirements: FOUND-007
+
+Delivers backlog item tests-open-shared-database: Audit 2026-10-11 (M24, verified). tests/page-metadata.test.mjs, tests/theme-sdk.test.mjs and mechanisms/check-font-loading.mjs import database-backed modules statically (page-metadata -> site-config -> site-settings -> database), which opens .runtime/directory.db and runs import-time migrations when DATABASE_URL is unset. During the 2026-10-11 test run the .runtime directory changed while directory.db did not. Set a temporary DATABASE_URL and use dynamic import() as the other tests do.
