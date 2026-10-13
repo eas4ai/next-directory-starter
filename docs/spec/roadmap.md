@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: tests-open-shared-database
+Current: mechanisms-pass-vacuously
 
 ## public-starter-and-theme
 
@@ -603,3 +603,9 @@ Delivers backlog item agent-publish-untrusted-text: Audit 2026-10-11 (M23, plaus
 Requirements: FOUND-007
 
 Delivers backlog item tests-open-shared-database: Audit 2026-10-11 (M24, verified). tests/page-metadata.test.mjs, tests/theme-sdk.test.mjs and mechanisms/check-font-loading.mjs import database-backed modules statically (page-metadata -> site-config -> site-settings -> database), which opens .runtime/directory.db and runs import-time migrations when DATABASE_URL is unset. During the 2026-10-11 test run the .runtime directory changed while directory.db did not. Set a temporary DATABASE_URL and use dynamic import() as the other tests do.
+
+## mechanisms-pass-vacuously
+
+Requirements: FOUND-007
+
+Delivers backlog item mechanisms-pass-vacuously: Audit 2026-10-11 (M25 verified, M26 reported). mechanisms/check-test-suite.mjs requires exit 0 and '# fail 0' but no positive pass count and no '# skipped 0', so an all-skipped suite passes FOUND-007; check-content-notifications.mjs checks only the exit status. check-theme-sdk.mjs passes each THM requirement on an 'ok ... THM-n' line even when the child exits non-zero or the line carries a SKIP directive. Parse TAP totals, require executed passing tests and zero skips, and require a successful child exit.
