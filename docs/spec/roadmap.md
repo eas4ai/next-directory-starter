@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: social-card-render-cache
+Current: agent-publish-untrusted-text
 
 ## public-starter-and-theme
 
@@ -591,3 +591,9 @@ Delivers backlog item agent-staging-quota: Audit 2026-10-11 (M21, reported, not 
 Requirements: SEO-012
 
 Delivers backlog item social-card-render-cache: Audit 2026-10-11 (M22, reported, not re-verified). /social-card and /og/listings/[slug].png render with Sharp on every anonymous request (and may fetch a remote image up to 5 MiB) with no-store responses, no result cache, no request coalescing and no concurrency bound (src/lib/social-cards.ts:145-173). Repeated requests tie up CPU. Cache cards by content, branding and theme revision, recheck eligibility before serving, and bound concurrent rendering.
+
+## agent-publish-untrusted-text
+
+Requirements: ING-003
+
+Delivers backlog item agent-publish-untrusted-text: Audit 2026-10-11 (M23, plausible, depends on the consuming model). MCP list_imports returns excerpts taken from external pages, and the same key can call publish_import with no recorded human approval (src/app/api/mcp/route.ts:30). Injected text could steer an agent to publish. ING-003 permits agent publication, so this is a delegation risk, not an auth bypass. Offer staging-only keys and require recorded approval when review is intended; mark external text as untrusted in tool output.
