@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: negative-route-test-gaps
+Current: import-card-category-entities
 
 ## public-starter-and-theme
 
@@ -615,3 +615,9 @@ Delivers backlog item mechanisms-pass-vacuously: Audit 2026-10-11 (M25 verified,
 Requirements: FOUND-007
 
 Delivers backlog item negative-route-test-gaps: Audit 2026-10-11 (M27, reported). No test exercises these rejections through the real HTTP routes: hosted-checkout session and Origin rejection; forged-Origin and cross-owner cancel; guest, wrong-capability and forged-Origin article-media upload; a correctly signed but expired Paddle payload (the existing stale case also has a bad HMAC); public media of a banned owner whose listing is still published (src/lib/media.ts:207). These are coverage gaps, not shown bypasses. Add route-level negative tests that assert the rejection and no state change.
+
+## import-card-category-entities
+
+Requirements: SEO-012
+
+Delivers backlog item import-card-category-entities: Audit 2026-10-11 (L1, verified; three reviewers). src/lib/agent-cards.ts escapes the category for XML at line 55 and then uppercases it at line 66, so R&D becomes R&AMP;D and Sharp rejects the SVG ('Entity AMP not defined'). Category names may contain ampersands. The import preview and /og/listings/<slug>.png throw. Uppercase before escaping, as social-cards.ts does.
