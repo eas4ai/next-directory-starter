@@ -12,6 +12,7 @@ const failed = (error: unknown) => ({ content: [{ type: "text" as const,
 
 const handler = createMcpHandler(({ authInfo }) => {
   const userId = authInfo?.clientId;
+  const keyId = authInfo?.token;
   const server = new McpServer({ name: "directory-import", version: "1.0.0" });
   server.registerTool("list_categories", {
     description: "List existing directory categories before staging observed links.",
@@ -20,7 +21,7 @@ const handler = createMcpHandler(({ authInfo }) => {
     description: "Stage 1 to 20 URLs observed with agent-browser as private directory drafts. Include source excerpts.",
     inputSchema: z.object({ items: z.array(z.unknown()).min(1).max(20) }),
   }, async ({ items }) => {
-    try { return result({ items: stageAgentImports(userId!, items) }); }
+    try { return result({ items: stageAgentImports(userId!, { kind: "key", id: keyId! }, items) }); }
     catch (error) {
       if (error instanceof AgentImportInputError) return failed(error);
       console.error("Agent import staging failed", error);

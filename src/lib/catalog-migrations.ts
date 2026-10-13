@@ -942,6 +942,19 @@ function migratePaymentReconciliationCursors(): void {
   });
 }
 
+function migrateAgentStagingLimits(): void {
+  applyCatalogMigration(29, () => {
+    database.exec(`ALTER TABLE agent_imports ADD COLUMN staging_principal TEXT;
+      CREATE TABLE agent_staging_usage (
+        principal TEXT PRIMARY KEY NOT NULL,
+        lifetime_created INTEGER NOT NULL CHECK (lifetime_created >= 0),
+        window_started_at TEXT NOT NULL,
+        window_created INTEGER NOT NULL CHECK (window_created >= 0),
+        updated_at TEXT NOT NULL
+      );`);
+  });
+}
+
 export function migrateCatalog(explicit = false): void {
   if (process.env.DIRECTORY_EXPLICIT_MIGRATIONS === "1" && !explicit) return;
   migrate.immediate();
@@ -978,6 +991,7 @@ export function migrateCatalog(explicit = false): void {
   migrateCheckoutTerminals();
   migratePaymentEvidenceRetries();
   migratePaymentReconciliationCursors();
+  migrateAgentStagingLimits();
 }
 
 export function seedCatalog(): void {
