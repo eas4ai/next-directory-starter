@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: tag-rename-orphans-revisions
+Current: signup-email-enumeration
 
 ## public-starter-and-theme
 
@@ -567,3 +567,9 @@ Delivers backlog item cli-env-mode-mismatch: Audit 2026-10-11 (M17, verified). s
 Requirements: EDIT-002
 
 Delivers backlog item tag-rename-orphans-revisions: Audit 2026-10-11 (M18, reviewer reproduced: 400 Unknown tag: Old). Tag rename (src/lib/taxonomy.ts:80) updates article_tags but not article_revisions.tags_json, and tag delete checks only article_tags (line 102). Publishing a saved revision that uses a renamed or deleted tag then fails in setTags. Update or check staged revision tags in the same transaction.
+
+## signup-email-enumeration
+
+Requirements: ACC-001
+
+Delivers backlog item signup-email-enumeration: Audit 2026-10-11 (M19, reviewer reproduced with in-memory Better Auth). With verification required, Better Auth's synthetic signup response for an existing email has role null, while a real new account returns role 'user' (admin plugin hook). Comparing the role field reveals whether an email is registered despite identical status codes. Return an identical minimal signup response for both cases or make the synthetic response include every default field.
