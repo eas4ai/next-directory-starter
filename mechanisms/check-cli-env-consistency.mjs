@@ -87,21 +87,38 @@ try {
   expect(rowCount(overrideDb, 'listings') >= 2, 'Explicit DATABASE_URL did not override .env.local');
   expect(!existsSync(defaultDb), 'Override run created the default database');
 
-  const layeredDb = join(sandbox, 'production.db');
-  writeFileSync(join(sandbox, '.env.production.local'), `DATABASE_URL=file:${layeredDb}\n`);
-  run('db:migrate', [], { NODE_ENV: 'production' });
-  run('db:seed', [], { NODE_ENV: 'production' });
-  expect(hasTable(layeredDb, 'user'), 'Authentication migration missed the mode-specific database');
-  expect(rowCount(layeredDb, 'listings') >= 2, 'Catalog migration or seed missed the mode-specific database');
-  expect(!existsSync(defaultDb), 'Mode-specific run created the default database');
-
+  const defaultProductionDb = join(sandbox, 'default-production.db');
+  const explicitProductionDb = join(sandbox, 'explicit-production.db');
   const developmentDb = join(sandbox, 'development.db');
+  const testDb = join(sandbox, 'test.db');
+  writeFileSync(join(sandbox, '.env.production.local'), `DATABASE_URL=file:${defaultProductionDb}\n`);
   writeFileSync(join(sandbox, '.env.development.local'), `DATABASE_URL=file:${developmentDb}\n`);
+  writeFileSync(join(sandbox, '.env.test.local'), `DATABASE_URL=file:${testDb}\n`);
+
   run('db:migrate');
   run('db:seed');
-  expect(hasTable(developmentDb, 'user'), 'Authentication migration missed the default development database');
-  expect(rowCount(developmentDb, 'listings') >= 2, 'Catalog migration or seed missed the default development database');
-  expect(!existsSync(defaultDb), 'Default development run created the default database');
+  expect(existsSync(defaultProductionDb), 'Unset NODE_ENV did not select the production database');
+  expect(hasTable(defaultProductionDb, 'user'), 'Authentication migration missed the default production database');
+  expect(rowCount(defaultProductionDb, 'listings') >= 2, 'Catalog migration or seed missed the default production database');
+  expect(!existsSync(developmentDb), 'Unset NODE_ENV selected the development database');
+  expect(!existsSync(testDb), 'Unset NODE_ENV selected the test database');
+
+  writeFileSync(join(sandbox, '.env.production.local'), `DATABASE_URL=file:${explicitProductionDb}\n`);
+  run('db:migrate', [], { NODE_ENV: 'production' });
+  run('db:seed', [], { NODE_ENV: 'production' });
+  expect(hasTable(explicitProductionDb, 'user'), 'Authentication migration missed the explicit production database');
+  expect(rowCount(explicitProductionDb, 'listings') >= 2, 'Catalog migration or seed missed the explicit production database');
+
+  run('db:migrate', [], { NODE_ENV: 'development' });
+  run('db:seed', [], { NODE_ENV: 'development' });
+  expect(hasTable(developmentDb, 'user'), 'Authentication migration missed the explicit development database');
+  expect(rowCount(developmentDb, 'listings') >= 2, 'Catalog migration or seed missed the explicit development database');
+
+  run('db:migrate', [], { NODE_ENV: 'test' });
+  run('db:seed', [], { NODE_ENV: 'test' });
+  expect(hasTable(testDb, 'user'), 'Authentication migration missed the explicit test database');
+  expect(rowCount(testDb, 'listings') >= 2, 'Catalog migration or seed missed the explicit test database');
+  expect(!existsSync(defaultDb), 'Mode-specific run created the default database');
 
   const manual = readFileSync(join(project, 'docs/operator-manual.md'), 'utf8');
   expect(manual.includes('.env.local') && manual.includes('DATABASE_URL') &&
