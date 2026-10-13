@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: mechanisms-pass-vacuously
+Current: negative-route-test-gaps
 
 ## public-starter-and-theme
 
@@ -609,3 +609,9 @@ Delivers backlog item tests-open-shared-database: Audit 2026-10-11 (M24, verifie
 Requirements: FOUND-007
 
 Delivers backlog item mechanisms-pass-vacuously: Audit 2026-10-11 (M25 verified, M26 reported). mechanisms/check-test-suite.mjs requires exit 0 and '# fail 0' but no positive pass count and no '# skipped 0', so an all-skipped suite passes FOUND-007; check-content-notifications.mjs checks only the exit status. check-theme-sdk.mjs passes each THM requirement on an 'ok ... THM-n' line even when the child exits non-zero or the line carries a SKIP directive. Parse TAP totals, require executed passing tests and zero skips, and require a successful child exit.
+
+## negative-route-test-gaps
+
+Requirements: FOUND-007
+
+Delivers backlog item negative-route-test-gaps: Audit 2026-10-11 (M27, reported). No test exercises these rejections through the real HTTP routes: hosted-checkout session and Origin rejection; forged-Origin and cross-owner cancel; guest, wrong-capability and forged-Origin article-media upload; a correctly signed but expired Paddle payload (the existing stale case also has a bad HMAC); public media of a banned owner whose listing is still published (src/lib/media.ts:207). These are coverage gaps, not shown bypasses. Add route-level negative tests that assert the rejection and no state change.
