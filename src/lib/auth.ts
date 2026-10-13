@@ -10,7 +10,7 @@ export const auth = betterAuth({
   database,
   advanced: {
     ipAddress: {
-      ipAddressHeaders: ["x-real-ip"],
+      ipAddressHeaders: ["x-forwarded-for"],
     },
   },
   emailVerification: {
