@@ -9,7 +9,7 @@ import { getThemePreset } from "@/lib/theme";
 import { getThemeSelection } from "@/lib/theme-selection";
 import { socialPaletteForSelection } from "@/lib/theme-sdk";
 import { SocialCardRenderCache, socialCardRevision,
-  type SocialCardCacheOptions } from "@/lib/social-card-cache";
+  type SocialCardCacheOptions, type SocialCardRenderResult } from "@/lib/social-card-cache";
 
 migrateCatalog();
 
@@ -85,7 +85,7 @@ function cardSnapshot(slug: string, includeDraft: boolean): CardSnapshot | null 
   };
 }
 
-async function renderSnapshot({ row, brand, palette }: CardSnapshot): Promise<Buffer> {
+async function renderSnapshot({ row, brand, palette }: CardSnapshot): Promise<SocialCardRenderResult> {
   const withScreenshot = Boolean(row.screenshot_bytes);
   const siteName = escapeXml(brand.name.slice(0, 42));
   const heading = lines(row.name, withScreenshot ? 24 : 42, 3);
@@ -117,7 +117,10 @@ async function renderSnapshot({ row, brand, palette }: CardSnapshot): Promise<Bu
       .resize(420, 400, { fit: "cover", position: "attention" }).png().toBuffer();
     overlays.push({ input: screenshot, left: 704, top: 109 });
   }
-  return sharp(Buffer.from(svg)).composite(overlays).png().toBuffer();
+  return {
+    bytes: await sharp(Buffer.from(svg)).composite(overlays).png().toBuffer(),
+    cacheable: true,
+  };
 }
 
 export async function renderImportCard(slug: string,
