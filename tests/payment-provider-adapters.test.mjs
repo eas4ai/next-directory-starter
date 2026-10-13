@@ -199,6 +199,81 @@ test('provider SDK recovery reads payments and confirms supported cancellation',
       database.prepare(`UPDATE purchases SET billing_mode = 'monthly',
         provider_subscription_id = ? WHERE id = ?`).run(subscription, id);
     }
+
+      purchase('now-paged', 'nowpayments', 'invoice_paged', null);
+      const periodStart = Math.floor(Date.now() / 1000) - 60;
+      const paddleRows = [
+        { id: 'txn_paddle_newer', start: periodStart + 30 * 86_400,
+          end: periodStart + 60 * 86_400 },
+        { id: 'txn_paddle_older', start: periodStart, end: periodStart + 30 * 86_400 },
+      ];
+      const paddleAfter = [];
+      const nowPages = [];
+      const paddleTransaction = (row, subscriptionId) => ({
+        id: row.id, status: 'completed', currency_code: 'USD',
+        created_at: new Date(row.start * 1000).toISOString(),
+        subscription_id: subscriptionId,
+        billing_period: { starts_at: new Date(row.start * 1000).toISOString(),
+          ends_at: new Date(row.end * 1000).toISOString() },
+        items: [{ quantity: 1, price: { id: 'pri_once',
+          unit_price: { amount: '1200', currency_code: 'USD' },
+          quantity: { minimum: 1, maximum: 100 } } }],
+        payments: [], details: { tax_rates_used: [], line_items: [],
+          totals: { grand_total: '1200', currency_code: 'USD' } },
+        adjustments: [],
+      });
+      globalThis.fetch = async (input) => {
+        const url = new URL(String(input));
+        if (url.pathname === '/transactions/txn_paddle') return reply({ data: {
+          ...paddleTransaction({ id: 'txn_paddle', start: periodStart,
+            end: periodStart + 30 * 86_400 }, null),
+          billing_period: null,
+        } });
+        if (url.pathname === '/transactions') {
+          const after = url.searchParams.get('after');
+          paddleAfter.push(after);
+          const index = after === null ? 0 :
+            paddleRows.findIndex(({ id }) => id === after) + 1;
+          const row = paddleRows[index];
+          return reply({ data: row ? [paddleTransaction(row, 'sub_paddle')] : [], meta: {
+            request_id: 'fixture', pagination: { per_page: 1,
+              next: '', has_more: index < paddleRows.length - 1,
+              estimated_total: paddleRows.length },
+          } });
+        }
+        if (url.pathname === '/v1/auth') return reply({ token: 'fixture.jwt.token' });
+        if (url.pathname === '/v1/payment/') {
+          const page = Number(url.searchParams.get('page'));
+          nowPages.push(page);
+          return reply({ data: [{ payment_id: 'pay_paged', invoice_id: 'invoice_paged',
+            payment_status: page === 0 ? 'waiting' : 'finished', order_id: 'now-paged',
+            price_amount: 12, price_currency: 'USD' }], limit: 1, page, total: 2 });
+        }
+        throw new Error(`Unexpected pagination request: ${url.pathname}`);
+      };
+      for (let run = 0; run < 2; run += 1) {
+        assert.deepEqual(await reconcilePurchase('paddle-purchase', 1), {
+          purchaseId: 'paddle-purchase', found: 1, processed: 1, unresolved: 0,
+        });
+      }
+      assert.deepEqual(paddleAfter, [null, 'txn_paddle_newer']);
+      assert.deepEqual(database.prepare(`SELECT provider_payment_id FROM payment_periods
+        WHERE purchase_id = 'paddle-purchase' ORDER BY starts_at`).all(), [
+        { provider_payment_id: 'txn_paddle_older' },
+        { provider_payment_id: 'txn_paddle' },
+        { provider_payment_id: 'txn_paddle_newer' },
+      ]);
+      assert.deepEqual(await reconcilePurchase('now-paged', 1), {
+        purchaseId: 'now-paged', found: 0, processed: 0, unresolved: 0,
+      });
+      assert.deepEqual(await reconcilePurchase('now-paged', 1), {
+        purchaseId: 'now-paged', found: 1, processed: 1, unresolved: 0,
+      });
+      assert.deepEqual(nowPages, [0, 1]);
+      assert.equal(database.prepare(`SELECT COUNT(*) AS count
+        FROM payment_reconciliation_cursors
+        WHERE purchase_id IN ('paddle-purchase', 'now-paged')`).get().count, 0);
+
     globalThis.fetch = async (input, init = {}) => {
       const url = new URL(String(input));
       const method = init.method ?? 'GET';
