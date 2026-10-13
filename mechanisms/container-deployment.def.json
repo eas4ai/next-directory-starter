@@ -1,9 +1,0 @@
-{
-  "command": "node mechanisms/check-container-deployment.mjs",
-  "cwd": null,
-  "documents": [],
-  "identity": { "env": [], "image": null, "tools": { "docker": "docker --version", "node": "node --version" } },
-  "inputs": [".dockerignore", ".env.docker.example", "Dockerfile", "README.md", "compose.yaml", "docs/operator-manual.md", "fixtures", "mechanisms/check-container-deployment.mjs", "mechanisms/container-deployment.def.json", "next.config.ts", "package-lock.json", "package.json", "scripts", "src"],
-  "requirements": ["OPS-003"],
-  "results": "per-requirement"
-}
