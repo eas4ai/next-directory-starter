@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: signup-email-enumeration
+Current: auth-rate-limit-forwarded-for
 
 ## public-starter-and-theme
 
@@ -573,3 +573,9 @@ Delivers backlog item tag-rename-orphans-revisions: Audit 2026-10-11 (M18, revie
 Requirements: ACC-001
 
 Delivers backlog item signup-email-enumeration: Audit 2026-10-11 (M19, reviewer reproduced with in-memory Better Auth). With verification required, Better Auth's synthetic signup response for an existing email has role null, while a real new account returns role 'user' (admin plugin hook). Comparing the role field reveals whether an email is registered despite identical status codes. Return an identical minimal signup response for both cases or make the synthetic response include every default field.
+
+## auth-rate-limit-forwarded-for
+
+Requirements: ACC-002
+
+Delivers backlog item auth-rate-limit-forwarded-for: Audit 2026-10-11 (M20, plausible, depends on the deployment proxy). src/lib/auth.ts configures no trusted client-IP policy, so Better Auth keys rate limits on a client-supplied X-Forwarded-For. If the reverse proxy passes the header through, an attacker rotates it per request for password guessing or reset and magic-link email floods. Confirm the proxy behavior, configure trusted IP extraction, and have the proxy overwrite the header.
