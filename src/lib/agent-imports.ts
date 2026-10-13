@@ -27,7 +27,7 @@ export type AgentImport = { slug: string; sourceUrl: string; sourceExcerpt: stri
 
 export class AgentImportInputError extends Error {}
 
-export const AGENT_STAGING_LIFETIME_QUOTA = 500;
+export const AGENT_STAGING_LIFETIME_QUOTA = 501;
 export const AGENT_STAGING_HOURLY_LIMIT = 100;
 
 function principalKey(principal: AgentStagingPrincipal): string {
