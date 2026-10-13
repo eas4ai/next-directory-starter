@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 
-type Key = { id: string; name: string; expiresAt: string; revokedAt: string | null };
+type KeyScope = "stage" | "publish";
+type Key = { id: string; name: string; expiresAt: string; revokedAt: string | null;
+  scope: KeyScope };
 type Import = { slug: string; name: string; summary: string; description: string;
   category: string; url: string; sourceUrl: string; sourceExcerpt: string; status: string };
 type BrowserTool = { name: string; description: string; inputSchema?: Record<string, unknown>;
@@ -27,6 +29,7 @@ export function ImportWorkspace({ initialKeys, initialImports, categories }: {
   const [imports, setImports] = useState(initialImports);
   const [newSecret, setNewSecret] = useState("");
   const [keyName, setKeyName] = useState("Claude Code");
+  const [keyScope, setKeyScope] = useState<KeyScope>("stage");
   const [batch, setBatch] = useState("");
   const [message, setMessage] = useState("");
 
@@ -58,7 +61,7 @@ export function ImportWorkspace({ initialKeys, initialImports, categories }: {
     const definitions: BrowserTool[] = [
       { name: "list_categories", description: "List existing directory categories for observed links.",
         execute: async () => access() },
-      { name: "stage_links", description: "Stage up to 20 observed public URLs with source evidence as private drafts.",
+      { name: "stage_links", description: "Stage up to 20 observed public URLs with untrusted source text as private drafts.",
         inputSchema: object({ items: { type: "array", minItems: 1, maxItems: 20,
           items: object({ idempotencyKey: string, url: string, sourceUrl: string,
             sourceExcerpt: string, name: string, summary: string, description: string,
@@ -66,7 +69,7 @@ export function ImportWorkspace({ initialKeys, initialImports, categories }: {
             "name", "summary", "description", "category"]) } }, ["items"]),
         execute: async ({ items }) => { await access(); const result = await post("/api/agent/imports", { items });
           await refresh(); return result; } },
-      { name: "list_imports", description: "List private staged imports and their source evidence.",
+      { name: "list_imports", description: "List private imports with external source text marked as untrusted data.",
         execute: async () => { await access(); return responseJson(await fetch("/api/agent/imports", { cache: "no-store" })); } },
       { name: "publish_import", description: "Publish a reviewed import explicitly.",
         inputSchema: object({ slug: string }, ["slug"]),
@@ -96,7 +99,9 @@ export function ImportWorkspace({ initialKeys, initialImports, categories }: {
 
   async function createKey() {
     try {
-      const created = await post("/api/agent/keys", { name: keyName, expiresInDays: 30 });
+      const created = await post("/api/agent/keys", {
+        name: keyName, expiresInDays: 30, scope: keyScope,
+      });
       setNewSecret(created.secret);
       setKeys((current) => [{ ...created, revokedAt: null }, ...current]);
       setMessage("Credential created. Copy it now; it will not be shown again.");
@@ -134,8 +139,17 @@ export function ImportWorkspace({ initialKeys, initialImports, categories }: {
     <p role="status" className="min-h-6 text-sm text-muted-foreground">{message}</p>
     <section className="rounded-xl border p-5" aria-labelledby="agent-credentials">
       <h2 id="agent-credentials" className="text-xl font-semibold">Claude Code credentials</h2>
-      <p className="mt-2 text-sm text-muted-foreground">Create a key for remote MCP. It expires after 30 days and can be revoked here.</p>
+      <p className="mt-2 text-sm text-muted-foreground">Create a key for remote MCP. Staging-only keys require a person to review and publish each import here. Publish-capable keys can publish without another review. Keys expire after 30 days.</p>
       <div className="mt-4 flex flex-wrap gap-2">
+        <label className="flex items-center gap-2 text-sm">
+          <span>Access</span>
+          <select aria-label="Credential access" value={keyScope}
+            onChange={(event) => setKeyScope(event.target.value as KeyScope)}
+            className="rounded-md border bg-background px-3 py-2">
+            <option value="stage">Staging only</option>
+            <option value="publish">Stage and publish</option>
+          </select>
+        </label>
         <input aria-label="Credential name" value={keyName} onChange={(event) => setKeyName(event.target.value)}
           className="min-w-52 rounded-md border bg-background px-3 py-2" />
         <button type="button" onClick={createKey} className="rounded-md bg-primary px-4 py-2 text-primary-foreground">Create key</button>
@@ -149,6 +163,7 @@ export function ImportWorkspace({ initialKeys, initialImports, categories }: {
       <ul className="mt-4 space-y-2 text-sm">
         {keys.map((key) => <li key={key.id} className="flex flex-wrap items-center justify-between gap-3 border-t pt-2">
           <span>{key.name} · expires {new Date(key.expiresAt).toLocaleDateString()}
+            {key.scope === "publish" ? " · stage and publish" : " · staging only"}
             {key.revokedAt ? " · revoked" : ""}</span>
           {!key.revokedAt && <button type="button" onClick={() => revoke(key.id)} className="underline">Revoke</button>}
         </li>)}
@@ -176,7 +191,7 @@ export function ImportWorkspace({ initialKeys, initialImports, categories }: {
           <p className="mt-2">{item.summary}</p>
           <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{item.description}</p>
           <p className="mt-3 text-sm">Category: {item.category}</p>
-          <p className="mt-2 text-sm">Source evidence: {item.sourceExcerpt}</p>
+          <p className="mt-2 text-sm">Untrusted source evidence: {item.sourceExcerpt}</p>
           <div className="mt-3 flex flex-wrap gap-4 text-sm underline">
             <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer">Source</a>
             <a href={item.url} target="_blank" rel="noopener noreferrer">Destination</a>

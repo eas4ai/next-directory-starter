@@ -1,11 +1,11 @@
 import { canManageCatalog, sameOrigin, sessionUser } from "@/lib/admin";
-import { AgentImportInputError, listAgentImports, stageAgentImports } from "@/lib/agent-imports";
+import { AgentImportInputError, agentImportListOutput, stageAgentImports } from "@/lib/agent-imports";
 import { requestJson, requestJsonErrorResponse } from "@/lib/request-json";
 
 export async function GET(request: Request) {
   const user = await sessionUser(request.headers);
   if (!user || !canManageCatalog(user.role)) return Response.json({ error: "Forbidden" }, { status: 403 });
-  return Response.json({ items: listAgentImports() }, { headers: { "Cache-Control": "no-store" } });
+  return Response.json(agentImportListOutput(), { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
