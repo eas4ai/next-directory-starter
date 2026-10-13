@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: agent-staging-quota
+Current: social-card-render-cache
 
 ## public-starter-and-theme
 
@@ -585,3 +585,9 @@ Delivers backlog item auth-rate-limit-forwarded-for: Audit 2026-10-11 (M20, plau
 Requirements: ING-002
 
 Delivers backlog item agent-staging-quota: Audit 2026-10-11 (M21, reported, not re-verified). Agent staging limits only 20 items per call (src/lib/agent-imports.ts:92-119); each new item parses every stored listing URL inside an immediate write transaction. A leaked catalog key can stage without limit while each duplicate scan blocks the event loop longer. Add per-key quotas and rate limits and store an indexed normalized destination key.
+
+## social-card-render-cache
+
+Requirements: SEO-012
+
+Delivers backlog item social-card-render-cache: Audit 2026-10-11 (M22, reported, not re-verified). /social-card and /og/listings/[slug].png render with Sharp on every anonymous request (and may fetch a remote image up to 5 MiB) with no-store responses, no result cache, no request coalescing and no concurrency bound (src/lib/social-cards.ts:145-173). Repeated requests tie up CPU. Cache cards by content, branding and theme revision, recheck eligibility before serving, and bound concurrent rendering.
