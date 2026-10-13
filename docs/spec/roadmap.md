@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: expired-hosted-checkout-blocks
+Current: reconciliation-batching
 
 ## public-starter-and-theme
 
@@ -549,3 +549,9 @@ Delivers backlog item dispute-event-ordering: Audit 2026-10-11 (M12, reported, n
 Requirements: COM-006
 
 Delivers backlog item expired-hosted-checkout-blocks: Audit 2026-10-11 (M13, reported, not re-verified). Stripe checkout.session.expired is a noop (src/lib/payment-normalizers.ts:67), so the purchase stays pending. A new request with the same terms returns the expired URL (src/lib/hosted-checkout.ts:50); different terms get 'Another checkout is pending'; owners cannot cancel a pending purchase. Record confirmed expiry or cancellation and allow a replacement checkout.
+
+## reconciliation-batching
+
+Requirements: COM-009
+
+Delivers backlog item reconciliation-batching: Audit 2026-10-11 (M14 and M15, reported by two reviewers independently). (1) Reconciliation selects the oldest unresolved rows every run and passes retryExhausted: true, bypassing the 8-attempt limit (src/lib/payment-reconciliation.ts:28); permanently invalid rows fill every batch and newer recoverable events are never selected. (2) Stripe inspection emits a subscription-link effect plus up to limit invoices plus outcomes, and reconcilePurchase rejects the whole batch when its length exceeds limit (lines 96, 239), so --limit 1 with one paid invoice fails. Quarantine exhausted events, schedule retries with backoff, and apply one budget to inspection and processing.
