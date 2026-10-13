@@ -286,6 +286,21 @@ try {
     if (old.response.ok || !fresh.response.ok || !fresh.cookie || oldSession.ok || replay.ok || expired.ok) {
       throw new Error('Password reset left old credentials/session usable or accepted token replay.');
     }
+
+    const forwardedStatuses = [];
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const options = json({
+        email: `forwarded-reset-${attempt}@example.invalid`,
+        redirectTo: `${origin}/owner/reset-password`,
+      });
+      options.headers['X-Real-IP'] = '198.51.100.42';
+      options.headers['X-Forwarded-For'] = `203.0.113.${attempt + 10}`;
+      const response = await request('/api/auth/request-password-reset', options);
+      forwardedStatuses.push(response.status);
+    }
+    if (forwardedStatuses.join(',') !== '200,200,200,429') {
+      throw new Error(`Caller-controlled forwarding bypassed the trusted-client reset limit (${forwardedStatuses.join(',')}).`);
+    }
   });
   await stopApp();
   await startApp();

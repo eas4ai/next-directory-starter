@@ -8,6 +8,11 @@ import { recordVerificationLinkUse } from "@/lib/email-verification";
 
 export const auth = betterAuth({
   database,
+  advanced: {
+    ipAddress: {
+      ipAddressHeaders: ["x-real-ip"],
+    },
+  },
   emailVerification: {
     sendOnSignUp: true,
     sendOnSignIn: true,
