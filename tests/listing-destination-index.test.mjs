@@ -61,6 +61,20 @@ test('listing writers maintain an indexed normalized destination key', async () 
     assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM agent_staging_usage
       WHERE principal = 'key:key-a'`).get().count, 0);
 
+    database.prepare(`INSERT INTO listings
+      (slug, name, summary, description, category, url, status)
+      VALUES ('late-legacy', 'Late legacy', 'Late summary', 'Late description', 'Tools',
+        'https://LATE.example.org:443/Path#old', 'draft')`).run();
+    const [lateDuplicate] = stageAgentImports('admin', { kind: 'key', id: 'key-a' }, [{
+      idempotencyKey: 'late-legacy-duplicate', url: 'https://late.example.org/Path',
+      sourceUrl: 'https://source.example.org/list', sourceExcerpt: 'Observed late legacy link',
+      name: 'Late legacy duplicate', summary: 'Duplicate summary',
+      description: 'Duplicate description', category: 'Tools',
+    }]);
+    assert.deepEqual(lateDuplicate, { status: 'duplicate', slug: 'late-legacy' });
+    assert.equal(database.prepare(`SELECT destination_key FROM listings WHERE slug = 'late-legacy'`)
+      .get().destination_key, 'https://late.example.org/Path');
+
     const indexes = database.prepare('PRAGMA index_list(listings)').all().map(({ name }) => name);
     assert.ok(indexes.includes('listings_destination_key'));
     const plan = database.prepare(`EXPLAIN QUERY PLAN

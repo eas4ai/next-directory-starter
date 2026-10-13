@@ -127,6 +127,24 @@ function availableSlug(name: string): string {
   return `${root}-${randomUUID().slice(0, 8)}`;
 }
 
+function listingWithDestination(destinationKey: string): { slug: string } | undefined {
+  const indexed = database.prepare(`SELECT slug FROM listings
+    WHERE destination_key = ? LIMIT 1`).get(destinationKey) as { slug: string } | undefined;
+  if (indexed) return indexed;
+  const rows = database.prepare(`SELECT slug, url FROM listings
+    WHERE destination_key IS NULL`).all() as { slug: string; url: string }[];
+  for (const row of rows) {
+    let normalized: string;
+    try { normalized = normalizeListingDestination(row.url); }
+    catch { continue; }
+    if (normalized !== destinationKey) continue;
+    database.prepare("UPDATE listings SET destination_key = ? WHERE slug = ?")
+      .run(destinationKey, row.slug);
+    return row;
+  }
+  return undefined;
+}
+
 function stageOne(actorUserId: string, stagingPrincipal: string, value: unknown): ItemResult {
   const parsed = inputFrom(value);
   if (!parsed.data) return { status: "invalid", error: parsed.error };
@@ -136,8 +154,7 @@ function stageOne(actorUserId: string, stagingPrincipal: string, value: unknown)
       WHERE actor_user_id = ? AND idempotency_key = ?`)
       .get(actorUserId, item.idempotencyKey) as { slug: string } | undefined;
     if (priorKey) return { status: "existing", slug: priorKey.slug };
-    const duplicate = database.prepare(`SELECT slug FROM listings
-      WHERE destination_key = ? LIMIT 1`).get(item.url) as { slug: string } | undefined;
+    const duplicate = listingWithDestination(item.url);
     if (duplicate) return { status: "duplicate", slug: duplicate.slug };
     const slug = availableSlug(item.name);
     const listing = parseListing({ ...item, slug, status: "draft" });
