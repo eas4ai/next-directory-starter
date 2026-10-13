@@ -14,7 +14,7 @@ import { getThemePreset } from "@/lib/theme";
 import { getThemeSelection } from "@/lib/theme-selection";
 import { socialPaletteForSelection } from "@/lib/theme-sdk";
 import { MAX_SOURCE_BYTES, requestPinnedImage } from "@/lib/pinned-image-request";
-import { SocialCardRenderCache, socialCardRevision,
+import { SocialCardRenderCache, socialCardEntityTag, socialCardRevision,
   type SocialCardRenderResult } from "@/lib/social-card-cache";
 
 const WIDTH = 1200;
@@ -30,7 +30,7 @@ type CardSnapshot = {
   revision: string;
 };
 
-export type RenderedSocialCard = { bytes: Buffer; revision: string };
+export type RenderedSocialCard = { bytes: Buffer; etag: string };
 
 const cardCache = new SocialCardRenderCache({
   maxEntries: 32,
@@ -215,7 +215,7 @@ export async function renderSocialCard(path: string): Promise<RenderedSocialCard
     const current = cardSnapshot(path);
     if (!current) return null;
     if (current.revision === snapshot.revision) {
-      return { bytes, revision: snapshot.revision };
+      return { bytes, etag: socialCardEntityTag(bytes) };
     }
   }
   return null;

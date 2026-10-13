@@ -11,7 +11,7 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
   try {
     const card = await renderImportCard(slug, false);
     if (!card) return new Response(null, { status: 404, headers: uncached });
-    const etag = `"${card.revision}"`;
+    const etag = card.etag;
     const headers = { "Cache-Control": cacheControl, ETag: etag,
       "X-Content-Type-Options": "nosniff" };
     if (request.headers.get("if-none-match")?.split(",").map((value) => value.trim())

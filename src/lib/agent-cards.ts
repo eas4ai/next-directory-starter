@@ -8,7 +8,7 @@ import { mediaFilePath } from "@/lib/media";
 import { getThemePreset } from "@/lib/theme";
 import { getThemeSelection } from "@/lib/theme-selection";
 import { socialPaletteForSelection } from "@/lib/theme-sdk";
-import { SocialCardRenderCache, socialCardRevision,
+import { SocialCardRenderCache, socialCardEntityTag, socialCardRevision,
   type SocialCardCacheOptions, type SocialCardRenderResult } from "@/lib/social-card-cache";
 
 migrateCatalog();
@@ -22,7 +22,7 @@ type CardSnapshot = {
   revision: string;
 };
 
-export type RenderedImportCard = { bytes: Buffer; revision: string };
+export type RenderedImportCard = { bytes: Buffer; etag: string };
 
 const cacheOptions: SocialCardCacheOptions = {
   maxEntries: 32,
@@ -132,7 +132,7 @@ export async function renderImportCard(slug: string,
     const current = cardSnapshot(slug, includeDraft);
     if (!current) return null;
     if (current.revision === snapshot.revision) {
-      return { bytes, revision: snapshot.revision };
+      return { bytes, etag: socialCardEntityTag(bytes) };
     }
   }
   return null;
