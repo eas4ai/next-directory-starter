@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import Database from 'better-sqlite3';
 import sharp from 'sharp';
 
 const workspace = mkdtempSync(join(tmpdir(), 'directory-social-check-'));
@@ -130,6 +131,39 @@ try {
   expect(signIn.ok, 'Admin sign-in failed: HTTP ' + signIn.status);
   const cookie = signIn.headers.getSetCookie().map((value) => value.split(';')[0]).join('; ');
   expect(cookie, 'Admin sign-in returned no session');
+  const database = new Database(join(workspace, 'directory.db'));
+  try {
+    database.prepare("INSERT OR IGNORE INTO categories (name) VALUES ('R&D')").run();
+    database.prepare("UPDATE listings SET category = 'R&D' WHERE slug = 'example-tool'").run();
+    database.prepare(`INSERT INTO agent_imports
+      (slug, actor_user_id, idempotency_key, source_url, source_excerpt, created_at)
+      VALUES ('example-tool', 'social-card-check', 'category-entity',
+        'https://example.org/source', 'Source excerpt', ?)`).run(new Date().toISOString());
+  } finally {
+    database.close();
+  }
+  const assertImportCard = async (response, label, cachePolicy) => {
+    expect(response.status === 200 && response.headers.get('content-type')?.startsWith('image/png'),
+      label + ' was unavailable as PNG: HTTP ' + response.status);
+    expect((response.headers.get('cache-control') ?? '').includes(cachePolicy),
+      label + ' lacked its ' + cachePolicy + ' cache policy');
+    const bytes = Buffer.from(await response.arrayBuffer());
+    const info = await sharp(bytes).metadata();
+    expect(info.format === 'png' && info.width === 1200 && info.height === 630,
+      label + ' pixels were not 1200 by 630');
+  };
+  await assertImportCard(await request('/api/agent/imports/example-tool/card', { Cookie: cookie }),
+    'R&D import preview card', 'no-store');
+  const importedPage = await request('/listings/example-tool', {
+    Accept: 'text/html', 'User-Agent': 'facebookexternalhit/1.1',
+  });
+  expect(importedPage.status === 200, 'R&D imported listing page was HTTP ' + importedPage.status);
+  const importedHtml = await importedPage.text();
+  const importedOg = meta(importedHtml, 'property', 'og:image');
+  expect(importedOg === origin + '/og/listings/example-tool.png' &&
+    meta(importedHtml, 'name', 'twitter:image') === importedOg,
+  'R&D imported listing did not advertise one public import card');
+  await assertImportCard(await fetch(importedOg), 'R&D public import card', 'must-revalidate');
   const articleCreated = await write('/api/admin/articles', {
     slug: 'social-article', title: 'Social Article', summary: 'Public summary',
     body: 'PUBLIC BODY', status: 'published', category: '', tags: [],
