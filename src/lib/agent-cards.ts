@@ -1,18 +1,36 @@
 import sharp from "sharp";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { database } from "@/lib/database";
 import { migrateCatalog } from "@/lib/catalog-migrations";
-import { publishedListingBySlug } from "@/lib/listings";
 import { getSiteConfig } from "@/lib/site-config";
 import { mediaFilePath } from "@/lib/media";
 import { getThemePreset } from "@/lib/theme";
 import { getThemeSelection } from "@/lib/theme-selection";
 import { socialPaletteForSelection } from "@/lib/theme-sdk";
+import { SocialCardRenderCache, socialCardRevision,
+  type SocialCardCacheOptions } from "@/lib/social-card-cache";
 
 migrateCatalog();
 
 type CardRow = { name: string; summary: string; category: string;
-  screenshot_bytes: Buffer | null };
+  revision: number; screenshot_bytes: Buffer | null };
+type CardSnapshot = {
+  row: CardRow;
+  brand: ReturnType<typeof getSiteConfig>;
+  palette: ReturnType<typeof socialPaletteForSelection>;
+  revision: string;
+};
+
+export type RenderedImportCard = { bytes: Buffer; revision: string };
+
+const cacheOptions: SocialCardCacheOptions = {
+  maxEntries: 32,
+  maxBytes: 16 * 1024 * 1024,
+  maxConcurrent: 2,
+  maxWaiting: 16,
+};
+const cardCache = new SocialCardRenderCache(cacheOptions);
 
 function escapeXml(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;")
@@ -40,16 +58,36 @@ function textLines(parts: string[], x: number, start: number, step: number): str
   return parts.map((part, index) => `<text x="${x}" y="${start + index * step}">${part}</text>`).join("");
 }
 
-export async function renderImportCard(slug: string, includeDraft: boolean): Promise<Buffer | null> {
-  if (!includeDraft && !publishedListingBySlug(slug)) return null;
-  const row = database.prepare(`SELECT l.name, l.summary, l.category, i.screenshot_bytes
-    FROM agent_imports i JOIN listings l ON l.slug = i.slug WHERE i.slug = ?`)
+function cardSnapshot(slug: string, includeDraft: boolean): CardSnapshot | null {
+  const row = database.prepare(`SELECT l.name, l.summary, l.category, l.revision, i.screenshot_bytes
+    FROM agent_imports i JOIN listings l ON l.slug = i.slug WHERE i.slug = ?
+      ${includeDraft ? "" : `AND l.status = 'published' AND NOT EXISTS (
+        SELECT 1 FROM "user" owner WHERE owner.id = l.owner_user_id AND owner.banned = 1
+      )`}`)
     .get(slug) as CardRow | undefined;
   if (!row) return null;
-  const withScreenshot = Boolean(row.screenshot_bytes);
   const brand = getSiteConfig();
+  const selection = getThemeSelection();
+  const palette = socialPaletteForSelection(getThemePreset(), selection.themeId);
+  const screenshot = includeDraft && row.screenshot_bytes
+    ? createHash("sha256").update(row.screenshot_bytes).digest("hex")
+    : Boolean(row.screenshot_bytes);
+  return {
+    row,
+    brand,
+    palette,
+    revision: socialCardRevision(`import:${includeDraft ? "preview" : "public"}:${slug}`, {
+      content: { name: row.name, summary: row.summary, category: row.category,
+        revision: row.revision, screenshot },
+      branding: brand,
+      theme: { selection, palette },
+    }),
+  };
+}
+
+async function renderSnapshot({ row, brand, palette }: CardSnapshot): Promise<Buffer> {
+  const withScreenshot = Boolean(row.screenshot_bytes);
   const siteName = escapeXml(brand.name.slice(0, 42));
-  const palette = socialPaletteForSelection(getThemePreset(), getThemeSelection().themeId);
   const heading = lines(row.name, withScreenshot ? 24 : 42, 3);
   const summary = lines(row.summary, withScreenshot ? 38 : 74, 3);
   const category = escapeXml(row.category.slice(0, 80));
@@ -80,4 +118,19 @@ export async function renderImportCard(slug: string, includeDraft: boolean): Pro
     overlays.push({ input: screenshot, left: 704, top: 109 });
   }
   return sharp(Buffer.from(svg)).composite(overlays).png().toBuffer();
+}
+
+export async function renderImportCard(slug: string,
+  includeDraft: boolean): Promise<RenderedImportCard | null> {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const snapshot = cardSnapshot(slug, includeDraft);
+    if (!snapshot) return null;
+    const bytes = await cardCache.get(snapshot.revision, () => renderSnapshot(snapshot));
+    const current = cardSnapshot(slug, includeDraft);
+    if (!current) return null;
+    if (current.revision === snapshot.revision) {
+      return { bytes, revision: snapshot.revision };
+    }
+  }
+  return null;
 }
