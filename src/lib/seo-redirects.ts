@@ -28,9 +28,14 @@ function path(value: unknown, allowRoot: boolean): string {
   return value;
 }
 
+export const REDIRECT_RESERVED_PREFIXES = [
+  "/", "/listings", "/articles", "/feed", "/robots", "/sitemap", "/favicon", "/admin",
+  "/owner", "/api", "/markdown", "/media", "/_next", "/social-card", "/og",
+  "/brand-assets", "/theme.css",
+] as const;
+
 function protectedRoute(source: string): boolean {
-  return ["/", "/listings", "/articles", "/feed", "/robots", "/sitemap", "/favicon", "/admin",
-    "/owner", "/api", "/markdown", "/media", "/_next"].some((prefix) =>
+  return REDIRECT_RESERVED_PREFIXES.some((prefix) =>
       source === prefix || source.startsWith(`${prefix}/`));
 }
 

@@ -18,6 +18,10 @@ test('redirects reject unsafe routes and slug changes retain a safe old address'
       await import('../src/lib/articles.ts');
     migrateCatalog();
     database.prepare("INSERT INTO tags (name) VALUES ('Guides')").run();
+    for (const source of ['/social-card', '/og', '/brand-assets', '/theme.css']) {
+      assert.throws(() => saveRedirect(source, '/', 'admin'), /shadow|bounded path/i);
+      assert.equal(redirectForPath(source), null);
+    }
     const old = createArticle({ slug: 'old-article', title: 'Old article', summary: 'Summary',
       body: 'Body', status: 'published', tags: ['Guides'], seo: { title: 'Search title' } }, 'editor');
     assert.throws(() => saveRedirect('/articles/old-article', '/articles/new-article', 'admin'), /shadow/i);
