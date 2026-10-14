@@ -136,10 +136,14 @@ export function generateRegistries(lock) {
     .sort((left, right) => left.template.id.localeCompare(right.template.id));
 
   const imports = themes.map(({ addon, theme }, index) =>
-    `import addonTheme${index} from ${JSON.stringify(relativeModulePath(addon.id, theme.entry))};`);
+    `import addonThemeSource${index} from ${JSON.stringify(relativeModulePath(addon.id, theme.entry))};`);
+  const authoritativeThemes = themes.map(({ theme }, index) =>
+    `const addonTheme${index}: ThemeDefinition = { ...addonThemeSource${index}, id: ${JSON.stringify(
+      theme.id)}, name: ${JSON.stringify(theme.name)} };`);
   const typescript = [
     'import type { ThemeDefinition } from "@/lib/theme-sdk";',
     ...(imports.length ? ["", ...imports] : []),
+    ...(authoritativeThemes.length ? ["", ...authoritativeThemes] : []),
     "",
     `export const addonThemeDefinitions: ThemeDefinition[] = [${themes.map((_, index) =>
       `addonTheme${index}`).join(", ")}];`,

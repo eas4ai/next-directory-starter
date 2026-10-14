@@ -61,7 +61,11 @@ function copyFixture(root, id = "reference-addon") {
       ({ ...template, id, name: `Template ${id}` }));
     writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
     for (const path of [join(destination, "src/theme.ts"), join(destination, "src/template.css")]) {
-      writeFileSync(path, readFileSync(path, "utf8").replaceAll("reference-addon", id));
+      let source = readFileSync(path, "utf8").replaceAll("reference-addon", id);
+      if (path.endsWith("theme.ts")) {
+        source = source.replace('name: "Reference Add-on"', `name: "Theme ${id}"`);
+      }
+      writeFileSync(path, source);
     }
   }
   return destination;
@@ -152,6 +156,13 @@ requirementTest("ADD-001 validates deterministic packages before workspace write
     expectFailure(run(repository, ["pack", linked, join(temporary, "linked.zip")]),
       "linked payload");
 
+    const mismatched = copyFixture(temporary, "identity-mismatch-addon");
+    const mismatchedTheme = join(mismatched, "src/theme.ts");
+    writeFileSync(mismatchedTheme, readFileSync(mismatchedTheme, "utf8")
+      .replace('id: "identity-mismatch-addon"', 'id: "studio"'));
+    expectFailure(run(repository, ["pack", mismatched, join(temporary, "mismatched.zip")]),
+      "manifest and runtime theme identity mismatch");
+
     const corrupt = join(temporary, "corrupt.zip");
     const bytes = readFileSync(first);
     bytes[Math.floor(bytes.length / 2)] ^= 0xff;
@@ -207,6 +218,9 @@ requirementTest("ADD-002 installs and removes owned files transactionally throug
     const collisionManifest = JSON.parse(readFileSync(collisionManifestPath, "utf8"));
     collisionManifest.themes[0].id = "reference-addon";
     writeFileSync(collisionManifestPath, `${JSON.stringify(collisionManifest, null, 2)}\n`);
+    const collisionThemePath = join(collisionSource, "src/theme.ts");
+    writeFileSync(collisionThemePath, readFileSync(collisionThemePath, "utf8")
+      .replace('id: "collision-addon"', 'id: "reference-addon"'));
     const collisionArchive = join(temporary, "collision.zip");
     packageArchive(collisionSource, collisionArchive);
     expectFailure(run(source, ["install", collisionArchive]), "duplicate contributed theme ID");

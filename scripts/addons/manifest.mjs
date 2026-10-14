@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import semver from "semver";
+import ts from "typescript";
 import { z } from "zod";
 
 export const ADDON_SCHEMA_VERSION = 1;
@@ -151,6 +152,85 @@ export function canonicalJson(value) {
   return Buffer.from(`${JSON.stringify(canonical(value), null, 2)}\n`);
 }
 
+function unwrapExpression(input) {
+  let expression = input;
+  while (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression) ||
+      ts.isSatisfiesExpression(expression) || ts.isTypeAssertionExpression(expression)) {
+    expression = expression.expression;
+  }
+  return expression;
+}
+
+function objectPropertyName(property) {
+  if (!property.name) return null;
+  if (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) {
+    return property.name.text;
+  }
+  return null;
+}
+
+function themeObject(sourceFile, path) {
+  const assignments = sourceFile.statements.filter((statement) =>
+    ts.isExportAssignment(statement) && !statement.isExportEquals);
+  if (assignments.length !== 1) throw new Error(`Theme must have one default export: ${path}`);
+  let expression = unwrapExpression(assignments[0].expression);
+  if (ts.isIdentifier(expression)) {
+    const declaration = sourceFile.statements.filter(ts.isVariableStatement)
+      .flatMap(({ declarationList }) => [...declarationList.declarations])
+      .find((candidate) => ts.isIdentifier(candidate.name) && candidate.name.text === expression.text);
+    if (!declaration?.initializer) throw new Error(`Theme default export is not defined: ${path}`);
+    expression = unwrapExpression(declaration.initializer);
+  }
+  if (!ts.isObjectLiteralExpression(expression)) {
+    throw new Error(`Theme default export must be an object literal: ${path}`);
+  }
+  if (expression.properties.some(ts.isSpreadAssignment)) {
+    throw new Error(`Theme default export cannot contain spreads: ${path}`);
+  }
+  return expression;
+}
+
+function literalProperty(object, name, path) {
+  const matches = object.properties.filter((property) => objectPropertyName(property) === name);
+  if (matches.length !== 1 || !ts.isPropertyAssignment(matches[0])) {
+    throw new Error(`Theme must declare one literal ${name}: ${path}`);
+  }
+  const expression = unwrapExpression(matches[0].initializer);
+  if (!ts.isStringLiteral(expression) && !ts.isNoSubstitutionTemplateLiteral(expression)) {
+    throw new Error(`Theme ${name} must be a string literal: ${path}`);
+  }
+  return expression.text;
+}
+
+export function validateThemeModules(manifest, files) {
+  const required = new Set([
+    "id", "name", "light", "dark", "typography", "radius", "shadow", "controlHeight",
+    "spacing", "width", "social",
+  ]);
+  for (const theme of manifest.themes) {
+    const bytes = files.get(theme.entry);
+    if (!bytes) throw new Error(`Theme entry is missing: ${theme.entry}`);
+    const source = bytes.toString("utf8");
+    if (!Buffer.from(source, "utf8").equals(bytes)) {
+      throw new Error(`Theme entry is not UTF-8: ${theme.entry}`);
+    }
+    const sourceFile = ts.createSourceFile(theme.entry, source, ts.ScriptTarget.Latest, true,
+      ts.ScriptKind.TS);
+    if (sourceFile.parseDiagnostics.length > 0) {
+      throw new Error(`Theme entry is not valid TypeScript: ${theme.entry}`);
+    }
+    const object = themeObject(sourceFile, theme.entry);
+    const names = new Set(object.properties.map(objectPropertyName).filter(Boolean));
+    if ([...required].some((name) => !names.has(name))) {
+      throw new Error(`Theme entry is missing required fields: ${theme.entry}`);
+    }
+    if (literalProperty(object, "id", theme.entry) !== theme.id ||
+        literalProperty(object, "name", theme.entry) !== theme.name) {
+      throw new Error(`Theme identity does not match the manifest: ${theme.entry}`);
+    }
+  }
+}
+
 function sourceFilePaths(root) {
   const paths = [];
   function visit(directory) {
@@ -195,6 +275,7 @@ export function readSourcePackage(source) {
     if (total > MAX_PACKAGE_BYTES) throw new Error("Add-on payload is too large");
     files.set(path, readFileSync(absolute));
   }
+  validateThemeModules(manifest, files);
   return { manifest, files, manifestBytes: canonicalJson(manifest), root };
 }
 
