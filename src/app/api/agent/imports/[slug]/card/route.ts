@@ -1,10 +1,14 @@
 import { canManageCatalog, sessionUser } from "@/lib/admin";
 import { renderImportCard } from "@/lib/agent-cards";
+import { agentPrincipal } from "@/lib/agent-keys";
 import { SocialCardCapacityError } from "@/lib/social-card-cache";
 
 export async function GET(request: Request, context: { params: Promise<{ slug: string }> }) {
   const user = await sessionUser(request.headers);
-  if (!user || !canManageCatalog(user.role)) return Response.json({ error: "Forbidden" }, { status: 403 });
+  if ((!user || !canManageCatalog(user.role)) &&
+      !agentPrincipal(request.headers.get("authorization"))) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
   try {
     const card = await renderImportCard((await context.params).slug, true);
     if (!card) return new Response(null, { status: 404 });
