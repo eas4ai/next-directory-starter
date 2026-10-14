@@ -3,14 +3,16 @@ import { parseListing } from "@/lib/catalog-input";
 import { database } from "@/lib/database";
 import { normalizeListingDestination } from "@/lib/listing-destinations";
 
-function insertSampleRows(): void {
+function insertSampleRows(inputRecords: readonly unknown[]): void {
   const category = database.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)");
   const existing = database.prepare("SELECT 1 FROM listings WHERE slug = ?");
   const listing = database.prepare(`INSERT INTO listings
     (slug, name, summary, description, category, url, destination_key, status)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
-  for (const [index, record] of records.entries()) {
-    const value = parseListing({ ...record, name: record.title });
+  for (const [index, record] of inputRecords.entries()) {
+    const input = record && typeof record === "object" && !Array.isArray(record)
+      ? record as Record<string, unknown> : {};
+    const value = parseListing({ ...input, name: input.title });
     if (!value) throw new Error(`Invalid sample listing at index ${index}.`);
     if (existing.get(value.slug)) continue;
     category.run(value.category);
@@ -1033,7 +1035,11 @@ export function migrateCatalog(explicit = false): void {
     migrateAgentBrowserApprovals();
 }
 
-export function seedCatalog(): void {
+export function seedCatalogRecords(inputRecords: readonly unknown[]): void {
   migrateCatalog(true);
-  database.transaction(insertSampleRows)();
+  database.transaction(() => insertSampleRows(inputRecords))();
+}
+
+export function seedCatalog(): void {
+  seedCatalogRecords(records);
 }
