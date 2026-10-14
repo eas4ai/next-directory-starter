@@ -19,6 +19,12 @@ test('private media reclaims displaced files and persists one account limit acro
     const { uploadPrivateImage } = await import('../src/lib/media.ts');
     const { submitOwnerListing, decideSubmission } = await import('../src/lib/moderation.ts');
     migrateCatalog();
+    database.exec(`CREATE TABLE IF NOT EXISTS "user" (
+      id TEXT PRIMARY KEY, role TEXT, banned INTEGER NOT NULL DEFAULT 0,
+      emailVerified INTEGER NOT NULL DEFAULT 0
+    )`);
+    database.prepare(`INSERT INTO "user" (id, role, banned, emailVerified)
+      VALUES ('owner', 'user', 0, 1), ('moderator', 'moderator', 0, 1)`).run();
     database.prepare("INSERT INTO categories (name) VALUES ('Tools')").run();
     database.prepare(`INSERT INTO listings
       (slug, name, summary, description, category, url, status, owner_user_id)

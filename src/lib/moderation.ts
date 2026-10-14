@@ -6,18 +6,29 @@ import { parseListing } from "@/lib/catalog-input";
 import type { Listing } from "@/lib/listings";
 import { HttpError, httpErrorResponse } from "@/lib/http-error";
 import { recordAudit } from "@/lib/audit";
-import { drainMediaCleanupQueue, promoteDraftMedia } from "@/lib/media";
+import { drainMediaCleanupQueue, promoteDraftMedia, promoteProfileMedia } from "@/lib/media";
 import { recordOwnerNotification } from "@/lib/notifications";
 import { redirectForPath } from "@/lib/seo-redirects";
 import { editableSeoOverrides, hasDraftSeo, publishDraftSeo, saveDraftSeo,
   type SeoOverrides } from "@/lib/seo-settings";
+import { canModerate, requireCurrentActor } from "@/lib/admin";
+import { activeDirectoryProfiles } from "@/lib/directory-profiles";
+import { profileValuesForListings, ProfileValueError, replaceListingProfileValues,
+  validateProfileValues } from "@/lib/profile-values";
+import type { DirectoryProfileField, ProfileValueSet } from "@/lib/directory-profile-types";
 
 migrateCatalog();
 
 export class ModerationError extends HttpError {}
-export const moderationErrorResponse = httpErrorResponse;
+export function moderationErrorResponse(error: unknown): Response {
+  if (error instanceof ProfileValueError) return Response.json({ error: error.message,
+    errors: { [error.fieldKey]: error.message } }, { status: error.status });
+  return httpErrorResponse(error);
+}
 
-type StoredListing = Listing & { owner_user_id: string | null };
+type StoredListing = Omit<Listing, "profileValues" | "profileStateRevision"> & {
+  owner_user_id: string | null;
+};
 type StoredSubmission = {
   id: string;
   slug: string;
@@ -52,12 +63,16 @@ export type ReviewSubmission = {
 };
 
 function reviewSubmission(row: StoredSubmission): ReviewSubmission {
+  const proposed = parseListing(JSON.parse(row.payload));
+  if (!proposed || proposed.slug !== row.slug) {
+    throw new ModerationError(500, "Stored submission is invalid");
+  }
   return {
     id: row.id,
     slug: row.slug,
     ownerUserId: row.owner_user_id,
     ownerEmail: row.owner_email ?? "",
-    proposed: JSON.parse(row.payload) as Listing,
+    proposed,
     status: row.status,
     reason: row.reason,
     submittedAt: row.submitted_at,
@@ -68,6 +83,39 @@ function reviewSubmission(row: StoredSubmission): ReviewSubmission {
     proposedSeo: row.seo_json ? JSON.parse(row.seo_json) as SeoOverrides :
       editableSeoOverrides("listing", row.slug),
   };
+}
+
+function requireOwnerActor(userId: string): void {
+  const actor = database.prepare(`SELECT banned, emailVerified FROM "user" WHERE id = ?`).get(userId) as
+    { banned: number; emailVerified: number } | undefined;
+  if (!actor || actor.banned || !actor.emailVerified) throw new ModerationError(403, "Forbidden");
+}
+
+function ownerFields(fields: DirectoryProfileField[]): Set<string> {
+  return new Set(fields.filter(({ writeAuthority }) => writeAuthority === "owner")
+    .map(({ key }) => key));
+}
+
+function ownerValues(values: ProfileValueSet, fields: DirectoryProfileField[]): ProfileValueSet {
+  const allowed = ownerFields(fields);
+  return Object.fromEntries(Object.entries(values).filter(([key]) => allowed.has(key)));
+}
+
+function hydrateStoredListing(row: StoredListing, forOwner = false): Listing {
+  const profiles = activeDirectoryProfiles();
+  const values = profileValuesForListings([row.slug], { includePrivate: true }).get(row.slug) ?? {};
+  return { ...row, profileValues: forOwner
+    ? ownerValues(values, profiles.definitions.flatMap(({ fields }) => fields)) : values,
+  profileStateRevision: profiles.state.revision };
+}
+
+function parseStoredListing(payload: string, slug: string): Listing {
+  let decoded: unknown;
+  try { decoded = JSON.parse(payload); }
+  catch { throw new ModerationError(500, "Stored listing proposal is invalid"); }
+  const listing = parseListing(decoded);
+  if (!listing || listing.slug !== slug) throw new ModerationError(500, "Stored listing proposal is invalid");
+  return listing;
 }
 
 function listingSeoInput(input: unknown): unknown | undefined {
@@ -105,6 +153,7 @@ function existingCategory(name: string, status = 400): string {
 }
 
 export function ownerListings(userId: string): (Listing & { hasDraft: boolean; pending: boolean })[] {
+  requireOwnerActor(userId);
   const rows = database.prepare(`SELECT l.*,
     (EXISTS(SELECT 1 FROM owner_drafts d WHERE d.slug = l.slug) OR
       EXISTS(SELECT 1 FROM seo_overrides seo WHERE seo.kind = 'listing' AND seo.slug = l.slug
@@ -112,17 +161,29 @@ export function ownerListings(userId: string): (Listing & { hasDraft: boolean; p
     EXISTS(SELECT 1 FROM submissions s WHERE s.slug = l.slug AND s.status = 'pending') AS pending
     FROM listings l WHERE l.owner_user_id = ? ORDER BY l.name COLLATE NOCASE, l.slug`)
     .all(userId) as (StoredListing & { has_draft: number; pending: number })[];
+  const profiles = activeDirectoryProfiles();
+  const values = profileValuesForListings(rows.map(({ slug }) => slug), { includePrivate: true });
+  const fields = profiles.definitions.flatMap(({ fields }) => fields);
   return rows.map(({ has_draft, pending, ...listing }) => ({
-    ...listing, hasDraft: Boolean(has_draft), pending: Boolean(pending),
+    ...listing, profileValues: ownerValues(values.get(listing.slug) ?? {}, fields),
+    profileStateRevision: profiles.state.revision,
+    hasDraft: Boolean(has_draft), pending: Boolean(pending),
   }));
 }
 
 export function ownerListing(userId: string, slug: string): {
   listing: Listing; proposal: Listing | null; pending: boolean; seo: SeoOverrides;
 } {
-  const listing = ownedListing(userId, slug);
+  requireOwnerActor(userId);
+  const stored = ownedListing(userId, slug);
+  const listing = hydrateStoredListing(stored, true);
   const draft = database.prepare("SELECT payload FROM owner_drafts WHERE slug = ?").get(slug) as { payload: string } | undefined;
-  return { listing, proposal: draft ? JSON.parse(draft.payload) as Listing : null,
+  const proposal = draft ? parseStoredListing(draft.payload, slug) : null;
+  if (proposal) {
+    const fields = activeDirectoryProfiles().definitions.flatMap(({ fields }) => fields);
+    proposal.profileValues = ownerValues(proposal.profileValues, fields);
+  }
+  return { listing, proposal,
     pending: pendingSubmission(slug), seo: editableSeoOverrides("listing", slug) };
 }
 
@@ -130,7 +191,14 @@ export function createOwnerListing(userId: string, input: unknown): Listing {
   const listing = parseListing({ ...(input && typeof input === "object" && !Array.isArray(input) ? input : {}), status: "draft" });
   if (!listing) throw new ModerationError(400, "Invalid listing");
   try {
-    database.transaction(() => {
+    return database.transaction(() => {
+      requireOwnerActor(userId);
+      const profiles = activeDirectoryProfiles();
+      if (listing.profileStateRevision !== profiles.state.revision) {
+        throw new ModerationError(409, "Directory profile changed since this listing was opened");
+      }
+      const values = validateProfileValues(listing.profileValues, { profiles, authority: "owner",
+        listingSlug: listing.slug, actorUserId: userId, requireComplete: true });
       if (redirectForPath(`/listings/${listing.slug}`)) {
         throw new ModerationError(409, "Listing slug is reserved by a redirect");
       }
@@ -141,8 +209,10 @@ export function createOwnerListing(userId: string, input: unknown): Listing {
         listing.slug, listing.name, listing.summary, listing.description,
         listing.category, listing.url, normalizeListingDestination(listing.url), userId,
       );
+      replaceListingProfileValues({ listingSlug: listing.slug, values, profiles });
       const seo = listingSeoInput(input);
       if (seo !== undefined) saveDraftSeo("listing", listing.slug, seo);
+      return hydrateStoredListing(ownedListing(userId, listing.slug), true);
     }).immediate();
   } catch (error) {
     if (error instanceof Error && error.message.includes("UNIQUE constraint")) {
@@ -150,11 +220,11 @@ export function createOwnerListing(userId: string, input: unknown): Listing {
     }
     throw error;
   }
-  return listing;
 }
 
 export function updateOwnerListing(userId: string, slug: string, changes: unknown): Listing {
   return database.transaction(() => {
+    requireOwnerActor(userId);
     const current = ownedListing(userId, slug);
     if (current.status === "suspended") throw new ModerationError(409, "Suspended listings cannot be edited");
     if (pendingSubmission(slug)) throw new ModerationError(409, "Wait for the current review");
@@ -162,11 +232,23 @@ export function updateOwnerListing(userId: string, slug: string, changes: unknow
       throw new ModerationError(400, "Invalid listing changes");
     }
     const draft = database.prepare("SELECT payload FROM owner_drafts WHERE slug = ?").get(slug) as { payload: string } | undefined;
-    const base = draft ? JSON.parse(draft.payload) as Listing : current;
+    const currentValues = profileValuesForListings([slug], { includePrivate: true }).get(slug) ?? {};
+    const base = draft ? parseStoredListing(draft.payload, slug)
+      : { ...current, profileValues: currentValues,
+        profileStateRevision: activeDirectoryProfiles().state.revision };
     const listing = parseListing({ ...base, ...changes, slug, status: current.status });
     if (!listing) throw new ModerationError(400, "Invalid listing changes");
     listing.revision = current.revision;
     listing.category = existingCategory(listing.category);
+    const profiles = activeDirectoryProfiles();
+    if (listing.profileStateRevision !== profiles.state.revision) {
+      throw new ModerationError(409, "Directory profile changed since this listing was opened");
+    }
+    const validatedOwnerValues = validateProfileValues(listing.profileValues, { profiles,
+      authority: "owner", listingSlug: slug, actorUserId: userId, requireComplete: true });
+    const writable = ownerFields(profiles.definitions.flatMap(({ fields }) => fields));
+    listing.profileValues = { ...Object.fromEntries(Object.entries(currentValues)
+      .filter(([key]) => !writable.has(key))), ...validatedOwnerValues };
     if (current.status === "draft") {
         database.prepare(`UPDATE listings SET name = ?, summary = ?, description = ?, category = ?,
           url = ?, destination_key = ?, revision = revision + 1
@@ -174,6 +256,9 @@ export function updateOwnerListing(userId: string, slug: string, changes: unknow
           listing.description, listing.category, listing.url,
           normalizeListingDestination(listing.url), slug, userId);
       listing.revision = current.revision + 1;
+      replaceListingProfileValues({ listingSlug: slug, values:
+        validateProfileValues(listing.profileValues, { profiles, authority: "system",
+          listingSlug: slug, actorUserId: userId, requireComplete: false }), profiles });
     } else {
       database.prepare(`INSERT INTO owner_drafts (slug, owner_user_id, payload, updated_at)
         VALUES (?, ?, ?, ?) ON CONFLICT(slug) DO UPDATE SET payload = excluded.payload,
@@ -181,12 +266,14 @@ export function updateOwnerListing(userId: string, slug: string, changes: unknow
     }
     const seo = listingSeoInput(changes);
     if (seo !== undefined) saveDraftSeo("listing", slug, seo);
-    return listing;
+    return { ...listing, profileValues: ownerValues(listing.profileValues,
+      profiles.definitions.flatMap(({ fields }) => fields)) };
   }).immediate();
 }
 
 export function submitOwnerListing(userId: string, slug: string): ReviewSubmission {
   return database.transaction(() => {
+    requireOwnerActor(userId);
     const current = ownedListing(userId, slug);
     if (current.status === "suspended") throw new ModerationError(409, "Suspended listings cannot be submitted");
     if (pendingSubmission(slug)) throw new ModerationError(409, "Listing already awaits review");
@@ -194,7 +281,14 @@ export function submitOwnerListing(userId: string, slug: string): ReviewSubmissi
     if (current.status !== "draft" && !draft && !hasDraftSeo("listing", slug)) {
       throw new ModerationError(400, "Save changes before submitting");
     }
-    const proposed = draft ? JSON.parse(draft.payload) as Listing : current;
+    const profiles = activeDirectoryProfiles();
+    const proposed = draft ? parseStoredListing(draft.payload, slug)
+      : hydrateStoredListing(current);
+    if (proposed.profileStateRevision !== profiles.state.revision) {
+      throw new ModerationError(409, "Directory profile changed; save the listing again before submitting");
+    }
+    proposed.profileValues = validateProfileValues(proposed.profileValues, { profiles,
+      authority: "system", listingSlug: slug, actorUserId: userId, requireComplete: true });
     const id = randomUUID();
     const submittedAt = new Date().toISOString();
     const proposedSeo = editableSeoOverrides("listing", slug);
@@ -228,6 +322,7 @@ export function reviewSubmissions(page = 1): { submissions: ReviewSubmission[]; 
 
 export function decideSubmission(id: string, actorId: string, decision: "approve" | "reject", reason: string): void {
   database.transaction(() => {
+    requireCurrentActor(actorId, canModerate);
     const row = database.prepare("SELECT * FROM submissions WHERE id = ? AND status = 'pending'")
       .get(id) as StoredSubmission | undefined;
     if (!row) throw new ModerationError(404, "Pending submission not found");
@@ -239,7 +334,14 @@ export function decideSubmission(id: string, actorId: string, decision: "approve
       if (row.base_revision !== current.revision) {
         throw new ModerationError(409, "Listing changed after submission; review the current version");
       }
-      const proposed = JSON.parse(row.payload) as Listing;
+      const proposed = parseStoredListing(row.payload, row.slug);
+      const profiles = activeDirectoryProfiles();
+      if (proposed.profileStateRevision !== profiles.state.revision) {
+        throw new ModerationError(409,
+          "Directory profile changed after submission; ask the owner to refresh and resubmit");
+      }
+      const profileValues = validateProfileValues(proposed.profileValues, { profiles,
+        authority: "system", listingSlug: row.slug, actorUserId: actorId, requireComplete: true });
       proposed.category = existingCategory(proposed.category, 409);
       database.prepare(`UPDATE listings SET name = ?, summary = ?, description = ?, category = ?,
             url = ?, destination_key = ?, status = 'published', revision = revision + 1
@@ -247,7 +349,9 @@ export function decideSubmission(id: string, actorId: string, decision: "approve
         proposed.name, proposed.summary, proposed.description, proposed.category,
           proposed.url, normalizeListingDestination(proposed.url), row.slug, row.owner_user_id,
       );
+      replaceListingProfileValues({ listingSlug: row.slug, values: profileValues, profiles });
       promoteDraftMedia("listing", row.slug);
+      promoteProfileMedia(row.slug, profileValues);
       if (row.seo_json) {
         saveDraftSeo("listing", row.slug, JSON.parse(row.seo_json));
         publishDraftSeo("listing", row.slug);
@@ -270,6 +374,7 @@ export function decideSubmission(id: string, actorId: string, decision: "approve
 
 export function suspendPublishedListing(slug: string, actorId: string, reason: string): void {
   database.transaction(() => {
+    requireCurrentActor(actorId, canModerate);
     const owner = database.prepare("SELECT owner_user_id FROM listings WHERE slug = ? AND status = 'published'")
       .get(slug) as { owner_user_id: string | null } | undefined;
     const changed = database.prepare(`UPDATE listings SET status = 'suspended', revision = revision + 1

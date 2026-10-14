@@ -21,8 +21,12 @@ test('draft images stay private and public images follow approved content state'
     const { articleBySlug, createArticle, publishArticleRevision,
       unpublishArticleRevision } = await import('../src/lib/articles.ts');
     migrateCatalog();
-    database.exec('CREATE TABLE IF NOT EXISTS "user" (id TEXT PRIMARY KEY, banned INTEGER NOT NULL DEFAULT 0)');
-    database.prepare("INSERT INTO \"user\" (id, banned) VALUES ('owner', 0)").run();
+    database.exec(`CREATE TABLE IF NOT EXISTS "user" (
+      id TEXT PRIMARY KEY, role TEXT, banned INTEGER NOT NULL DEFAULT 0,
+      emailVerified INTEGER NOT NULL DEFAULT 0
+    )`);
+    database.prepare(`INSERT INTO "user" (id, role, banned, emailVerified)
+      VALUES ('owner', 'user', 0, 1), ('moderator', 'moderator', 0, 1)`).run();
     database.prepare("INSERT INTO categories (name) VALUES ('Tools')").run();
     createOwnerListing('owner', { slug: 'my-listing', name: 'Mine', summary: 'Summary',
       description: 'Description', category: 'Tools', url: 'https://example.org' });

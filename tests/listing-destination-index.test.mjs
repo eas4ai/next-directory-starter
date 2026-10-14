@@ -18,6 +18,8 @@ test('listing writers maintain an indexed normalized destination key', async () 
     )`);
     database.prepare(`INSERT INTO "user" (id, role, banned, emailVerified)
       VALUES ('admin', 'admin', 0, 1)`).run();
+    database.prepare(`INSERT INTO "user" (id, role, banned, emailVerified)
+      VALUES ('owner', 'user', 0, 1)`).run();
     const { createListing, updateListing } = await import('../src/lib/listings.ts');
     const { createOwnerListing, updateOwnerListing } = await import('../src/lib/moderation.ts');
     const { stageAgentImports } = await import('../src/lib/agent-imports.ts');

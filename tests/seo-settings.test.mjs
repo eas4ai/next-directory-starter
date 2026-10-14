@@ -21,8 +21,13 @@ test('site settings and content search overrides publish only with their approve
     const { createArticle, saveArticleRevision, publishArticleRevision,
       publishedArticleBySlug } = await import('../src/lib/articles.ts');
     migrateCatalog();
-    database.exec('CREATE TABLE IF NOT EXISTS "user" (id TEXT PRIMARY KEY, email TEXT, banned INTEGER NOT NULL DEFAULT 0)');
-    database.prepare("INSERT INTO \"user\" (id, email) VALUES ('owner', 'owner@example.invalid')").run();
+    database.exec(`CREATE TABLE IF NOT EXISTS "user" (
+      id TEXT PRIMARY KEY, email TEXT, role TEXT, banned INTEGER NOT NULL DEFAULT 0,
+      emailVerified INTEGER NOT NULL DEFAULT 0
+    )`);
+    database.prepare(`INSERT INTO "user" (id, email, role, banned, emailVerified) VALUES
+      ('owner', 'owner@example.invalid', 'user', 0, 1),
+      ('admin', 'admin@example.invalid', 'admin', 0, 1)`).run();
     database.prepare("INSERT INTO categories (name) VALUES ('Tools')").run();
     assert.throws(() => saveSeoSettings({ titleFormat: 'No marker', description: 'Value' }, 'admin'), /format/i);
     saveSeoSettings({ titleFormat: '%s | Directory Search', description: 'Search default',

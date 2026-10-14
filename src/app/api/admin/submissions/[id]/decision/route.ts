@@ -1,6 +1,6 @@
 import { canModerate, sameOrigin, sessionUser } from "@/lib/admin";
 import { decideSubmission, moderationErrorResponse } from "@/lib/moderation";
-import { requestJson } from "@/lib/request-json";
+import { requestJson, requestJsonErrorResponse } from "@/lib/request-json";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await sessionUser(request.headers);
@@ -8,7 +8,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!sameOrigin(request)) return Response.json({ error: "Invalid origin" }, { status: 403 });
   let input: unknown;
   try { input = await requestJson(request); }
-  catch { return Response.json({ error: "Invalid JSON" }, { status: 400 }); }
+  catch (error) { return requestJsonErrorResponse(error); }
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     return Response.json({ error: "Invalid decision" }, { status: 400 });
   }

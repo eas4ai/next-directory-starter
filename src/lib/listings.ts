@@ -5,7 +5,7 @@ import { checkoutMode } from "@/lib/plans";
 import { redirectForPath } from "@/lib/seo-redirects";
 import { HttpError } from "@/lib/http-error";
 import { canAdmin, canManageCatalog, canModerate } from "@/lib/admin";
-import { markAgentImportPublished } from "@/lib/agent-imports";
+import { markAgentImportChanged, markAgentImportPublished } from "@/lib/agent-imports";
 import { normalizeListingDestination } from "@/lib/listing-destinations";
 import { activeDirectoryProfiles, directoryProfileState } from "@/lib/directory-profiles";
 import {
@@ -199,6 +199,7 @@ export function updateListing(listing: Listing, actorUserId: string, expectedRev
       listing.name, listing.summary, listing.description, listing.category,
         listing.url, normalizeListingDestination(listing.url), listing.status, listing.slug,
     );
+    markAgentImportChanged(listing.slug);
     replaceListingProfileValues({ listingSlug: listing.slug, values, profiles });
     const action = listing.status === "published" && current.status !== "published"
       ? "catalog.publish" : current.status === "published" && listing.status === "draft"

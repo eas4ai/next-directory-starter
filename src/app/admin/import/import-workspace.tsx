@@ -7,7 +7,8 @@ type Key = { id: string; name: string; expiresAt: string; revokedAt: string | nu
   scope: KeyScope };
 type Import = { slug: string; name: string; summary: string; description: string;
   category: string; url: string; sourceUrl: string; sourceExcerpt: string; status: string;
-  revision: number; browserApprovedAt: string | null; browserApprovedRevision: number | null };
+  revision: number; browserApprovedAt: string | null; browserApprovedRevision: number | null;
+  profileValues: Record<string, unknown>; profileStateRevision: number };
 type BrowserTool = { name: string; description: string; inputSchema?: Record<string, unknown>;
   execute: (args: Record<string, unknown>) => Promise<unknown> };
 type ModelContext = { registerTool: (tool: BrowserTool, options?: { signal: AbortSignal }) => Promise<void> };
@@ -66,7 +67,9 @@ export function ImportWorkspace({ initialKeys, initialImports, categories }: {
         inputSchema: object({ items: { type: "array", minItems: 1, maxItems: 20,
           items: object({ idempotencyKey: string, url: string, sourceUrl: string,
             sourceExcerpt: string, name: string, summary: string, description: string,
-            category: string }, ["idempotencyKey", "url", "sourceUrl", "sourceExcerpt",
+            category: string, profileValues: { type: "object", additionalProperties: true },
+            profileStateRevision: { type: "integer", minimum: 0 } },
+          ["idempotencyKey", "url", "sourceUrl", "sourceExcerpt",
             "name", "summary", "description", "category"]) } }, ["items"]),
         execute: async ({ items }) => { await access(); const result = await post("/api/agent/imports", { items });
           await refresh(); return result; } },
@@ -180,7 +183,7 @@ export function ImportWorkspace({ initialKeys, initialImports, categories }: {
     </section>
     <section className="rounded-xl border p-5" aria-labelledby="agent-batch">
       <h2 id="agent-batch" className="text-xl font-semibold">Stage observed links</h2>
-      <p className="mt-2 text-sm text-muted-foreground">Agent-browser can inspect a single URL, a directory page, or a link list. Paste a JSON array of up to 20 observed links, with category from {categories.join(", ")}.</p>
+      <p className="mt-2 text-sm text-muted-foreground">Agent-browser can inspect a single URL, a directory page, or a link list. Paste a JSON array of up to 20 observed links, with category from {categories.join(", ")}. Profile values are optional while staging; publication waits until every required field is valid.</p>
       <textarea aria-label="Observed links JSON array" value={batch} onChange={(event) => setBatch(event.target.value)}
         rows={5} className="mt-4 w-full rounded-md border bg-background p-3 font-mono text-sm" />
       <button type="button" onClick={stageBatch} className="mt-3 rounded-md bg-primary px-4 py-2 text-primary-foreground">Stage private drafts</button>
@@ -200,6 +203,12 @@ export function ImportWorkspace({ initialKeys, initialImports, categories }: {
           <p className="mt-2">{item.summary}</p>
           <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{item.description}</p>
           <p className="mt-3 text-sm">Category: {item.category}</p>
+          {Object.keys(item.profileValues).length > 0 && <details className="mt-3 text-sm">
+            <summary className="cursor-pointer font-medium">Staged profile values</summary>
+            <pre className="mt-2 overflow-x-auto rounded-md bg-muted p-3 text-xs">
+              {JSON.stringify(item.profileValues, null, 2)}
+            </pre>
+          </details>}
           <p className="mt-2 text-sm">Untrusted source evidence: {item.sourceExcerpt}</p>
           <div className="mt-3 flex flex-wrap gap-4 text-sm underline">
             <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer">Source</a>

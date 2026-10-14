@@ -11,6 +11,8 @@ import { ReviewDecision } from "./review-decision";
 import { SuspendButton } from "./suspend-button";
 import { assignedMedia } from "@/lib/media";
 import { ContentImage } from "@/components/content-image";
+import { ProfileValuesView } from "@/components/profile-values-view";
+import { activeDirectoryProfiles } from "@/lib/directory-profiles";
 
 export async function generateMetadata(): Promise<Metadata> {
   await connection();
@@ -29,6 +31,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const requestedPage = Number(query.page ?? "1");
   const { submissions, page, pages } = reviewSubmissions(requestedPage);
   const published = searchPublishedListings({ page: query.catalogPage });
+  const profileFields = activeDirectoryProfiles().definitions.flatMap(({ fields }) => fields);
 
   return (
     <main className="mx-auto w-full theme-page-width px-6 py-10">
@@ -53,6 +56,11 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
             <p className="mt-3 text-sm">{submission.proposed.summary}</p>
             <p className="mt-2 text-sm text-muted-foreground">{submission.proposed.description}</p>
             <p className="mt-2 text-sm text-muted-foreground">{submission.proposed.category} · <a href={submission.proposed.url} target="_blank" rel="noopener noreferrer" className="underline">{submission.proposed.url}</a></p>
+            {Object.keys(submission.proposed.profileValues).length > 0 && <div className="mt-4">
+              <h3 className="mb-2 text-sm font-semibold">Proposed profile values</h3>
+              <ProfileValuesView fields={profileFields} values={submission.proposed.profileValues}
+                mode="staff" />
+            </div>}
             {(submission.proposedSeo.title || submission.proposedSeo.description ||
               submission.proposedSeo.socialImage || submission.proposedSeo.indexable !== null) && (
               <div className="mt-3 rounded-md border p-3 text-sm">

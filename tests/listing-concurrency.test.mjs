@@ -28,6 +28,9 @@ test('stale catalog and submission writes cannot replace newer moderation state'
       VALUES (?, ?, ?, ?, 0, 1)`).run('admin-user', 'Admin user', 'admin@example.invalid', 'admin');
     database.prepare(`INSERT INTO "user" (id, name, email, role, banned, emailVerified)
       VALUES (?, ?, ?, ?, 0, 1)`).run('owner-user', 'Owner user', 'owner@example.invalid', 'user');
+    database.prepare(`INSERT INTO "user" (id, name, email, role, banned, emailVerified)
+      VALUES (?, ?, ?, ?, 0, 1)`).run('moderator-user', 'Moderator user',
+      'moderator@example.invalid', 'moderator');
     database.prepare('INSERT INTO categories (name) VALUES (?)').run('Tools');
     database.prepare(`INSERT INTO listings
       (slug, name, summary, description, category, url, status, owner_user_id)

@@ -16,8 +16,13 @@ test('moderation and verified payment changes retain one private notice atomical
     const { retainVerifiedEvidence } = await import('../src/lib/payment-lifecycle.ts');
     const { listOwnerNotifications, recordOwnerNotification } = await import('../src/lib/notifications.ts');
     migrateCatalog();
-    database.exec('CREATE TABLE IF NOT EXISTS "user" (id TEXT PRIMARY KEY, email TEXT, banned INTEGER NOT NULL DEFAULT 0)');
-    database.prepare("INSERT INTO \"user\" (id, email) VALUES ('owner', 'owner@example.invalid')").run();
+    database.exec(`CREATE TABLE IF NOT EXISTS "user" (
+      id TEXT PRIMARY KEY, email TEXT, role TEXT, banned INTEGER NOT NULL DEFAULT 0,
+      emailVerified INTEGER NOT NULL DEFAULT 0
+    )`);
+    database.prepare(`INSERT INTO "user" (id, email, role, banned, emailVerified) VALUES
+      ('owner', 'owner@example.invalid', 'user', 0, 1),
+      ('moderator', 'moderator@example.invalid', 'moderator', 0, 1)`).run();
     database.prepare("INSERT INTO categories (name) VALUES ('Tools')").run();
     const listing = (slug) => ({ slug, name: slug, summary: 'Summary',
       description: 'Description', category: 'Tools', url: `https://example.org/${slug}` });
