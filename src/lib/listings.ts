@@ -7,6 +7,11 @@ import { HttpError } from "@/lib/http-error";
 import { canAdmin, canManageCatalog, canModerate } from "@/lib/admin";
 import { markAgentImportPublished } from "@/lib/agent-imports";
 import { normalizeListingDestination } from "@/lib/listing-destinations";
+import { activeDirectoryProfiles, directoryProfileState } from "@/lib/directory-profiles";
+import {
+  profileValuesForListings, replaceListingProfileValues, validateProfileValues,
+} from "@/lib/profile-values";
+import type { ProfileValueSet } from "@/lib/directory-profile-types";
 
 export type Listing = {
   slug: string;
@@ -17,9 +22,13 @@ export type Listing = {
   url: string;
   status: "published" | "draft" | "suspended";
   revision: number;
+  profileValues: ProfileValueSet;
+  profileStateRevision: number;
 };
 
-type StoredListing = Listing & { owner_user_id: string | null };
+type StoredListing = Omit<Listing, "profileValues" | "profileStateRevision"> & {
+  owner_user_id: string | null;
+};
 
 export const LISTINGS_PER_PAGE = 12;
 export const PUBLIC_LISTING_PREDICATE = `l.status = 'published' AND NOT EXISTS (
@@ -28,20 +37,35 @@ export const PUBLIC_LISTING_PREDICATE = `l.status = 'published' AND NOT EXISTS (
 
 migrateCatalog();
 
+function hydrateOne(row: StoredListing | undefined, includePrivate: boolean): Listing | undefined {
+  if (!row) return undefined;
+  const values = profileValuesForListings([row.slug], { includePrivate }).get(row.slug) ?? {};
+  return { ...row, profileValues: values, profileStateRevision: directoryProfileState().revision };
+}
+
+function hydrateMany(rows: StoredListing[], includePrivate: boolean): Listing[] {
+  if (!rows.length) return [];
+  const values = profileValuesForListings(rows.map(({ slug }) => slug), { includePrivate });
+  const profileStateRevision = directoryProfileState().revision;
+  return rows.map((row) => ({ ...row, profileValues: values.get(row.slug) ?? {},
+    profileStateRevision }));
+}
+
 export function publishedListingBySlug(slug: string): Listing | undefined {
-  return database.prepare(`SELECT l.* FROM listings l WHERE l.slug = ? AND ${PUBLIC_LISTING_PREDICATE}`)
-    .get(slug) as Listing | undefined;
+  return hydrateOne(database.prepare(`SELECT l.* FROM listings l WHERE l.slug = ? AND ${PUBLIC_LISTING_PREDICATE}`)
+    .get(slug) as StoredListing | undefined, false);
 }
 
 export function allListings(operatorOnly = false): Listing[] {
-  return database.prepare(`SELECT * FROM listings ${operatorOnly ? "WHERE owner_user_id IS NULL" : ""}
+  const rows = database.prepare(`SELECT * FROM listings ${operatorOnly ? "WHERE owner_user_id IS NULL" : ""}
     ORDER BY name COLLATE NOCASE, slug`)
-    .all() as Listing[];
+    .all() as StoredListing[];
+  return hydrateMany(rows, true);
 }
 
 export function listingBySlug(slug: string, operatorOnly = false): Listing | undefined {
-  return database.prepare(`SELECT * FROM listings WHERE slug = ?
-    ${operatorOnly ? "AND owner_user_id IS NULL" : ""}`).get(slug) as Listing | undefined;
+  return hydrateOne(database.prepare(`SELECT * FROM listings WHERE slug = ?
+    ${operatorOnly ? "AND owner_user_id IS NULL" : ""}`).get(slug) as StoredListing | undefined, true);
 }
 
 export function directoryCategories(): string[] {
@@ -81,21 +105,23 @@ export function searchPublishedListings({ q = "", category = "", page = "1" }: L
     .get(...args) as { count: number }).count;
   const pages = Math.max(1, Math.ceil(total / LISTINGS_PER_PAGE));
   const pageNumber = Math.min(requestedPage, pages);
-  const listings = database.prepare(`SELECT l.* FROM listings l WHERE ${where}
+  const rows = database.prepare(`SELECT l.* FROM listings l WHERE ${where}
     ORDER BY l.name COLLATE NOCASE, l.slug LIMIT ? OFFSET ?`)
-    .all(...args, LISTINGS_PER_PAGE, (pageNumber - 1) * LISTINGS_PER_PAGE) as Listing[];
+    .all(...args, LISTINGS_PER_PAGE, (pageNumber - 1) * LISTINGS_PER_PAGE) as StoredListing[];
+  const listings = hydrateMany(rows, false);
   return { listings, total, page: pageNumber, pages };
 }
 
 export function activeFeaturedListings(search: Pick<ListingSearch, "q" | "category"> = {}): Listing[] {
   const { where, args } = publicFilter(search.q ?? "", search.category ?? "");
   const now = new Date().toISOString();
-  return database.prepare(`SELECT l.* FROM listings l WHERE ${where}
+  const rows = database.prepare(`SELECT l.* FROM listings l WHERE ${where}
     AND EXISTS (SELECT 1 FROM entitlements e
       JOIN purchases p ON p.id = e.purchase_id AND p.plan_mode = ?
       WHERE e.listing_slug = l.slug
       AND e.featured = 1 AND e.revoked_at IS NULL AND e.starts_at <= ? AND e.ends_at > ?)
-    ORDER BY l.name COLLATE NOCASE, l.slug LIMIT 6`).all(...args, checkoutMode(), now, now) as Listing[];
+    ORDER BY l.name COLLATE NOCASE, l.slug LIMIT 6`).all(...args, checkoutMode(), now, now) as StoredListing[];
+  return hydrateMany(rows, false);
 }
 
 export function activeFeaturedSlugs(slugs: string[]): Set<string> {
@@ -113,6 +139,19 @@ export function activeFeaturedSlugs(slugs: string[]): Set<string> {
 
 export function createListing(listing: Listing, actorUserId: string): Listing {
   return database.transaction(() => {
+    const actor = database.prepare(`SELECT role, banned, emailVerified
+      FROM "user" WHERE id = ?`).get(actorUserId) as {
+        role: string | null; banned: number; emailVerified: number;
+      } | undefined;
+    if (!actor || actor.banned || !actor.emailVerified || !canManageCatalog(actor.role)) {
+      throw new HttpError(403, "Forbidden");
+    }
+    const profiles = activeDirectoryProfiles();
+    if (listing.profileStateRevision !== profiles.state.revision) {
+      throw new HttpError(409, "Directory profile changed since this listing was opened");
+    }
+    const values = validateProfileValues(listing.profileValues, { profiles,
+      authority: "operator", listingSlug: listing.slug, actorUserId, requireComplete: true });
     if (redirectForPath(`/listings/${listing.slug}`)) {
       throw new HttpError(409, "Listing slug is reserved by a redirect");
     }
@@ -123,6 +162,7 @@ export function createListing(listing: Listing, actorUserId: string): Listing {
       listing.slug, listing.name, listing.summary, listing.description,
       listing.category, listing.url, normalizeListingDestination(listing.url), listing.status,
     );
+    replaceListingProfileValues({ listingSlug: listing.slug, values, profiles });
     recordAudit(listing.status === "published" ? "catalog.publish" : "catalog.create", actorUserId, listing.slug);
     return listingBySlug(listing.slug)!;
   }).immediate();
@@ -152,6 +192,12 @@ export function updateListing(listing: Listing, actorUserId: string, expectedRev
     if (!canModerate(actor.role) && (current.status === "suspended" || listing.status === "suspended")) {
       throw new HttpError(403, "Moderation permission required");
     }
+    const profiles = activeDirectoryProfiles();
+    if (listing.profileStateRevision !== profiles.state.revision) {
+      throw new HttpError(409, "Directory profile changed since this listing was opened");
+    }
+    const values = validateProfileValues(listing.profileValues, { profiles,
+      authority: "operator", listingSlug: listing.slug, actorUserId, requireComplete: true });
     database.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)").run(listing.category);
     database.prepare(`UPDATE listings SET name = ?, summary = ?, description = ?,
         category = ?, url = ?, destination_key = ?, status = ?, revision = revision + 1
@@ -159,6 +205,7 @@ export function updateListing(listing: Listing, actorUserId: string, expectedRev
       listing.name, listing.summary, listing.description, listing.category,
         listing.url, normalizeListingDestination(listing.url), listing.status, listing.slug,
     );
+    replaceListingProfileValues({ listingSlug: listing.slug, values, profiles });
     const action = listing.status === "published" && current.status !== "published"
       ? "catalog.publish" : current.status === "published" && listing.status === "draft"
         ? "catalog.unpublish" : listing.status === "suspended" && current.status !== "suspended"
