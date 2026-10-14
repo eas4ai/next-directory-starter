@@ -6,6 +6,7 @@ import { createServer as createHttpServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
+import { tapRunPassed } from './tap-results.mjs';
 
 const ids = ['ACC-001', 'ACC-002', 'ACC-003', 'ACC-004'];
 const results = Object.fromEntries(ids.map((id) => [id, false]));
@@ -249,6 +250,14 @@ try {
   await startApp();
 
   await check('ACC-002', async () => {
+    const recoveryUi = spawnSync(process.execPath,
+      ['--import', 'tsx', '--test', '--test-reporter=tap', 'tests/recovery-request.test.mjs'], {
+        encoding: 'utf8', timeout: 90_000, env: appEnv,
+      });
+    if (!tapRunPassed(recoveryUi.status, recoveryUi.stdout ?? '')) {
+      throw new Error(`Recovery request UI regression failed: ${
+        (recoveryUi.stdout ?? '').slice(-900)} ${(recoveryUi.stderr ?? '').slice(-400)}`);
+    }
     const email = 'reset-owner@example.invalid';
     const owner = await provision(email);
     const unknown = await request('/api/auth/request-password-reset',

@@ -6,6 +6,7 @@ import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { requestRecoveryEmail } from "@/lib/recovery-request";
 
 export function RecoveryForm({ token }: { token?: string }) {
   const [pending, setPending] = useState(false);
@@ -29,11 +30,18 @@ export function RecoveryForm({ token }: { token?: string }) {
         }
         setMessage("Password updated. Sign in with your new password.");
       } else {
-        await authClient.requestPasswordReset({
-          email: String(values.get("email")),
-          redirectTo: `${window.location.origin}/owner/reset-password`,
-        });
-        setMessage("If that address has an account, a password reset link is on its way.");
+        const outcome = await requestRecoveryEmail(
+          (input) => authClient.requestPasswordReset(input),
+          {
+            email: String(values.get("email")),
+            redirectTo: `${window.location.origin}/owner/reset-password`,
+          },
+        );
+        if (!outcome.ok) {
+          setError(outcome.error);
+          return;
+        }
+        setMessage(outcome.message);
       }
     } catch {
       setError("Unable to connect. Try again.");
