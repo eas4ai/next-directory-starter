@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: paddle-recovery-purchase-binding
+Current: database-url-validation
 
 ## public-starter-and-theme
 
@@ -633,3 +633,9 @@ Delivers backlog item redirect-reserved-routes: Audit 2026-10-11 (L2, verified).
 Requirements: COM-009
 
 Delivers backlog item paddle-recovery-purchase-binding: Audit 2026-10-11 (L3, reported). Resource-less Paddle recovery accepts an operator-supplied transaction id and checks its terms but not customData.purchaseId (src/lib/payment-reconciliation.ts:141). An operator who mixes up two reservations with identical terms binds the wrong payment to a purchase. Require the transaction's purchase metadata to match the target before binding.
+
+## database-url-validation
+
+Requirements: FOUND-006
+
+Delivers backlog item database-url-validation: Audit 2026-10-11 (L4, verified). src/lib/database.ts and scripts/ops-common.mjs only strip 'file:'. file:/x.db?mode=ro creates a file literally named 'x.db?mode=ro', and 'file:' alone opens an anonymous temporary database that disappears between processes. Validate the path centrally and reject query strings and empty paths.
