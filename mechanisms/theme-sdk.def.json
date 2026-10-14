@@ -1,0 +1,17 @@
+{
+  "command": "node mechanisms/check-theme-sdk.mjs",
+  "requirements": ["THM-001", "THM-002", "THM-003", "THM-004"],
+  "results": "per-requirement",
+  "inputs": [
+    ".agents/skills/create-directory-theme",
+    ".env.example", "README.md",
+    "mechanisms/theme-sdk.def.json", "mechanisms/check-theme-sdk.mjs",
+    "mechanisms/tap-results.mjs",
+    "package.json", "package-lock.json", "scripts/ops-common.mjs", "src",
+    "tests/theme-sdk.test.mjs"
+  ],
+  "identity": {
+    "env": [],
+    "tools": { "node": "node --version", "npm": "npm --version" }
+  }
+}
