@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash, randomBytes } from "node:crypto";
 import {
-  cpSync, existsSync, lstatSync, mkdtempSync, readFileSync, readdirSync,
+  cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync,
   readlinkSync, rmSync, symlinkSync, writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -170,6 +170,16 @@ requirementTest("ADD-002 installs and removes owned files transactionally throug
     const baseline = treeSnapshot(source);
     const archive = join(temporary, "reference.zip");
     packageArchive(fixture, archive);
+
+    const danglingDirectory = join(source, "src/addons/reference-addon");
+    const danglingTarget = join(danglingDirectory, "theme.ts");
+    mkdirSync(danglingDirectory, { recursive: true });
+    symlinkSync("missing-theme.ts", danglingTarget);
+    const danglingBaseline = treeSnapshot(source);
+    expectFailure(run(source, ["install", archive]), "dangling target collision");
+    assert.deepEqual(treeSnapshot(source), danglingBaseline,
+      "rejected dangling target collision changed the workspace");
+    rmSync(danglingDirectory, { recursive: true, force: true });
 
     const failed = run(source, ["install", archive], {
       env: { NODE_ENV: "test", DIRECTORY_ADDON_TEST_FAIL_AFTER: "1" },

@@ -1,5 +1,5 @@
 import {
-  existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync,
+  lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync,
   rmdirSync, writeFileSync,
 } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
@@ -13,6 +13,15 @@ import {
 
 function workspacePath(root, path) {
   return join(root, ...path.split("/"));
+}
+
+function lstatOptional(path) {
+  try {
+    return lstatSync(path);
+  } catch (error) {
+    if (error && typeof error === "object" && error.code === "ENOENT") return null;
+    throw error;
+  }
 }
 
 function requireOwnedFile(root, file) {
@@ -79,8 +88,8 @@ function requireAvailableParent(root, target) {
   let current = root;
   for (const part of parts) {
     current = join(current, part);
-    if (!existsSync(current)) continue;
-    const status = lstatSync(current);
+    const status = lstatOptional(current);
+    if (!status) continue;
     if (!status.isDirectory() || status.isSymbolicLink()) {
       throw new Error(`Unsafe workspace parent for ${target}`);
     }
@@ -92,7 +101,7 @@ function createdParentDirectories(root, target) {
   let current = root;
   for (const part of target.split("/").slice(0, -1)) {
     current = join(current, part);
-    if (!existsSync(current)) missing.push(current);
+    if (!lstatOptional(current)) missing.push(current);
   }
   mkdirSync(dirname(workspacePath(root, target)), { recursive: true });
   return missing;
@@ -100,8 +109,8 @@ function createdParentDirectories(root, target) {
 
 function snapshotDestination(root, target) {
   const path = workspacePath(root, target);
-  if (!existsSync(path)) return null;
-  const status = lstatSync(path);
+  const status = lstatOptional(path);
+  if (!status) return null;
   if (!status.isFile() || status.isSymbolicLink()) {
     throw new Error(`Mutation target is not a regular file: ${target}`);
   }
@@ -227,7 +236,7 @@ export async function installAddon(rootInput, archiveInput) {
   const ownedTargets = new Set(lock.addons.flatMap(({ files }) => files.map(({ target }) => target)));
   for (const file of entry.files) {
     requireAvailableParent(root, file.target);
-    if (ownedTargets.has(file.target) || existsSync(workspacePath(root, file.target))) {
+    if (ownedTargets.has(file.target) || lstatOptional(workspacePath(root, file.target))) {
       throw new Error(`Workspace target collision: ${file.target}`);
     }
   }
