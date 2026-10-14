@@ -12,19 +12,29 @@ function expect(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-function run(script, args = [], overrides = {}) {
-  const env = { ...process.env, ...overrides };
+function execute(command, args, overrides = {}) {
+  const env = { ...process.env };
   delete env.DATABASE_URL;
   delete env.BILLING_ENCRYPTION_KEY;
   delete env.NODE_ENV;
-  if (overrides.DATABASE_URL) env.DATABASE_URL = overrides.DATABASE_URL;
-  if (overrides.NODE_ENV) env.NODE_ENV = overrides.NODE_ENV;
-  const result = spawnSync('npm', ['run', script, ...(args.length ? ['--', ...args] : [])], {
+  Object.assign(env, overrides);
+  return spawnSync(command, args, {
     cwd: sandbox, env, encoding: 'utf8', timeout: 120_000,
   });
+}
+
+function run(script, args = [], overrides = {}) {
+  const result = execute('npm', ['run', script, ...(args.length ? ['--', ...args] : [])], overrides);
   expect(result.status === 0,
     `${script} failed in isolated fixture: ${(result.stderr || result.stdout || result.error?.message || '').slice(-1000)}`);
   return result.stdout;
+}
+
+function reject(label, command, args, url) {
+  const result = execute(command, args, { DATABASE_URL: url });
+  const output = result.stderr || result.stdout || result.error?.message || '';
+  expect(result.status !== 0 && output.includes('DATABASE_URL'),
+    `${label} accepted ${url}: ${output.slice(-1000)}`);
 }
 
 function rowCount(file, table) {
@@ -80,6 +90,43 @@ try {
   expect(rowCount(join(restored, 'database.db'), 'listings') >= 2,
     'Restored backup does not contain the custom database listings');
   expect(!existsSync(defaultDb), 'Backup or restore created the default database');
+
+  for (const path of ['src/lib/database.ts', 'src/lib/media.ts',
+    'scripts/ops-common.mjs', 'scripts/healthcheck.mjs']) {
+    expect(readFileSync(join(project, path), 'utf8').includes('parseDatabaseUrl'),
+      `${path} does not use the shared DATABASE_URL parser`);
+  }
+
+  const malformedDatabase = join(sandbox, 'malformed.db');
+  for (const [name, url] of [
+    ['empty', 'file:'],
+    ['query-bearing', `file:${malformedDatabase}?mode=ro`],
+  ]) {
+    const malformedBackup = join(sandbox, `malformed-${name}-backup`);
+    const malformedRestore = join(sandbox, `malformed-${name}-restore`);
+    const commands = [
+      ['application runtime', process.execPath,
+        ['--import', 'tsx', '--eval', "import('./src/lib/database.ts')"]],
+      ['media runtime', process.execPath,
+        ['--import', 'tsx', '--eval', "import('./src/lib/media.ts')"]],
+      ['authentication and catalog migration', 'npm', ['run', 'db:migrate']],
+      ['catalog seed', 'npm', ['run', 'db:seed']],
+      ['notification maintenance', 'npm', ['run', 'notifications:deliver', '--', '--limit', '1']],
+      ['billing maintenance', 'npm', ['run', 'billing:reconcile', '--', '--limit', '1']],
+      ['backup maintenance', 'npm',
+        ['run', 'ops:backup', '--', '--output', malformedBackup, '--key-file', keyFile]],
+      ['restore maintenance', 'npm',
+        ['run', 'ops:restore', '--', '--backup', backup, '--target', malformedRestore]],
+      ['health check', process.execPath, ['scripts/healthcheck.mjs']],
+    ];
+    for (const [label, command, args] of commands) {
+      reject(`${label} (${name})`, command, args, url);
+      expect(!existsSync(`${malformedDatabase}?mode=ro`),
+        `${label} created a query-bearing database file`);
+      expect(!existsSync(malformedBackup), `${label} created a backup from a malformed URL`);
+      expect(!existsSync(malformedRestore), `${label} restored beside a malformed URL`);
+    }
+  }
 
   run('db:migrate', [], { DATABASE_URL: `file:${overrideDb}` });
   run('db:seed', [], { DATABASE_URL: `file:${overrideDb}` });
