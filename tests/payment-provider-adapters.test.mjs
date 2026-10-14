@@ -119,22 +119,27 @@ test('provider SDK recovery reads payments and confirms supported cancellation',
           : [], has_more: false });
       if (url.pathname === '/transactions/txn_paddle' ||
           url.pathname === '/transactions/txn_paddle_refunds' ||
-          url.pathname === '/transactions/txn_paddle_wrong') {
+          url.pathname === '/transactions/txn_paddle_wrong' ||
+          url.pathname === '/transactions/txn_paddle_missing') {
         const withRefunds = url.pathname.endsWith('_refunds');
         const wrongPurchase = url.pathname.endsWith('_wrong');
+        const missingPurchase = url.pathname.endsWith('_missing');
         const disputeAt = new Date(Date.now() - 1000).toISOString();
         return reply({ data: {
           id: withRefunds ? 'txn_paddle_refunds' :
-            wrongPurchase ? 'txn_paddle_wrong' : 'txn_paddle',
-          custom_data: { purchaseId: wrongPurchase ? 'other-purchase' :
-            withRefunds ? 'paddle-refunds' : 'paddle-purchase' },
+            wrongPurchase ? 'txn_paddle_wrong' :
+              missingPurchase ? 'txn_paddle_missing' : 'txn_paddle',
+          ...(missingPurchase ? {} : { custom_data: {
+            purchaseId: wrongPurchase ? 'other-purchase' :
+              withRefunds ? 'paddle-refunds' : 'paddle-purchase',
+          } }),
           status: 'completed', currency_code: 'USD',
           created_at: new Date().toISOString(), items: [{ quantity: 1,
             price: { id: 'pri_once', unit_price: { amount: '1200', currency_code: 'USD' },
               quantity: { minimum: 1, maximum: 100 } } }],
           payments: [], details: { tax_rates_used: [], line_items: [],
             totals: { grand_total: '1200', currency_code: 'USD' } },
-          adjustments: wrongPurchase ? [] : withRefunds ? [
+          adjustments: wrongPurchase || missingPurchase ? [] : withRefunds ? [
             { id: 'adj_reconcile_one', action: 'refund', status: 'approved',
               currency_code: 'USD', totals: { total: '600' }, items: [{ type: 'partial' }] },
             { id: 'adj_reconcile_two', action: 'refund', status: 'approved',
@@ -178,16 +183,20 @@ test('provider SDK recovery reads payments and confirms supported cancellation',
     assert.deepEqual(await reconcilePurchase('stripe-early', 5, undefined, 'cs_early'), {
       purchaseId: 'stripe-early', found: 1, processed: 1, unresolved: 0,
     });
-      await assert.rejects(
-        reconcilePurchase('paddle-early', 5, undefined, 'txn_paddle_wrong'),
-        /does not match the reserved purchase/,
-      );
+      for (const resource of ['txn_paddle_wrong', 'txn_paddle_missing']) {
+        await assert.rejects(
+          reconcilePurchase('paddle-early', 5, undefined, resource),
+          /does not match the reserved purchase/,
+        );
+      }
       assert.deepEqual(database.prepare(`SELECT provider_resource_id, provider_subscription_id, status
         FROM purchases WHERE id = 'paddle-early'`).get(), {
         provider_resource_id: null, provider_subscription_id: null, status: 'pending',
       });
       assert.equal(database.prepare(`SELECT COUNT(*) AS n FROM payment_evidence
-        WHERE provider = 'paddle' AND event_id LIKE '%txn_paddle_wrong%'`).get().n, 0);
+        WHERE provider = 'paddle' AND event_id IN
+          ('reconcile:paddle:transaction:txn_paddle_wrong',
+           'reconcile:paddle:transaction:txn_paddle_missing')`).get().n, 0);
     database.prepare(`UPDATE purchases SET stripe_payment_intent_id = 'pi_other'
       WHERE id = 'stripe-legacy'`).run();
     await assert.rejects(reconcilePurchase('stripe-legacy', 5, undefined, 'cs_legacy'),
