@@ -37,11 +37,8 @@ export function RecoveryForm({ token }: { token?: string }) {
             redirectTo: `${window.location.origin}/owner/reset-password`,
           },
         );
-        if (!outcome.ok) {
-          setError(outcome.error);
-          return;
-        }
         setMessage(outcome.message);
+        setError(outcome.error);
       }
     } catch {
       setError("Unable to connect. Try again.");

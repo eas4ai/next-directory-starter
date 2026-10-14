@@ -11,8 +11,8 @@ const input = {
 test('password recovery distinguishes accepted requests from account-neutral failures', async () => {
   const accepted = await requestRecoveryEmail(async () => ({ data: {}, error: null }), input);
   assert.deepEqual(accepted, {
-    ok: true,
     message: 'If that address has an account, a password reset link is on its way.',
+    error: '',
   });
 
   const limited = await requestRecoveryEmail(async () => ({
@@ -20,7 +20,7 @@ test('password recovery distinguishes accepted requests from account-neutral fai
     error: { status: 429, message: 'Too many requests' },
   }), input);
   assert.deepEqual(limited, {
-    ok: false,
+    message: '',
     error: 'Unable to send a reset link right now. Try again.',
   });
 
@@ -28,7 +28,7 @@ test('password recovery distinguishes accepted requests from account-neutral fai
     throw new Error('provider details must remain private');
   }, input);
   assert.deepEqual(disconnected, {
-    ok: false,
+    message: '',
     error: 'Unable to send a reset link right now. Try again.',
   });
 });
