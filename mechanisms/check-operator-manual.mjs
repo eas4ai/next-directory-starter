@@ -78,6 +78,9 @@ try {
   expect(manual.includes('docker image inspect "$RECOVERY_IMAGE"') &&
     manual.match(/DIRECTORY_IMAGE="\$RECOVERY_IMAGE" docker compose/g)?.length >= 2,
     'Manual does not pin the prior image for recovery');
+  expect(manual.includes('before the first backup') &&
+    manual.includes('even when paid billing is unused'),
+    'Manual makes the required backup key appear billing-only');
   expect(manual.includes('BILLING_ENCRYPTION_KEY') && manual.includes('Isolated restore verified.') &&
     manual.includes('Backup created and verified.'), 'Manual omits backup recovery boundaries');
   passed = true;
