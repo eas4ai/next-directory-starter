@@ -1,0 +1,13 @@
+{
+  "listings": [
+    {
+      "slug": "reference-tool",
+      "title": "Reference Tool",
+      "summary": "A sample listing installed only through the explicit add-on seed command.",
+      "description": "Reference Tool proves that an add-on can carry repeatable sample catalog data without mutating the database during source installation.",
+      "category": "Reference",
+      "url": "https://example.com/reference-tool",
+      "status": "published"
+    }
+  ]
+}
