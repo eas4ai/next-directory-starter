@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: release-1-1-0
+Current: addon-installer-foundation
 
 ## public-starter-and-theme
 
@@ -394,6 +394,27 @@ Done-when: `1.1.0` resolves through an annotated tag to a commit contained by
 the remote default branch; the matching GitHub release is published rather than
 draft or prerelease; its tag resolves to the same commit; and its notes name the
 material operator-visible changes and any required upgrade action since `1.0.0`.
+
+## addon-installer-foundation
+
+Requirements: ADD-001, ADD-002, ADD-003
+
+Delivery: add a versioned directory add-on manifest, deterministic ZIP packer,
+preflight validator, transactional installer and guarded remover for clean
+compatible starters. Give installed packages namespaced source and public
+directories, an ownership and integrity lock, and generated static theme,
+template, and CSS registries consumed by the existing theme system. Support an
+explicit sample-catalog seed action without changing operator data during
+installation or removal. Ship a noncommercial reference package that exercises
+the complete contract and document the author and operator commands.
+
+Done-when: malformed, incompatible, corrupt, unsafe, duplicate-ID, and
+colliding archives fail before changing the workspace; a valid reference ZIP
+installs into an isolated clean starter, appears in the existing theme preview
+and selection flow, explicitly seeds its sample catalog, and passes the
+production build; removal refuses changed owned files, otherwise removes only
+owned files and returns tracked source to its pre-install state; and equal
+package inputs produce byte-identical archives.
 
 ## cli-env-local-mismatch
 
