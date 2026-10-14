@@ -44,6 +44,53 @@ Each section links to the application code or executable script that supports it
 
 3. Check the home, listing, and article pages in both light and dark appearance. A visitor's choice is independent of the administrator's preset mode and persists in that visitor's browser. See [appearance initialization](../src/app/layout.tsx) and [appearance control](../src/components/appearance-switch.tsx).
 
+### Install or remove a directory add-on
+
+Directory add-ons package themes, public page templates, public assets, and optional sample listings without replacing the starter. Use them only with a clean compatible starter checkout, and commit or back up your source before changing installed add-ons.
+
+1. Validate a package source directory or a distributable ZIP. Validation checks manifest schema 1, the starter SemVer range, add-on API version 1, declared files, safe paths, and package integrity without changing the workspace:
+
+   ```sh
+   npm run addon:validate -- ./path/to/addon-source
+   npm run addon:validate -- ./path/to/addon.zip
+   ```
+
+2. An add-on author packs a validated source directory into a deterministic ZIP, then validates the result. Equal source bytes produce an equal ZIP:
+
+   ```sh
+   npm run addon:pack -- ./path/to/addon-source ./dist/addon.zip
+   npm run addon:validate -- ./dist/addon.zip
+   ```
+
+3. Install the validated archive, build the application, and inspect `/admin/theme` before selecting the new design:
+
+   ```sh
+   npm run addon:install -- ./dist/addon.zip
+   npm run build
+   ```
+
+   Installation copies `src/` payload into `src/addons/<add-on-id>/`, public payload into `public/addons/<add-on-id>/`, and optional seed payload into `src/addons/<add-on-id>/seed/`. It records the package digest, contributed IDs, target paths, and file hashes in `.directory-starter/addons.lock.json`, then regenerates `src/addons/generated.ts` and `src/addons/generated.css`. Do not edit the lock or generated registries by hand. A duplicate add-on, theme, or template ID, a target collision, a changed installed file, incompatible package, or invalid archive is rejected before installation writes.
+
+4. Optional catalog data is never applied during install. After the normal database migration, seed only the named installed add-on when you deliberately want its sample listings:
+
+   ```sh
+   npm run db:migrate
+   npm run addon:seed -- add-on-id
+   ```
+
+   The seed inserts only missing listing slugs and is repeatable. Removal does not delete records that were explicitly seeded.
+
+5. Remove an installed add-on by ID, then build and inspect the site. Removal refuses to continue if an owned file or generated registry changed, so it does not erase local edits. A saved selection that names the removed design falls back to the preset theme and Classic template:
+
+   ```sh
+   npm run addon:remove -- add-on-id
+   npm run build
+   ```
+
+   There is no in-place add-on upgrade command in schema 1. Remove an unchanged installed version, then install and validate the replacement archive. Install and remove never open or mutate the operator database. A caught command failure restores the files and lock it started with; if the process is forcibly interrupted, inspect `git status`, restore the committed starter source if needed, and rerun validation before another add-on operation.
+
+An authoring directory contains exactly `directory-addon.json` and the files named by its `files` array. The manifest names `schemaVersion`, `id`, `name`, `version`, `compatibility.starter`, `compatibility.addonApi`, every contributed theme `{ id, name, entry }`, every template `{ id, name, stylesheet }`, public `assets`, optional JSON `seed`, and the complete `files` list. IDs use lowercase letters, numbers, and hyphens. Theme entries are TypeScript files under `src/`; template stylesheets are CSS files under `src/`; assets are under `public/`; and seed data is under `seed/`. Keep selectors scoped to `[data-template="your-id"]`, export a complete `ThemeDefinition` as the theme module default, and keep its runtime ID equal to the manifest theme ID. Direct edits to `src/themes/index.ts`, `src/lib/theme-selection.ts`, and `src/app/globals.css` are reserved for designs shipped as part of the starter; distributable designs use the manifest and generated registries. See the [reference manifest](../fixtures/addons/reference-addon/directory-addon.json), [manifest validator](../scripts/addons/manifest.mjs), [installer](../scripts/addons/workspace.mjs), and [generated registry builder](../scripts/addons/registry.mjs).
+
 ## 3. Build the catalog
 
 1. An administrator or staff member with the taxonomy capability opens `/admin/taxonomy` to add listing categories before asking owners or agents to use them. Rename a category to update its existing references. A category still used by a listing or pending draft cannot be deleted. The same workspace manages article categories and tags. See [taxonomy page access](../src/app/admin/taxonomy/page.tsx), [taxonomy controls](../src/app/admin/taxonomy/taxonomy-editor.tsx), and [taxonomy rules](../src/lib/taxonomy.ts).

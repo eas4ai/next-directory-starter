@@ -106,6 +106,14 @@ function packageArchive(source, output) {
 
 requirementTest("ADD-001 validates deterministic packages before workspace writes", () => {
   assert.ok(existsSync(join(repository, "scripts/addons.mjs")), "add-on CLI is missing");
+  const manual = readFileSync(join(repository, "docs/operator-manual.md"), "utf8");
+  for (const command of [
+    "npm run addon:validate --", "npm run addon:pack --", "npm run addon:install --",
+    "npm run addon:seed --", "npm run addon:remove --",
+  ]) {
+    assert.match(manual, new RegExp(command.replaceAll(" ", "\\s+")),
+      `operator manual is missing ${command}`);
+  }
   const temporary = mkdtempSync(join(tmpdir(), "directory-addon-contract-"));
   try {
     const first = join(temporary, "first.zip");
