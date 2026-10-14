@@ -192,6 +192,16 @@ requirementTest("ADD-002 installs and removes owned files transactionally throug
       "rejected dangling target collision changed the workspace");
     rmSync(danglingDirectory, { recursive: true, force: true });
 
+    const interrupted = run(source, ["install", archive], {
+      env: { NODE_ENV: "test", DIRECTORY_ADDON_TEST_EXIT_AFTER: "1" },
+    });
+    expectFailure(interrupted, "interrupted installation");
+    expectSuccess(run(source, ["install", archive]), "recover and retry interrupted install");
+    expectSuccess(run(source, ["remove", "reference-addon"]),
+      "remove recovered reference add-on");
+    assert.deepEqual(treeSnapshot(source), baseline,
+      "recovery after interrupted install did not restore the starter");
+
     const failed = run(source, ["install", archive], {
       env: { NODE_ENV: "test", DIRECTORY_ADDON_TEST_FAIL_AFTER: "1" },
     });
@@ -208,6 +218,16 @@ requirementTest("ADD-002 installs and removes owned files transactionally throug
     const lock = JSON.parse(readFileSync(join(source, ".directory-starter/addons.lock.json"), "utf8"));
     assert.equal(lock.addons[0].id, "reference-addon");
     assert.ok(lock.addons[0].files.every((file) => /^[a-f0-9]{64}$/.test(file.sha256)));
+
+    const interruptedRemoval = run(source, ["remove", "reference-addon"], {
+      env: { NODE_ENV: "test", DIRECTORY_ADDON_TEST_EXIT_AFTER: "1" },
+    });
+    expectFailure(interruptedRemoval, "interrupted removal");
+    expectSuccess(run(source, ["remove", "reference-addon"]),
+      "recover and retry interrupted removal");
+    assert.deepEqual(treeSnapshot(source), baseline,
+      "recovery after interrupted removal did not restore the starter");
+    expectSuccess(run(source, ["install", archive]), "reinstall after removal recovery");
 
     const installed = treeSnapshot(source);
     expectFailure(run(source, ["install", archive]), "duplicate add-on identity");
