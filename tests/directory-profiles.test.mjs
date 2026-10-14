@@ -1040,7 +1040,7 @@ requirementTest("PRF-003 parses bounded public profile facets and stable sorts",
       "BANNED_PROFILE_SENTINEL"]) assert.deepEqual(slugs({ q: sentinel }), []);
     assert.deepEqual(slugs({ sort: "vendor.ai-tools.team-size:asc" }).slice(0, 3),
       ["alpha", "beta", "gamma"]);
-    assert.deepEqual(slugs({ sort: "vendor.ai-tools.team-size:desc" }).slice(-3),
+    assert.deepEqual(slugs({ sort: "vendor.ai-tools.team-size:desc", page: "2" }),
       ["gamma", "beta", "alpha"]);
     const page = discovery.searchProfileDirectory(discovery.parseProfileDirectoryQuery({}, profiles));
     assert.equal(page.total, 15);
@@ -1066,6 +1066,45 @@ requirementTest("PRF-003 parses bounded public profile facets and stable sorts",
     assert.match(sql, /directory_profile_search/i);
     assert.ok((sql.match(/directory_profile_values/g) ?? []).length < 20,
       "profile discovery performs unbounded per-listing value queries");
+
+    const explain = (input) => {
+      const calls = [];
+      api.database.prepare = function planPrepare(statementSql) {
+        const statement = originalPrepare.call(this, statementSql);
+        return new Proxy(statement, { get(target, property) {
+          const value = Reflect.get(target, property, target);
+          if (property !== "all" && property !== "get") {
+            return typeof value === "function" ? value.bind(target) : value;
+          }
+          return (...args) => {
+            calls.push({ sql: String(statementSql), args });
+            return value.apply(target, args);
+          };
+        } });
+      };
+      try {
+        discovery.searchProfileDirectory(discovery.parseProfileDirectoryQuery(input, profiles));
+      } finally { api.database.prepare = originalPrepare; }
+      const pageCall = calls.find(({ sql: statementSql }) => /^SELECT l\.\*/.test(statementSql));
+      assert.ok(pageCall, `missing page query for ${JSON.stringify(input)}`);
+      return originalPrepare.call(api.database, `EXPLAIN QUERY PLAN ${pageCall.sql}`)
+        .all(...pageCall.args).map(({ detail }) => detail).join("\n");
+    };
+    for (const [input, expectedIndex] of [
+      [{ "facet.vendor.ai-tools.pricing-model": "paid" }, "directory_profile_values_text"],
+      [{ "facet.vendor.ai-tools.platforms": ["web", "mac"] }, "directory_profile_values_text"],
+      [{ "facet.vendor.ai-tools.open-source": "true" }, "directory_profile_values_integer"],
+      [{ "min.vendor.ai-tools.team-size": "1" }, "directory_profile_values_integer"],
+      [{ "min.vendor.ai-tools.rating": "1.00" }, "directory_profile_values_integer"],
+      [{ "min.vendor.ai-tools.starting-price": "USD:1" }, "directory_profile_values_money"],
+      [{ "min.vendor.ai-tools.launched": "2025-01-01" }, "directory_profile_values_dates"],
+      [{ "min.vendor.ai-tools.availability": "2026-01-01" }, "directory_profile_values_dates"],
+      [{ "min.vendor.ai-tools.setup-time": "1" }, "directory_profile_values_integer"],
+      [{ "facet.vendor.ai-tools.headquarters": "US|NY|New York" },
+        "directory_profile_values_location"],
+      [{ q: "canvas" }, "directory_profile_search"],
+    ]) assert.match(explain(input), new RegExp(expectedIndex, "i"),
+      `${JSON.stringify(input)} does not use ${expectedIndex}`);
   });
 
   await t.test("renders public placements and alternate outputs without protected sentinels", async () => {

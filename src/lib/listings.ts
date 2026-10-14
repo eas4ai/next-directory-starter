@@ -26,7 +26,7 @@ export type Listing = {
   profileStateRevision: number;
 };
 
-type StoredListing = Omit<Listing, "profileValues" | "profileStateRevision"> & {
+export type StoredListing = Omit<Listing, "profileValues" | "profileStateRevision"> & {
   owner_user_id: string | null;
 };
 
@@ -49,6 +49,10 @@ function hydrateMany(rows: StoredListing[], includePrivate: boolean): Listing[] 
   const profileStateRevision = directoryProfileState().revision;
   return rows.map((row) => ({ ...row, profileValues: values.get(row.slug) ?? {},
     profileStateRevision }));
+}
+
+export function hydratePublicListings(rows: StoredListing[]): Listing[] {
+  return hydrateMany(rows, false);
 }
 
 export function publishedListingBySlug(slug: string): Listing | undefined {
