@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: operator-manual
+Current: release-1-1-0
 
 ## public-starter-and-theme
 
@@ -379,6 +379,21 @@ persistent-storage dependencies explicit. A mechanism checks chapter coverage,
 source links, commands and high-risk boundaries; the builder and adversary
 review every remaining semantic claim against current source and observed
 commands.
+
+## release-1-1-0
+
+Requirements: FOUND-008
+
+Delivery: publish the completed repository snapshot as the annotated `1.1.0`
+tag and a matching stable GitHub release. Push the tagged commit to the default
+branch and provide curated notes covering the material security, billing,
+agent-ingestion, media, SEO, recovery, and operator-documentation changes since
+`1.0.0`, including explicit upgrade guidance.
+
+Done-when: `1.1.0` resolves through an annotated tag to a commit contained by
+the remote default branch; the matching GitHub release is published rather than
+draft or prerelease; its tag resolves to the same commit; and its notes name the
+material operator-visible changes and any required upgrade action since `1.0.0`.
 
 ## cli-env-local-mismatch
 

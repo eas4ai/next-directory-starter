@@ -36,3 +36,8 @@ Status: Agreed 2026-10-10
 Falsifier: The documented test command omits a test file or fails from concurrent builds, a migration fixture claims applied versions while missing their tables, or an HTTP test expects access that the declared role is denied.
 Mechanism: test-suite
 Status: Agreed 2026-10-10
+
+[FOUND-008] Version `1.1.0` is published from a completed, verified commit on the default branch as an annotated SemVer tag and a matching non-draft, non-prerelease GitHub release. The release notes summarize material operator-visible changes and identify any required upgrade action since `1.0.0`.
+Falsifier: Version `1.1.0` uses a lightweight or moved tag, its tag and GitHub release do not identify the same default-branch commit, the GitHub release is missing or marked as a draft or prerelease, or its notes omit a material operator-visible change or required upgrade action since `1.0.0`.
+Mechanism: release-publication
+Status: Agreed 2026-10-14
