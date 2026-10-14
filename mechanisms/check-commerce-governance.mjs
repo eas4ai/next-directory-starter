@@ -338,14 +338,44 @@ try {
       description: 'A published listing created by an administrator.', category: 'Tools',
       url: 'https://example.org/audit-catalog', status: 'published',
     }, adminCookie));
+    const catalogCreated = catalogCreate.ok ? (await catalogCreate.json()).listing : null;
     const catalogUnpublish = await request('/api/admin/listings/audit-catalog',
-      json({ status: 'draft' }, adminCookie, 'PATCH'));
+      json({ status: 'draft', expectedRevision: catalogCreated?.revision }, adminCookie, 'PATCH'));
+    const catalogUnpublished = catalogUnpublish.ok ? (await catalogUnpublish.json()).listing : null;
     const catalogRepublish = await request('/api/admin/listings/audit-catalog',
-      json({ status: 'published' }, adminCookie, 'PATCH'));
+      json({ status: 'published', expectedRevision: catalogUnpublished?.revision }, adminCookie, 'PATCH'));
+
+    const taxonomyCreate = await request('/api/admin/categories',
+      json({ name: 'Audit unused' }, adminCookie));
+    const taxonomyRename = await request('/api/admin/categories/Tools',
+      json({ name: 'Audited Tools' }, adminCookie, 'PATCH'));
+    const taxonomyDelete = await request('/api/admin/categories/Audit%20unused',
+      json({}, adminCookie, 'DELETE'));
+    const renamedListings = withDatabase((database) => database.prepare(
+      "SELECT COUNT(*) AS count FROM listings WHERE category = 'Audited Tools'").get().count);
+    const currentTheme = await request('/api/admin/theme', { headers: { Cookie: adminCookie } });
+    const currentPreset = currentTheme.ok ? (await currentTheme.json()).preset : null;
+    const themeSave = await request('/api/admin/theme', json(currentPreset, adminCookie));
+
     const history = await request('/api/admin/audit', { headers: { Cookie: adminCookie } });
     const events = history.ok ? (await history.json()).events : null;
     const actions = ['moderation.approve', 'article.publish', 'plan.update', 'account.role',
       'catalog.publish', 'catalog.unpublish'];
+    const addedEvents = [
+      ['taxonomy.category.create', 'Audit unused'],
+      ['taxonomy.category.rename', 'Tools -> Audited Tools'],
+      ['taxonomy.category.delete', 'Audit unused'],
+      ['site.theme.save', 'site'],
+    ];
+    const validEvent = (event, action, target) => event.action === action &&
+      event.target === target && event.actorUserId === adminId &&
+      Number.isFinite(Date.parse(event.occurredAt));
+    if (taxonomyCreate.status !== 201 || !taxonomyRename.ok || !taxonomyDelete.ok ||
+        renamedListings < 1 || !currentTheme.ok || !themeSave.ok || !Array.isArray(events) ||
+        addedEvents.some(([action, target]) =>
+          !events.some((event) => validEvent(event, action, target)))) {
+      throw new Error('Taxonomy or theme changes lack actor and time in audit history.');
+    }
     if (!plan.ok || article.status !== 201 || !role.ok || catalogCreate.status !== 201 ||
         !catalogUnpublish.ok || !catalogRepublish.ok || !Array.isArray(events) ||
         actions.some((action) => !events.some((event) =>
