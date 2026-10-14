@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: taxonomy-theme-audit
+Current: recovery-form-error
 
 ## public-starter-and-theme
 
@@ -645,3 +645,9 @@ Delivers backlog item database-url-validation: Audit 2026-10-11 (L4, verified). 
 Requirements: ADM-002
 
 Delivers backlog item taxonomy-theme-audit: Audit 2026-10-11 (L5, reported). Taxonomy create, rename and delete (src/lib/taxonomy-routes.ts:39, src/lib/taxonomy.ts:62) and theme preset saves (src/lib/theme.ts:28) write no audit row, so a bulk category rename that changes published listings leaves no actor record. Pass the actor through and call recordAudit in the same transaction.
+
+## recovery-form-error
+
+Requirements: ACC-002
+
+Delivers backlog item recovery-form-error: Audit 2026-10-11 (L6, reported). src/app/owner/forgot-password/recovery-form.tsx:32 ignores the error returned by requestPasswordReset and always shows the success message, for example after HTTP 429. Check the returned error and show a generic retry message without revealing account existence.
