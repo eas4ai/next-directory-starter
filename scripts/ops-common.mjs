@@ -2,13 +2,10 @@ import { createDecipheriv, createHash } from 'node:crypto';
 import { createReadStream, lstatSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import Database from 'better-sqlite3';
+import { DEFAULT_DATABASE_URL, parseDatabaseUrl } from '../src/lib/database-url.mjs';
 
 export function databasePath() {
-  const url = process.env.DATABASE_URL ?? 'file:./.runtime/directory.db';
-  if (!url.startsWith('file:') || url.slice(5) === ':memory:') {
-    throw new Error('DATABASE_URL must name a persistent file: SQLite database');
-  }
-  return resolve(url.slice(5));
+  return resolve(parseDatabaseUrl(process.env.DATABASE_URL ?? DEFAULT_DATABASE_URL));
 }
 
 export function mediaPath(databaseFile = databasePath()) {

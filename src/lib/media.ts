@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import sharp from "sharp";
 import { canEditArticles, canModerate } from "@/lib/admin";
 import { database } from "@/lib/database";
+import { DEFAULT_DATABASE_URL, parseDatabaseUrl } from "@/lib/database-url.mjs";
 import { migrateCatalog } from "@/lib/catalog-migrations";
 import { HttpError, httpErrorResponse } from "@/lib/http-error";
 
@@ -22,7 +23,8 @@ const mimeFormat = {
 } as const;
 
 function mediaDirectory(): string {
-  const databaseFile = (process.env.DATABASE_URL ?? "file:./.runtime/directory.db").slice(5);
+  const databaseFile = parseDatabaseUrl(process.env.DATABASE_URL ?? DEFAULT_DATABASE_URL,
+    { allowMemory: process.env.NODE_ENV === "test" });
   // Runtime storage is deployed separately from the application bundle.
   return resolve(/* turbopackIgnore: true */ process.env.MEDIA_DIR?.trim() ||
     join(dirname(databaseFile), "media"));
