@@ -359,9 +359,6 @@ function paddleAdjustmentEvidence(purchase: Purchase, paymentId: string,
 
 function paddleTransactionEvidence(purchase: Purchase,
   transaction: Transaction): VerifiedEvidence[] {
-  if (transaction.customData?.purchaseId !== purchase.id) {
-    throw new Error("Paddle transaction does not match the reserved purchase");
-  }
   const item = transaction.items.length === 1 ? transaction.items[0] : null;
   const amount = Number(item?.price?.unitPrice.amount);
   const paid = Number(transaction.details?.totals?.grandTotal);
