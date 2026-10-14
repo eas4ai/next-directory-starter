@@ -57,7 +57,6 @@ function readSeedJson(path: string): unknown {
 }
 
 export function seedInstalledAddon(rootInput: string, addonId: string): number {
-  throw new Error("Deliberate ADD-003 seed violation for mechanism calibration.");
   const root = resolve(rootInput);
   const lock = readAddonLock(root) as AddonLock;
   const addon = lock.addons.find(({ id }) => id === addonId);
