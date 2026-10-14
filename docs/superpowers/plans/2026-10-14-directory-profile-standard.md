@@ -114,7 +114,7 @@ await t.test('reports and applies compatible, breaking, site, and switch changes
 });
 ```
 
-Include all 15 field types, defaults, cardinality, permission/visibility/placement rules, safe widening, required-field effects on published listings, rename/type mappings, explicit archive, state revision races, the 100,000-row migration limit, inactive profile retention, site namespace enforcement, purge count confirmation, and audit event assertions.
+Include all 16 field types, defaults, cardinality, permission/visibility/placement rules, safe widening, required-field effects on published listings, rename/type mappings, explicit archive, state revision races, the 100,000-row migration limit, inactive profile retention, site namespace enforcement, purge count confirmation, and audit event assertions.
 
 - [ ] **Step 2: Run the focused test and verify the failure reaches PRF-001**
 
