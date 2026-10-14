@@ -66,6 +66,11 @@ try {
   expect(manual.includes('preview_card') && manual.includes('previewUrl') &&
     manual.includes('site origin') && manual.includes('Authorization: Bearer <secret>'),
     'Manual omits the bearer-authenticated remote preview fetch');
+  expect(manual.includes('100 newly created drafts') &&
+    manual.includes('500 newly created drafts') && manual.includes('next UTC hour') &&
+    manual.includes('browser account has no reset control') &&
+    manual.includes('Agent screenshots must be no larger than 5 MiB and 4096 pixels'),
+    'Manual omits agent staging or screenshot limits');
   expect(manual.includes('NOWPayments') && manual.includes('HTTPS') &&
     manual.includes('one-time'), 'Manual omits payment provider limits');
   expect(manual.includes('client_max_body_size 8m;') && manual.includes('7,100,000 bytes') &&
