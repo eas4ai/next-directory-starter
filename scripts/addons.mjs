@@ -3,11 +3,14 @@ import { lstatSync } from "node:fs";
 import { resolve } from "node:path";
 import { packAddon, readArchive } from "./addons/archive.mjs";
 import { readSourcePackage, readStarterIdentity, validateCompatibility } from "./addons/manifest.mjs";
+import { installAddon, removeAddon } from "./addons/workspace.mjs";
 
 function usage() {
   return `Usage:
   node scripts/addons.mjs pack <source-directory> <output.zip>
-  node scripts/addons.mjs validate <archive-or-source>`;
+  node scripts/addons.mjs validate <archive-or-source>
+  node scripts/addons.mjs install <archive.zip>
+  node scripts/addons.mjs remove <add-on-id>`;
 }
 
 function exactArgs(args, count, command) {
@@ -35,6 +38,18 @@ async function main() {
     exactArgs(args, 1, command);
     const manifest = await validate(args[0]);
     process.stdout.write(`Valid ${manifest.id}@${manifest.version}\n`);
+    return;
+  }
+  if (command === "install") {
+    exactArgs(args, 1, command);
+    const result = await installAddon(process.cwd(), args[0]);
+    process.stdout.write(`Installed ${result.id}@${result.version} (${result.files} files)\n`);
+    return;
+  }
+  if (command === "remove") {
+    exactArgs(args, 1, command);
+    const result = removeAddon(process.cwd(), args[0]);
+    process.stdout.write(`Removed ${result.id}@${result.version} (${result.files} files)\n`);
     return;
   }
   throw new Error(command ? `Unknown add-on command: ${command}\n${usage()}` : usage());

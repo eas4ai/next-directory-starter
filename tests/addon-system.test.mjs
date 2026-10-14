@@ -67,7 +67,9 @@ function copyFixture(root, id = "reference-addon") {
   return destination;
 }
 
-const ignoredRoots = new Set([".git", ".next", ".runtime", ".claude", ".gstack", "node_modules"]);
+const ignoredRoots = new Set([
+  ".git", ".next", ".runtime", ".claude", ".gstack", ".superpowers", "node_modules",
+]);
 
 function copyStarter(destination) {
   cpSync(repository, destination, {
@@ -182,6 +184,17 @@ requirementTest("ADD-002 installs and removes owned files transactionally throug
     expectFailure(run(source, ["install", archive]), "duplicate add-on identity");
     assert.deepEqual(treeSnapshot(source), installed, "rejected duplicate changed the workspace");
 
+    const collisionSource = copyFixture(temporary, "collision-addon");
+    const collisionManifestPath = join(collisionSource, "directory-addon.json");
+    const collisionManifest = JSON.parse(readFileSync(collisionManifestPath, "utf8"));
+    collisionManifest.themes[0].id = "reference-addon";
+    writeFileSync(collisionManifestPath, `${JSON.stringify(collisionManifest, null, 2)}\n`);
+    const collisionArchive = join(temporary, "collision.zip");
+    packageArchive(collisionSource, collisionArchive);
+    expectFailure(run(source, ["install", collisionArchive]), "duplicate contributed theme ID");
+    assert.deepEqual(treeSnapshot(source), installed,
+      "rejected contributed ID collision changed the workspace");
+
     const themePath = join(source, "src/addons/reference-addon/theme.ts");
     const theme = readFileSync(themePath, "utf8");
     writeFileSync(themePath, `${theme}\n// local change\n`);
@@ -189,6 +202,19 @@ requirementTest("ADD-002 installs and removes owned files transactionally throug
     assert.match(readFileSync(themePath, "utf8"), /local change/);
     writeFileSync(themePath, theme);
     expectSuccess(run(source, ["remove", "reference-addon"]), "remove reference add-on");
+    const fallback = spawnSync(process.execPath, [
+      "--import", "tsx", "--input-type=module", "--eval",
+      `const imported = await import("./src/lib/theme-selection.ts");
+       const parseThemeSelection = imported.parseThemeSelection ?? imported.default?.parseThemeSelection;
+       if (parseThemeSelection({ themeId: "reference-addon", templateId: "reference-addon" }) !== null) {
+         throw new Error("removed selection remains valid");
+       }`,
+    ], {
+      cwd: source,
+      encoding: "utf8",
+      env: { ...process.env, CI: "1", NODE_ENV: "test", DATABASE_URL: "file::memory:" },
+    });
+    expectSuccess(fallback, "removed selection fallback");
     assert.deepEqual(treeSnapshot(source), baseline, "clean removal did not restore starter source");
 
     const secondSource = copyFixture(temporary, "second-addon");

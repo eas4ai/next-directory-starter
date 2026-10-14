@@ -2,10 +2,12 @@ import { recordAudit } from "@/lib/audit";
 import { isInstalledTheme, installedThemes } from "@/lib/theme-sdk";
 import { readSiteSetting, writeSiteSetting } from "@/lib/site-settings";
 import { database } from "@/lib/database";
+import { addonTemplateOptions } from "@/addons/generated";
 
 export const templateOptions = [
   { id: "classic", name: "Classic" },
   { id: "editorial", name: "Editorial" },
+  ...addonTemplateOptions,
 ] as const;
 
 export type ThemeSelection = { themeId: string; templateId: string };
