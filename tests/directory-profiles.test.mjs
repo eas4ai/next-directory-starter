@@ -128,6 +128,14 @@ async function profileTestContext() {
     VALUES (?, ?, ?, ?, ?)`).run("profile-admin", "admin@example.invalid", "admin", 0, 1);
   database.prepare(`INSERT OR REPLACE INTO "user" (id, email, role, banned, emailVerified)
     VALUES (?, ?, ?, ?, ?)`).run("profile-catalog", "catalog@example.invalid", "catalog", 0, 1);
+  database.prepare(`INSERT OR REPLACE INTO "user" (id, email, role, banned, emailVerified)
+    VALUES (?, ?, ?, ?, ?)`).run("profile-moderator", "moderator@example.invalid", "moderator", 0, 1);
+  database.prepare(`INSERT OR REPLACE INTO "user" (id, email, role, banned, emailVerified)
+    VALUES (?, ?, ?, ?, ?)`).run("profile-owner", "owner@example.invalid", null, 0, 1);
+  database.prepare(`INSERT OR REPLACE INTO "user" (id, email, role, banned, emailVerified)
+    VALUES (?, ?, ?, ?, ?)`).run("profile-banned", "banned@example.invalid", "admin", 1, 1);
+  database.prepare(`INSERT OR REPLACE INTO "user" (id, email, role, banned, emailVerified)
+    VALUES (?, ?, ?, ?, ?)`).run("profile-unverified", "unverified@example.invalid", "admin", 0, 0);
   const modulePath = join(repository, "src/lib/directory-profiles.ts");
   assert.ok(existsSync(modulePath),
     "directory-profile definition and lifecycle module is missing");
@@ -229,6 +237,36 @@ requirementTest("PRF-001 activates immutable versioned directory-profile definit
     const faceted = privateFacet.fields.find(({ facet }) => facet);
     faceted.visibility = "private";
     assert.throws(() => api.parseDirectoryProfileDefinition(privateFacet), /visibility|public|facet/i);
+    const defaults = structuredClone(completeProfile());
+    defaults.fields.find(({ type }) => type === "decimal").default = "4.2";
+    defaults.fields.find(({ type }) => type === "money").default =
+      { amountMinor: 1299, currency: "usd" };
+    defaults.fields.find(({ type }) => type === "multiple-choice").default = ["mac", "web"];
+    defaults.fields.find(({ type }) => type === "datetime").default =
+      "2026-10-14T12:00:00-04:00";
+    defaults.fields.find(({ type }) => type === "location").default =
+      { countryCode: "us", region: " NY ", latitude: 40.7128, longitude: -74.006 };
+    defaults.fields.find(({ type }) => type === "group").default = [
+      { id: "slack", values: { name: "Slack", native: true } },
+    ];
+    const normalized = api.parseDirectoryProfileDefinition(defaults);
+    assert.equal(normalized.fields.find(({ type }) => type === "decimal").default, "4.20");
+    assert.deepEqual(normalized.fields.find(({ type }) => type === "money").default,
+      { amountMinor: 1299, currency: "USD" });
+    assert.deepEqual(normalized.fields.find(({ type }) => type === "multiple-choice").default,
+      ["web", "mac"]);
+    assert.equal(normalized.fields.find(({ type }) => type === "datetime").default,
+      "2026-10-14T16:00:00.000Z");
+    assert.deepEqual(normalized.fields.find(({ type }) => type === "location").default,
+      { countryCode: "US", region: "NY", latitude: 40.7128, longitude: -74.006 });
+    const invalidGroup = structuredClone(defaults);
+    invalidGroup.fields.find(({ type }) => type === "group").default = [
+      { id: "slack", values: { native: true } },
+    ];
+    assert.throws(() => api.parseDirectoryProfileDefinition(invalidGroup), /group|name|required/i);
+    const invalidLocation = structuredClone(defaults);
+    invalidLocation.fields.find(({ type }) => type === "location").default.latitude = 91;
+    assert.throws(() => api.parseDirectoryProfileDefinition(invalidLocation), /location|latitude/i);
   });
 
   await t.test("canonicalizes definitions and produces stable digests", async () => {
@@ -286,6 +324,13 @@ requirementTest("PRF-001 activates immutable versioned directory-profile definit
     const url = profile.fields.find(({ type }) => type === "url");
     assert.throws(() => api.validateProfileFieldValue(url,
       "https://user:secret@example.com", {}), /credential|URL/i);
+    const repeatedMedia = { ...profile.fields.find(({ type }) => type === "media"),
+      cardinality: "many", constraints: { maxItems: 2 } };
+    assert.throws(() => api.validateProfileFieldValue(repeatedMedia, [
+      { id: "one", value: "123e4567-e89b-12d3-a456-426614174000" },
+      { id: "two", value: "123e4567-e89b-12d3-a456-426614174000" },
+      { id: "three", value: "123e4567-e89b-12d3-a456-426614174000" },
+    ], {}), /media|bounded|maxItems|too many/i);
   });
 
   await t.test("creates normalized profile storage idempotently", async () => {
@@ -309,10 +354,16 @@ requirementTest("PRF-001 activates immutable versioned directory-profile definit
   await t.test("stores immutable definitions and protects activation", async () => {
     const api = await profileTestContext();
     resetProfileTables(api.database);
-    assert.throws(() => api.activateDirectoryProfile({
-      definition: completeProfile(), sourceKind: "addon", sourceId: "vendor",
-      expectedRevision: 0, actorUserId: "profile-catalog",
-    }), /Forbidden|admin/i);
+    const untouched = profileSnapshot(api.database);
+    for (const actorUserId of ["profile-catalog", "profile-moderator", "profile-owner",
+      "profile-banned", "profile-unverified", "profile-missing"]) {
+      assert.throws(() => api.activateDirectoryProfile({
+        definition: completeProfile(), sourceKind: "addon", sourceId: "vendor",
+        expectedRevision: 0, actorUserId,
+      }), /Forbidden|admin/i, `${actorUserId} activated a profile`);
+      assert.deepEqual(profileSnapshot(api.database), untouched,
+        `${actorUserId} changed profile state before rejection`);
+    }
     const first = activate(api, completeProfile(), 0);
     assert.equal(first.revision, 1);
     assert.equal(first.base.profileId, "vendor.ai-tools");
@@ -343,11 +394,12 @@ requirementTest("PRF-001 activates immutable versioned directory-profile definit
     const renamedFields = compatible.fields
       .filter(({ key }) => key !== "vendor.ai-tools.starting-price")
       .concat({ ...compatible.fields.find(({ key }) => key === "vendor.ai-tools.starting-price"),
-        key: "vendor.ai-tools.price", label: "Price" });
+        key: "vendor.ai-tools.price", label: "Price", required: true });
     const breaking = completeProfile({ version: "2.0.0", fields: renamedFields });
     const impact = api.profileImpact({ definition: breaking, expectedRevision: 2 });
     assert.equal(impact.compatible, false);
-    assert.deepEqual(impact.breakingFields, ["vendor.ai-tools.starting-price"]);
+    assert.deepEqual(impact.breakingFields,
+      ["vendor.ai-tools.price", "vendor.ai-tools.starting-price"]);
     const before = profileSnapshot(api.database);
     assert.throws(() => activate(api, breaking, 2), /mapping|breaking/i);
     assert.deepEqual(profileSnapshot(api.database), before);
@@ -357,11 +409,14 @@ requirementTest("PRF-001 activates immutable versioned directory-profile definit
       },
     }, defaults: {} }), /target|missing|field/i);
     assert.deepEqual(profileSnapshot(api.database), before);
-    const migrated = activate(api, breaking, 2, { fields: {
+    const mapping = { fields: {
       "vendor.ai-tools.starting-price": {
         action: "map", to: "vendor.ai-tools.price", onInvalid: "reject",
       },
-    }, defaults: {} });
+    }, defaults: {} };
+    assert.equal(api.profileImpact({ definition: breaking, expectedRevision: 2,
+      migration: mapping }).publishedMissingRequired, 0);
+    const migrated = activate(api, breaking, 2, mapping);
     assert.equal(migrated.revision, 3);
     const current = api.database.prepare(`SELECT field_key, integer_value, currency, archived_at
       FROM directory_profile_values WHERE listing_slug = ? ORDER BY field_key, archived_at`)
