@@ -67,7 +67,9 @@ function copyFixture(root, id = "reference-addon") {
   return destination;
 }
 
-const ignoredRoots = new Set([".git", ".next", ".runtime", ".claude", ".gstack", "node_modules"]);
+const ignoredRoots = new Set([
+  ".git", ".next", ".runtime", ".claude", ".gstack", ".superpowers", "node_modules",
+]);
 
 function copyStarter(destination) {
   cpSync(repository, destination, {
