@@ -4,6 +4,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { spawn, spawnSync } from "node:child_process";
+import { chromium } from "playwright-core";
 import { parseListing } from "../src/lib/catalog-input.ts";
 import { parseManifest } from "../scripts/addons/manifest.mjs";
 
@@ -866,15 +868,292 @@ requirementTest("PRF-002 validates profile values with the complete listing revi
   });
 });
 
-requirementTest("PRF-003 parses bounded public profile facets and stable sorts", async () => {
+function discoveryProfile() {
+  const profile = authoringProfile();
+  const field = (key) => profile.fields.find((candidate) => candidate.key === key);
+  field("vendor.ai-tools.tagline").placement = "card";
+  field("vendor.ai-tools.pricing-model").placement = "badge";
+  field("vendor.ai-tools.team-size").facet = { label: "Team size", mode: "any" };
+  field("vendor.ai-tools.rating").facet = { label: "Rating", mode: "any" };
+  field("vendor.ai-tools.setup-time").sort = { label: "Setup time", directions: ["asc", "desc"] };
+  return profile;
+}
+
+function publicProfileValues(index, overrides = {}) {
+  const values = completeProfileValues({ includeSystem: false, mediaId: undefined });
+  delete values["vendor.ai-tools.screenshot"];
+  return {
+    ...values,
+    "vendor.ai-tools.tagline": index === 0 ? "Neural canvas exact phrase" : `Tool profile ${index}`,
+    "vendor.ai-tools.notes": `PRIVATE_PROFILE_SENTINEL_${index}`,
+    "vendor.ai-tools.open-source": index % 2 === 0,
+    "vendor.ai-tools.team-size": index < 3 ? [10, 20, 30][index] : 100 + index,
+    "vendor.ai-tools.rating": index < 3 ? ["4.50", "3.00", "4.75"][index] : "2.50",
+    "vendor.ai-tools.starting-price": { amountMinor: index < 3 ? [1000, 2000, 1500][index] : 5000,
+      currency: index === 2 ? "EUR" : "USD" },
+    "vendor.ai-tools.pricing-model": index === 1 ? "free" : "paid",
+    "vendor.ai-tools.platforms": index === 0 ? ["web", "mac"] : index === 1 ? ["web"]
+      : index === 2 ? ["mac"] : ["web", "mac"],
+    "vendor.ai-tools.launched": index < 3 ? ["2025-01-10", "2024-01-10", "2025-06-10"][index] : "2023-01-01",
+    "vendor.ai-tools.availability": index === 0
+      ? { start: "2026-01-01", end: "2026-01-31" }
+      : { start: "2026-02-01", end: "2026-02-28" },
+    "vendor.ai-tools.setup-time": index < 3 ? [3600, 7200, 1800][index] : 9000,
+    "vendor.ai-tools.headquarters": index === 0
+      ? { countryCode: "US", region: "NY", locality: "New York" }
+      : index === 1 ? { countryCode: "US", region: "CA", locality: "San Francisco" }
+        : { countryCode: "CA", region: "ON", locality: "Toronto" },
+    ...overrides,
+  };
+}
+
+async function setupDiscoveryCatalog() {
+  const api = await profileTestContext();
+  resetProfileTables(api.database);
+  activate(api, discoveryProfile(), 0);
+  const listingApi = await import("../src/lib/listings.ts");
+  for (let index = 0; index < 15; index += 1) {
+    const slug = index === 0 ? "alpha" : index === 1 ? "beta" : index === 2 ? "gamma"
+      : `page-${String(index).padStart(2, "0")}`;
+    const parsed = parseListing(listingInput(slug, publicProfileValues(index), 1, {
+      name: index < 3 ? "Stable name" : `Page ${String(index).padStart(2, "0")}`,
+      summary: index === 0 ? "Core alpha summary" : `Core summary ${index}`,
+      status: "published",
+    }));
+    assert.ok(parsed);
+    listingApi.createListing(parsed, "profile-admin");
+  }
+  for (const [slug, status, sentinel] of [
+    ["hidden-draft-profile", "draft", "DRAFT_PROFILE_SENTINEL"],
+    ["hidden-suspended-profile", "suspended", "SUSPENDED_PROFILE_SENTINEL"],
+    ["hidden-banned-profile", "published", "BANNED_PROFILE_SENTINEL"],
+  ]) {
+    const parsed = parseListing(listingInput(slug, publicProfileValues(0, {
+      "vendor.ai-tools.tagline": sentinel,
+    }), 1, { status }));
+    assert.ok(parsed);
+    listingApi.createListing(parsed, "profile-admin");
+  }
+  api.database.prepare(`UPDATE listings SET owner_user_id = 'profile-banned'
+    WHERE slug = 'hidden-banned-profile'`).run();
+  return api;
+}
+
+async function discoveryModule() {
   const modulePath = join(repository, "src/lib/profile-discovery.ts");
   assert.ok(existsSync(modulePath),
     "generic server-rendered profile discovery and facet support is missing");
-  const discovery = await import(modulePath);
-  assert.equal(typeof discovery.parseProfileDirectoryQuery, "function",
-    "profile discovery does not expose bounded GET query validation");
-  assert.equal(typeof discovery.searchProfileDirectory, "function",
-    "profile discovery does not expose indexed facet and sort execution");
+  const discovery = await import(pathToFileURL(modulePath).href);
+  for (const name of ["parseProfileDirectoryQuery", "serializeProfileDirectoryQuery",
+    "searchProfileDirectory"]) assert.equal(typeof discovery[name], "function",
+    `profile discovery does not expose ${name}`);
+  return discovery;
+}
+
+async function startProfileApp() {
+  const build = spawnSync("npm", ["run", "build"], { cwd: repository, encoding: "utf8",
+    timeout: 180_000, env: { ...process.env, SITE_URL: "http://127.0.0.1:38763",
+      BETTER_AUTH_URL: "http://127.0.0.1:38763",
+      BETTER_AUTH_SECRET: "profile-browser-secret-at-least-32-characters-long" } });
+  assert.equal(build.status, 0, build.stderr || build.stdout);
+  const origin = "http://127.0.0.1:38763";
+  const child = spawn("npm", ["run", "start", "--", "-p", "38763"], { cwd: repository,
+    stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, SITE_URL: origin,
+      BETTER_AUTH_URL: origin,
+      BETTER_AUTH_SECRET: "profile-browser-secret-at-least-32-characters-long" } });
+  let output = "";
+  child.stdout.on("data", (chunk) => { output += chunk; });
+  child.stderr.on("data", (chunk) => { output += chunk; });
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (child.exitCode !== null) assert.fail(`profile browser server exited early\n${output}`);
+    try {
+      const response = await fetch(`${origin}/listings`);
+      if (response.ok) return { origin, child };
+    } catch {}
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
+  }
+  child.kill("SIGTERM");
+  assert.fail(`profile browser server did not start\n${output}`);
+}
+
+requirementTest("PRF-003 parses bounded public profile facets and stable sorts", async (t) => {
+  await t.test("rejects hidden, unknown, malformed, duplicate, and excessive query state generically", async () => {
+    const discovery = await discoveryModule();
+    const profiles = (await setupDiscoveryCatalog()).activeDirectoryProfiles();
+    const valid = discovery.parseProfileDirectoryQuery({
+      "facet.vendor.ai-tools.platforms": ["mac", "web"],
+      "min.vendor.ai-tools.starting-price": "USD:1000",
+      "max.vendor.ai-tools.starting-price": "USD:2500",
+      sort: "vendor.ai-tools.team-size:desc", page: "2",
+    }, profiles);
+    assert.equal(valid.invalid, false);
+    assert.deepEqual(valid.facets["vendor.ai-tools.platforms"].values, ["web", "mac"]);
+    assert.equal(valid.page, 2);
+    assert.equal(valid.sort.fieldKey, "vendor.ai-tools.team-size");
+    assert.equal(valid.sort.direction, "desc");
+    assert.equal(discovery.serializeProfileDirectoryQuery(valid, 3).toString(),
+      "min.vendor.ai-tools.starting-price=USD%3A1000&max.vendor.ai-tools.starting-price=USD%3A2500&facet.vendor.ai-tools.platforms=web&facet.vendor.ai-tools.platforms=mac&sort=vendor.ai-tools.team-size%3Adesc&page=3");
+
+    const invalidInputs = [
+      { q: "x".repeat(4097) },
+      Object.fromEntries(Array.from({ length: 13 }, (_, index) => [`facet.unknown-${index}`, "x"])),
+      { "facet.vendor.ai-tools.platforms": Array.from({ length: 21 }, (_, index) => `value-${index}`) },
+      { "min.vendor.ai-tools.team-size": ["1", "2"] },
+      { sort: "vendor.ai-tools.notes:asc" },
+      { "facet.vendor.ai-tools.notes": "PRIVATE_QUERY_SENTINEL" },
+      { "min.vendor.ai-tools.launched": "not-a-date" },
+      { "min.vendor.ai-tools.starting-price": "usd-no-amount" },
+      { "facet.vendor.ai-tools.headquarters": "US|NY|x|unexpected" },
+    ];
+    for (const input of invalidInputs) {
+      const parsed = discovery.parseProfileDirectoryQuery(input, profiles);
+      assert.equal(parsed.invalid, true, JSON.stringify(input));
+      assert.doesNotMatch(JSON.stringify(parsed), /Notes help|PRIVATE_QUERY_SENTINEL|unknown-0/i);
+    }
+  });
+
+  await t.test("filters every facet family with AND semantics, stable sorts, privacy, and indexed SQL", async () => {
+    const api = await setupDiscoveryCatalog();
+    const discovery = await discoveryModule();
+    const profiles = api.activeDirectoryProfiles();
+    const slugs = (input) => discovery.searchProfileDirectory(
+      discovery.parseProfileDirectoryQuery(input, profiles)).listings.map(({ slug }) => slug);
+    assert.deepEqual(slugs({ "facet.vendor.ai-tools.platforms": ["web", "mac"],
+      "max.vendor.ai-tools.team-size": "30" }), ["alpha"]);
+    assert.deepEqual(slugs({ "facet.vendor.ai-tools.pricing-model": "free" }), ["beta"]);
+    assert.deepEqual(slugs({ "facet.vendor.ai-tools.open-source": "true",
+      "min.vendor.ai-tools.team-size": "10", "max.vendor.ai-tools.team-size": "10" }), ["alpha"]);
+    assert.deepEqual(slugs({ "min.vendor.ai-tools.rating": "4.00",
+      "max.vendor.ai-tools.rating": "4.60" }), ["alpha"]);
+    assert.deepEqual(slugs({ "min.vendor.ai-tools.starting-price": "USD:900",
+      "max.vendor.ai-tools.starting-price": "USD:1200" }), ["alpha"]);
+    assert.deepEqual(slugs({ "min.vendor.ai-tools.launched": "2025-01-01",
+      "max.vendor.ai-tools.launched": "2025-02-01" }), ["alpha"]);
+    assert.deepEqual(slugs({ "min.vendor.ai-tools.availability": "2026-01-15",
+      "max.vendor.ai-tools.availability": "2026-01-20" }), ["alpha"]);
+    assert.deepEqual(slugs({ "min.vendor.ai-tools.setup-time": "3000",
+      "max.vendor.ai-tools.setup-time": "4000" }), ["alpha"]);
+    assert.deepEqual(slugs({ "facet.vendor.ai-tools.headquarters": "US|NY|New York" }), ["alpha"]);
+    assert.deepEqual(slugs({ q: "Neural canvas exact phrase" }), ["alpha"]);
+    assert.deepEqual(slugs({ q: "PRIVATE_PROFILE_SENTINEL_0" }), []);
+    for (const sentinel of ["DRAFT_PROFILE_SENTINEL", "SUSPENDED_PROFILE_SENTINEL",
+      "BANNED_PROFILE_SENTINEL"]) assert.deepEqual(slugs({ q: sentinel }), []);
+    assert.deepEqual(slugs({ sort: "vendor.ai-tools.team-size:asc" }).slice(0, 3),
+      ["alpha", "beta", "gamma"]);
+    assert.deepEqual(slugs({ sort: "vendor.ai-tools.team-size:desc" }).slice(-3),
+      ["gamma", "beta", "alpha"]);
+    const page = discovery.searchProfileDirectory(discovery.parseProfileDirectoryQuery({}, profiles));
+    assert.equal(page.total, 15);
+    assert.equal(page.listings.length, 12);
+    assert.equal(page.pages, 2);
+    assert.ok(page.listings.every(({ profileValues }) =>
+      !Object.keys(profileValues).includes("vendor.ai-tools.notes")));
+    assert.equal(page.facetCounts["vendor.ai-tools.pricing-model"].paid, 14);
+
+    const prepared = [];
+    const originalPrepare = api.database.prepare;
+    api.database.prepare = function trackedPrepare(sql) {
+      prepared.push(String(sql));
+      return originalPrepare.call(this, sql);
+    };
+    try {
+      discovery.searchProfileDirectory(discovery.parseProfileDirectoryQuery({
+        "min.vendor.ai-tools.team-size": "1", q: "canvas",
+      }, profiles));
+    } finally { api.database.prepare = originalPrepare; }
+    const sql = prepared.join("\n");
+    assert.match(sql, /directory_profile_values_integer/i);
+    assert.match(sql, /directory_profile_search/i);
+    assert.ok((sql.match(/directory_profile_values/g) ?? []).length < 20,
+      "profile discovery performs unbounded per-listing value queries");
+  });
+
+  await t.test("renders public placements and alternate outputs without protected sentinels", async () => {
+    await setupDiscoveryCatalog();
+    const facetsPath = join(repository, "src/components/profile-facets.tsx");
+    assert.ok(existsSync(facetsPath), "server-rendered profile facet controls are missing");
+    const React = await import("react");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { ProfileValuesView } = await import("../src/components/profile-values-view.tsx");
+    const profile = discoveryProfile();
+    const html = renderToStaticMarkup(React.createElement(ProfileValuesView, {
+      fields: profile.fields, values: publicProfileValues(0), mode: "public",
+    }));
+    for (const visible of ["Neural canvas exact phrase", "Paid", "Web", "macOS",
+      "$10.00", "1 hour", "New York", "Slack"]) assert.match(html, new RegExp(visible, "i"));
+    assert.doesNotMatch(html, /PRIVATE_PROFILE_SENTINEL|System note|<script/i);
+    assert.match(html, /dateTime=|datetime=/i);
+    assert.match(html, /rel="noopener noreferrer"/i);
+    const { listingMarkdown } = await import("../src/lib/markdown-twins.ts");
+    const listing = (await import("../src/lib/listings.ts")).publishedListingBySlug("alpha");
+    const markdown = listingMarkdown(listing);
+    assert.match(markdown, /Neural canvas exact phrase/);
+    assert.doesNotMatch(markdown, /PRIVATE_PROFILE_SENTINEL|system-note/i);
+    for (const path of ["src/app/listings/page.tsx", "src/app/listings/[slug]/page.tsx",
+      "src/app/markdown/listings/[slug]/route.ts"]) {
+      assert.match(readFileSync(join(repository, path), "utf8"), /Profile|profile/,
+        `${path} does not consume the public profile projection`);
+    }
+  });
+
+  await t.test("works without JavaScript, preserves GET state, supports keyboard use, and fits 320 pixels", async () => {
+    await setupDiscoveryCatalog();
+    assert.ok(existsSync(join(repository, "src/components/profile-facets.tsx")),
+      "browser discovery controls are missing");
+    const { origin, child } = await startProfileApp();
+    const browser = await chromium.launch({ headless: true,
+      ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: "chrome" }),
+      args: ["--no-sandbox"] });
+    try {
+      const noScript = await browser.newContext({ javaScriptEnabled: false });
+      const page = await noScript.newPage();
+      await page.goto(`${origin}/listings?facet.vendor.ai-tools.platforms=web&facet.vendor.ai-tools.platforms=mac`);
+      assert.match(await page.locator("main").innerText(), /alpha/i);
+      assert.doesNotMatch(await page.locator("main").innerText(), /PRIVATE_PROFILE_SENTINEL/);
+      const next = page.getByRole("link", { name: "Next" });
+      if (await next.count()) assert.match(await next.getAttribute("href"),
+        /facet\.vendor\.ai-tools\.platforms=web.*facet\.vendor\.ai-tools\.platforms=mac.*page=2/);
+      const filteredHtml = await (await fetch(`${origin}/listings?sort=vendor.ai-tools.team-size%3Aasc`)).text();
+      assert.match(filteredHtml, /noindex/i);
+      assert.match(filteredHtml, /rel="canonical"[^>]+\/listings|href="[^\"]+\/listings"[^>]+rel="canonical"/i);
+      for (const path of ["/listings", "/listings/alpha", "/markdown/listings/alpha", "/feed.xml"]) {
+        const response = await fetch(`${origin}${path}`);
+        assert.equal(response.status, 200, path);
+        const body = await response.text();
+        assert.doesNotMatch(body, /PRIVATE_PROFILE_SENTINEL|DRAFT_PROFILE_SENTINEL|SUSPENDED_PROFILE_SENTINEL|BANNED_PROFILE_SENTINEL/);
+      }
+      await noScript.close();
+
+      const keyboard = await browser.newContext({ viewport: { width: 1024, height: 800 } });
+      const keyboardPage = await keyboard.newPage();
+      await keyboardPage.goto(`${origin}/listings`);
+      const controls = await keyboardPage.locator("form input, form select, form button, form a").count();
+      const focused = new Set();
+      for (let index = 0; index < controls + 4; index += 1) {
+        await keyboardPage.keyboard.press("Tab");
+        focused.add(await keyboardPage.evaluate(() => {
+          const element = document.activeElement;
+          return element?.getAttribute("name") || element?.textContent?.trim() || element?.tagName || "";
+        }));
+      }
+      assert.ok(focused.size >= controls, "not every discovery control is keyboard reachable");
+      await keyboard.close();
+
+      for (const colorScheme of ["light", "dark"]) {
+        const narrow = await browser.newContext({ viewport: { width: 320, height: 740 }, colorScheme });
+        const narrowPage = await narrow.newPage();
+        for (const path of ["/listings", "/listings/alpha"]) {
+          await narrowPage.goto(`${origin}${path}`);
+          const width = await narrowPage.evaluate(() => document.documentElement.scrollWidth);
+          assert.ok(width <= 320, `${path} overflows at 320 pixels in ${colorScheme} mode`);
+        }
+        await narrow.close();
+      }
+    } finally {
+      await browser.close();
+      child.kill("SIGTERM");
+    }
+  });
 });
 
 requirementTest("PRF-004 validates profile-bearing add-on manifests", () => {
