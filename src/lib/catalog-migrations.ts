@@ -993,6 +993,130 @@ function migrateAgentBrowserApprovals(): void {
   });
 }
 
+function migrateDirectoryProfiles(): void {
+  applyCatalogMigration(33, () => {
+    database.exec(`CREATE TABLE directory_profile_definitions (
+        profile_id TEXT NOT NULL,
+        version TEXT NOT NULL,
+        name TEXT NOT NULL,
+        digest TEXT NOT NULL CHECK (length(digest) = 64),
+        source_kind TEXT NOT NULL CHECK (source_kind IN ('addon', 'site')),
+        source_id TEXT,
+        definition_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        created_by TEXT NOT NULL,
+        PRIMARY KEY (profile_id, version),
+        UNIQUE (profile_id, version, digest)
+      );
+      CREATE TABLE directory_profile_state (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        base_profile_id TEXT,
+        base_profile_version TEXT,
+        site_profile_id TEXT,
+        site_profile_version TEXT,
+        revision INTEGER NOT NULL CHECK (revision >= 0),
+        updated_at TEXT NOT NULL,
+        updated_by TEXT NOT NULL
+      );
+      INSERT INTO directory_profile_state
+        (id, revision, updated_at, updated_by) VALUES (1, 0, CURRENT_TIMESTAMP, 'system');
+      CREATE TABLE directory_profile_values (
+        listing_slug TEXT NOT NULL REFERENCES listings(slug) ON DELETE CASCADE,
+        profile_id TEXT NOT NULL,
+        definition_version TEXT NOT NULL,
+        field_key TEXT NOT NULL,
+        item_id TEXT NOT NULL,
+        child_key TEXT NOT NULL DEFAULT '',
+        position INTEGER NOT NULL CHECK (position BETWEEN 0 AND 24),
+        value_type TEXT NOT NULL CHECK (value_type IN (
+          'short-text', 'markdown', 'boolean', 'integer', 'decimal', 'money',
+          'single-choice', 'multiple-choice', 'url', 'date', 'datetime', 'date-range',
+          'duration', 'location', 'media'
+        )),
+        text_value TEXT,
+        integer_value INTEGER,
+        real_value REAL,
+        currency TEXT,
+        date_start TEXT,
+        date_end TEXT,
+        country_code TEXT,
+        region TEXT,
+        locality TEXT,
+        latitude_e6 INTEGER,
+        longitude_e6 INTEGER,
+        media_id TEXT REFERENCES media_assets(id) ON DELETE RESTRICT,
+        archived_at TEXT,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (
+          listing_slug, profile_id, definition_version, field_key, item_id, child_key
+        )
+      );
+      CREATE INDEX directory_profile_values_listing
+        ON directory_profile_values(listing_slug, profile_id, archived_at, field_key);
+      CREATE INDEX directory_profile_values_text
+        ON directory_profile_values(profile_id, field_key, text_value, listing_slug)
+        WHERE archived_at IS NULL AND text_value IS NOT NULL;
+      CREATE INDEX directory_profile_values_integer
+        ON directory_profile_values(profile_id, field_key, integer_value, listing_slug)
+        WHERE archived_at IS NULL AND integer_value IS NOT NULL;
+      CREATE INDEX directory_profile_values_real
+        ON directory_profile_values(profile_id, field_key, real_value, listing_slug)
+        WHERE archived_at IS NULL AND real_value IS NOT NULL;
+      CREATE INDEX directory_profile_values_money
+        ON directory_profile_values(profile_id, field_key, currency, integer_value, listing_slug)
+        WHERE archived_at IS NULL AND currency IS NOT NULL;
+      CREATE INDEX directory_profile_values_dates
+        ON directory_profile_values(profile_id, field_key, date_start, date_end, listing_slug)
+        WHERE archived_at IS NULL AND date_start IS NOT NULL;
+      CREATE INDEX directory_profile_values_location
+        ON directory_profile_values(profile_id, field_key, country_code, region, locality, listing_slug)
+        WHERE archived_at IS NULL AND country_code IS NOT NULL;
+      CREATE TABLE directory_profile_changes (
+        id TEXT PRIMARY KEY NOT NULL,
+        kind TEXT NOT NULL CHECK (kind IN ('activate', 'switch', 'site-save', 'site-archive', 'purge')),
+        from_profile_id TEXT,
+        from_version TEXT,
+        to_profile_id TEXT,
+        to_version TEXT,
+        plan_json TEXT NOT NULL,
+        impact_json TEXT NOT NULL,
+        actor_user_id TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX directory_profile_changes_recent
+        ON directory_profile_changes(created_at DESC, id DESC);
+      CREATE TABLE directory_profile_media (
+        asset_id TEXT PRIMARY KEY NOT NULL REFERENCES media_assets(id) ON DELETE RESTRICT,
+        listing_slug TEXT NOT NULL REFERENCES listings(slug) ON DELETE CASCADE,
+        field_key TEXT NOT NULL,
+        item_id TEXT NOT NULL,
+        state TEXT NOT NULL CHECK (state IN ('draft', 'public')),
+        uploaded_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE (listing_slug, field_key, item_id, state)
+      );
+      CREATE INDEX directory_profile_media_listing
+        ON directory_profile_media(listing_slug, state, field_key, item_id);
+      CREATE TABLE directory_profile_seed_runs (
+        addon_id TEXT NOT NULL,
+        addon_version TEXT NOT NULL,
+        seed_digest TEXT NOT NULL CHECK (length(seed_digest) = 64),
+        profile_id TEXT NOT NULL,
+        profile_version TEXT NOT NULL,
+        record_count INTEGER NOT NULL CHECK (record_count >= 0),
+        applied_at TEXT NOT NULL,
+        PRIMARY KEY (addon_id, addon_version, seed_digest)
+      );
+      CREATE VIRTUAL TABLE directory_profile_search USING fts5(
+        listing_slug UNINDEXED,
+        profile_id UNINDEXED,
+        field_key UNINDEXED,
+        value,
+        tokenize = 'unicode61'
+      );`);
+  });
+}
+
 export function migrateCatalog(explicit = false): void {
   if (process.env.DIRECTORY_EXPLICIT_MIGRATIONS === "1" && !explicit) return;
   migrate.immediate();
@@ -1031,8 +1155,9 @@ export function migrateCatalog(explicit = false): void {
   migratePaymentReconciliationCursors();
   migrateAgentStagingLimits();
   migrateListingDestinationKeys();
-    migrateAgentKeyScopes();
-    migrateAgentBrowserApprovals();
+  migrateAgentKeyScopes();
+  migrateAgentBrowserApprovals();
+  migrateDirectoryProfiles();
 }
 
 export function seedCatalogRecords(inputRecords: readonly unknown[]): void {
