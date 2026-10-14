@@ -1,4 +1,5 @@
 import { database } from "@/lib/database";
+import { HttpError } from "@/lib/http-error";
 import type {
   ActiveProfileSet, CanonicalProfileValue, DirectoryProfileField, NormalizedProfileRow,
   ProfileChildField, ProfileGroupItem, ProfileLocation, ProfileMoney, ProfileRepeatedValue,
@@ -6,6 +7,13 @@ import type {
 } from "@/lib/directory-profile-types";
 
 type ValueContext = { isMediaAllowed?: (id: string) => boolean };
+
+export class ProfileValueError extends HttpError {
+  constructor(public fieldKey: string, message: string, options?: ErrorOptions) {
+    super(400, message);
+    if (options?.cause !== undefined) this.cause = options.cause;
+  }
+}
 
 const decimalPattern = /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/;
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
@@ -427,22 +435,23 @@ export function validateProfileValues(input: unknown, options: {
   requireComplete: boolean;
 }): ValidatedProfileValues {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
-    throw new Error("Profile values must be an object");
+    throw new ProfileValueError("_profile", "Profile values must be an object");
   }
   const supplied = input as ProfileValueSet;
   const fields = profileFields(options.profiles);
   const unknown = Object.keys(supplied).find((key) => !fields.has(key));
-  if (unknown) throw new Error(`Unknown profile field: ${unknown}`);
+  if (unknown) throw new ProfileValueError(unknown, `Unknown profile field: ${unknown}`);
   const result: ProfileValueSet = {};
   for (const field of fields.values()) {
     const hasValue = Object.hasOwn(supplied, field.key) && supplied[field.key] !== undefined;
     if (hasValue && !writable(options.authority, field)) {
-      throw new Error(`Profile field ${field.key} is outside ${options.authority} write authority`);
+      throw new ProfileValueError(field.key,
+        `Profile field ${field.key} is outside ${options.authority} write authority`);
     }
     const raw = hasValue ? supplied[field.key] : field.default;
     if (raw === undefined) {
       if (options.requireComplete && field.required && writable(options.authority, field)) {
-        throw new Error(`Profile field ${field.key} is required`);
+        throw new ProfileValueError(field.key, `Profile field ${field.key} is required`);
       }
       continue;
     }
@@ -455,7 +464,7 @@ export function validateProfileValues(input: unknown, options: {
       if (value !== undefined) result[field.key] = value;
     } catch (error) {
       const message = error instanceof Error ? error.message : "invalid value";
-      throw new Error(`Profile field ${field.key}: ${message}`, { cause: error });
+      throw new ProfileValueError(field.key, `Profile field ${field.key}: ${message}`, { cause: error });
     }
   }
   return result as ValidatedProfileValues;

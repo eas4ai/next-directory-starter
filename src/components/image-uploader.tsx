@@ -5,17 +5,21 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-export function ImageUploader({ kind, slug, onUploaded }: {
-  kind: "listing" | "article"; slug: string; onUploaded?: () => void;
+export type UploadedImage = { id: string; alt: string; width: number; height: number };
+
+export function ImageUploader({ kind, slug, endpoint: endpointOverride, label = "Image",
+  onUploaded, onAsset }: {
+  kind?: "listing" | "article"; slug?: string; endpoint?: string; label?: string;
+  onUploaded?: () => void; onAsset?: (asset: UploadedImage) => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [alt, setAlt] = useState("");
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
-  const [asset, setAsset] = useState<{ id: string; alt: string; width: number; height: number } | null>(null);
-  const endpoint = kind === "listing"
-    ? `/api/owner/listings/${encodeURIComponent(slug)}/media`
-    : `/api/admin/articles/${encodeURIComponent(slug)}/media`;
+  const [asset, setAsset] = useState<UploadedImage | null>(null);
+  const endpoint = endpointOverride ?? (kind === "listing"
+    ? `/api/owner/listings/${encodeURIComponent(slug ?? "")}/media`
+    : `/api/admin/articles/${encodeURIComponent(slug ?? "")}/media`);
 
   useEffect(() => {
     let active = true;
@@ -43,7 +47,9 @@ export function ImageUploader({ kind, slug, onUploaded }: {
         setMessage((await response.json()).error ?? "Could not upload the image.");
         return;
       }
-      setAsset((await response.json() as { asset: typeof asset }).asset);
+      const uploaded = (await response.json() as { asset: UploadedImage }).asset;
+      setAsset(uploaded);
+      onAsset?.(uploaded);
       setFile(null);
       setAlt("");
       setMessage("Image saved privately. It will be public after approval or publication.");
@@ -57,7 +63,7 @@ export function ImageUploader({ kind, slug, onUploaded }: {
 
   return (
     <div className="space-y-3 rounded-md border p-4">
-      <p className="text-sm font-medium">Image</p>
+      <p className="text-sm font-medium">{label}</p>
       {asset && <Image unoptimized src={`/api/media/${asset.id}`} alt={asset.alt}
         width={asset.width} height={asset.height} className="max-h-48 w-auto max-w-full rounded-md object-contain" />}
       <Input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
