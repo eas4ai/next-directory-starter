@@ -56,6 +56,14 @@ test('provider SDK recovery reads payments and confirms supported cancellation',
       VALUES ('stripe-early', 'mine', 'owner', 'once', 'test', 'one-time', 'Once', '',
         1200, 'usd', 30, 30, 1, 'pending:stripe-early', 'early-request',
         'pending', ?, 'stripe', 'price_once')`).run(new Date().toISOString());
+      database.prepare(`INSERT INTO purchases
+        (id, listing_slug, owner_user_id, plan_key, plan_mode, billing_mode, plan_name,
+          plan_description, amount_minor, currency, duration_days, accepted_duration_days,
+          featured, stripe_session_id, checkout_request_id, status, created_at,
+          provider, provider_price_id)
+        VALUES ('paddle-early', 'mine', 'owner', 'once', 'test', 'one-time', 'Once', '',
+          1200, 'usd', 30, 30, 1, 'pending:paddle-early', 'paddle-request',
+          'pending', ?, 'paddle', 'pri_once')`).run(new Date().toISOString());
     const legacyStartsAt = new Date(Date.now() - 86_400_000).toISOString();
     const legacyEndsAt = new Date(Date.now() + 29 * 86_400_000).toISOString();
     database.prepare(`INSERT INTO purchases
@@ -110,27 +118,32 @@ test('provider SDK recovery reads payments and confirms supported cancellation',
           ? [{ id: 'dp_legacy', status: 'needs_response', created: 1 }]
           : [], has_more: false });
       if (url.pathname === '/transactions/txn_paddle' ||
-          url.pathname === '/transactions/txn_paddle_refunds') {
+          url.pathname === '/transactions/txn_paddle_refunds' ||
+          url.pathname === '/transactions/txn_paddle_wrong') {
         const withRefunds = url.pathname.endsWith('_refunds');
+        const wrongPurchase = url.pathname.endsWith('_wrong');
         const disputeAt = new Date(Date.now() - 1000).toISOString();
         return reply({ data: {
-        id: withRefunds ? 'txn_paddle_refunds' : 'txn_paddle',
-        status: 'completed', currency_code: 'USD',
-        created_at: new Date().toISOString(), items: [{ quantity: 1,
-          price: { id: 'pri_once', unit_price: { amount: '1200', currency_code: 'USD' },
-            quantity: { minimum: 1, maximum: 100 } } }],
-        payments: [], details: { tax_rates_used: [], line_items: [],
-          totals: { grand_total: '1200', currency_code: 'USD' } },
-        adjustments: withRefunds ? [
-          { id: 'adj_reconcile_one', action: 'refund', status: 'approved',
-            currency_code: 'USD', totals: { total: '600' }, items: [{ type: 'partial' }] },
-          { id: 'adj_reconcile_two', action: 'refund', status: 'approved',
-            currency_code: 'USD', totals: { total: '600' }, items: [{ type: 'partial' }] },
-        ] : [{ id: 'adj_chargeback_reconciled', action: 'chargeback', status: 'reversed',
-          currency_code: 'USD', created_at: disputeAt, updated_at: disputeAt,
-          customer_id: 'ctm_fixture', reason: 'reconciled', credit_applied_to_balance: false,
-          totals: null, payout_totals: null, items: [] }],
-      } });
+          id: withRefunds ? 'txn_paddle_refunds' :
+            wrongPurchase ? 'txn_paddle_wrong' : 'txn_paddle',
+          custom_data: { purchaseId: wrongPurchase ? 'other-purchase' :
+            withRefunds ? 'paddle-refunds' : 'paddle-purchase' },
+          status: 'completed', currency_code: 'USD',
+          created_at: new Date().toISOString(), items: [{ quantity: 1,
+            price: { id: 'pri_once', unit_price: { amount: '1200', currency_code: 'USD' },
+              quantity: { minimum: 1, maximum: 100 } } }],
+          payments: [], details: { tax_rates_used: [], line_items: [],
+            totals: { grand_total: '1200', currency_code: 'USD' } },
+          adjustments: wrongPurchase ? [] : withRefunds ? [
+            { id: 'adj_reconcile_one', action: 'refund', status: 'approved',
+              currency_code: 'USD', totals: { total: '600' }, items: [{ type: 'partial' }] },
+            { id: 'adj_reconcile_two', action: 'refund', status: 'approved',
+              currency_code: 'USD', totals: { total: '600' }, items: [{ type: 'partial' }] },
+          ] : [{ id: 'adj_chargeback_reconciled', action: 'chargeback', status: 'reversed',
+            currency_code: 'USD', created_at: disputeAt, updated_at: disputeAt,
+            customer_id: 'ctm_fixture', reason: 'reconciled', credit_applied_to_balance: false,
+            totals: null, payout_totals: null, items: [] }],
+        } });
       }
       if (url.pathname === '/v1/auth') return reply({ token: 'fixture.jwt.token' });
       if (url.pathname === '/v1/payment/') return reply({ data: [{
@@ -165,6 +178,16 @@ test('provider SDK recovery reads payments and confirms supported cancellation',
     assert.deepEqual(await reconcilePurchase('stripe-early', 5, undefined, 'cs_early'), {
       purchaseId: 'stripe-early', found: 1, processed: 1, unresolved: 0,
     });
+      await assert.rejects(
+        reconcilePurchase('paddle-early', 5, undefined, 'txn_paddle_wrong'),
+        /does not match the reserved purchase/,
+      );
+      assert.deepEqual(database.prepare(`SELECT provider_resource_id, provider_subscription_id, status
+        FROM purchases WHERE id = 'paddle-early'`).get(), {
+        provider_resource_id: null, provider_subscription_id: null, status: 'pending',
+      });
+      assert.equal(database.prepare(`SELECT COUNT(*) AS n FROM payment_evidence
+        WHERE provider = 'paddle' AND event_id LIKE '%txn_paddle_wrong%'`).get().n, 0);
     database.prepare(`UPDATE purchases SET stripe_payment_intent_id = 'pi_other'
       WHERE id = 'stripe-legacy'`).run();
     await assert.rejects(reconcilePurchase('stripe-legacy', 5, undefined, 'cs_legacy'),
@@ -211,6 +234,7 @@ test('provider SDK recovery reads payments and confirms supported cancellation',
       const nowPages = [];
       const paddleTransaction = (row, subscriptionId) => ({
         id: row.id, status: 'completed', currency_code: 'USD',
+          custom_data: { purchaseId: 'paddle-purchase' },
         created_at: new Date(row.start * 1000).toISOString(),
         subscription_id: subscriptionId,
         billing_period: { starts_at: new Date(row.start * 1000).toISOString(),
