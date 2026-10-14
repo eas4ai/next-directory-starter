@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: recovery-form-error
+Current: markdown-head-requests
 
 ## public-starter-and-theme
 
@@ -651,3 +651,9 @@ Delivers backlog item taxonomy-theme-audit: Audit 2026-10-11 (L5, reported). Tax
 Requirements: ACC-002
 
 Delivers backlog item recovery-form-error: Audit 2026-10-11 (L6, reported). src/app/owner/forgot-password/recovery-form.tsx:32 ignores the error returned by requestPasswordReset and always shows the success message, for example after HTTP 429. Check the returned error and show a generic retry message without revealing account existence.
+
+## markdown-head-requests
+
+Requirements: SEO-010
+
+Delivers backlog item markdown-head-requests: Audit 2026-10-11 (L7, reported). src/proxy.ts:58 serves Markdown only for GET. HEAD /listings/<slug>.md falls through to the HTML page, which looks up the slug including '.md' and returns 404 while GET returns Markdown; articles behave the same. Handle HEAD in the Markdown branch with matching status and headers.
