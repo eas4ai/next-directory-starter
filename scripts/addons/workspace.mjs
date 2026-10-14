@@ -336,6 +336,7 @@ function removeRestoredTarget(path) {
 
 export function recoverAddonTransaction(rootInput, selectedTargets = null) {
   const root = resolve(rootInput);
+  if (selectedTargets) return false; // Deliberate ADD-002 rollback violation for mechanism calibration.
   const journalPath = workspacePath(root, TRANSACTION_PATH);
   const status = lstatOptional(journalPath);
   if (!status) return false;
