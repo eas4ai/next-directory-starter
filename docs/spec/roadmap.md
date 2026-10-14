@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: database-url-validation
+Current: taxonomy-theme-audit
 
 ## public-starter-and-theme
 
@@ -639,3 +639,9 @@ Delivers backlog item paddle-recovery-purchase-binding: Audit 2026-10-11 (L3, re
 Requirements: FOUND-006
 
 Delivers backlog item database-url-validation: Audit 2026-10-11 (L4, verified). src/lib/database.ts and scripts/ops-common.mjs only strip 'file:'. file:/x.db?mode=ro creates a file literally named 'x.db?mode=ro', and 'file:' alone opens an anonymous temporary database that disappears between processes. Validate the path centrally and reject query strings and empty paths.
+
+## taxonomy-theme-audit
+
+Requirements: ADM-002
+
+Delivers backlog item taxonomy-theme-audit: Audit 2026-10-11 (L5, reported). Taxonomy create, rename and delete (src/lib/taxonomy-routes.ts:39, src/lib/taxonomy.ts:62) and theme preset saves (src/lib/theme.ts:28) write no audit row, so a bulk category rename that changes published listings leaves no actor record. Pass the actor through and call recordAudit in the same transaction.
