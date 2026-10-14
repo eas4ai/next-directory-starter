@@ -4,6 +4,9 @@ import { join, relative, resolve, sep } from "node:path";
 import semver from "semver";
 import ts from "typescript";
 import { z } from "zod";
+import {
+  PROFILE_LIMITS, parseDirectoryProfileDefinition, profileDigest,
+} from "./profile-schema.mjs";
 
 export const ADDON_SCHEMA_VERSION = 1;
 export const ADDON_API_VERSION = 1;
@@ -15,6 +18,7 @@ export const MAX_PACKAGE_BYTES = 50 * 1024 * 1024;
 export const MAX_ARCHIVE_BYTES = MAX_PACKAGE_BYTES + 2 * 1024 * 1024;
 
 const idPattern = /^[a-z][a-z0-9-]*$/;
+const profileIdPattern = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$/;
 const payloadPattern = /^[a-z0-9][a-z0-9._-]*(?:\/[a-z0-9][a-z0-9._-]*)*$/;
 
 const identity = z.string().min(1).max(80).regex(idPattern);
@@ -37,6 +41,17 @@ const templateSchema = z.object({
   id: identity,
   name: displayName,
   stylesheet: payloadPath,
+  supportedProfiles: z.array(z.object({
+    id: z.string().min(3).max(160).regex(profileIdPattern),
+    range: z.string().min(1).max(120)
+      .refine((value) => semver.validRange(value) !== null, "Invalid profile version range"),
+  }).strict()).max(40).default([]),
+}).strict();
+
+const profileSchema = z.object({
+  id: z.string().min(3).max(160).regex(profileIdPattern),
+  version: z.string().refine((value) => semver.valid(value) !== null, "Invalid profile version"),
+  schema: payloadPath,
 }).strict();
 
 const manifestSchema = z.object({
@@ -51,6 +66,7 @@ const manifestSchema = z.object({
   }).strict(),
   themes: z.array(themeSchema).max(40),
   templates: z.array(templateSchema).max(40),
+  profiles: z.array(profileSchema).max(40).default([]),
   assets: z.array(payloadPath).max(200),
   seed: payloadPath.optional(),
   files: z.array(payloadPath).min(1).max(MAX_FILES),
@@ -73,6 +89,55 @@ function unique(values, label) {
 
 function ordered(values, key) {
   return [...values].sort((left, right) => key(left).localeCompare(key(right)));
+}
+
+function validateTemplateDeclaration(template, profiles, files) {
+  if (!template.stylesheet.startsWith("src/") || !template.stylesheet.endsWith(".css") ||
+      !files.has(template.stylesheet)) {
+    throw new Error(`Template stylesheet is not a declared CSS payload: ${template.stylesheet}`);
+  }
+  unique(template.supportedProfiles.map(({ id }) => id),
+    `supported profile ID for template ${template.id}`);
+  for (const supported of template.supportedProfiles) {
+    const packaged = profiles.find(({ id }) => id === supported.id);
+    if (packaged && !semver.satisfies(packaged.version, supported.range,
+      { includePrerelease: true })) {
+      throw new Error(`Template ${template.id} is incompatible with packaged profile ` +
+        `${packaged.id}@${packaged.version}`);
+    }
+  }
+}
+
+function validateAssetAndSeedDeclarations(parsed, files) {
+  for (const asset of parsed.assets) {
+    if (!asset.startsWith("public/") || !files.has(asset)) {
+      throw new Error(`Asset is not a declared public payload: ${asset}`);
+    }
+  }
+  if (parsed.seed && (!parsed.seed.startsWith("seed/") || !parsed.seed.endsWith(".json") ||
+      !files.has(parsed.seed))) {
+    throw new Error(`Seed is not a declared JSON payload: ${parsed.seed}`);
+  }
+}
+
+function validateManifestPayloads(parsed) {
+  const files = new Set(parsed.files);
+  for (const theme of parsed.themes) {
+    if (!theme.entry.startsWith("src/") || !theme.entry.endsWith(".ts") ||
+        !files.has(theme.entry)) {
+      throw new Error(`Theme entry is not a declared TypeScript payload: ${theme.entry}`);
+    }
+  }
+  for (const template of parsed.templates) {
+    validateTemplateDeclaration(template, parsed.profiles, files);
+  }
+  for (const profile of parsed.profiles) {
+    if (!profile.schema.startsWith("src/") || !profile.schema.endsWith(".profile.json") ||
+        !files.has(profile.schema)) {
+      throw new Error(`Profile schema is not a declared src/*.profile.json payload: ${profile.schema}`);
+    }
+  }
+  validateAssetAndSeedDeclarations(parsed, files);
 }
 
 export function normalizePayloadPath(value) {
@@ -101,37 +166,19 @@ export function parseManifest(input) {
   unique(parsed.files, "payload path");
   unique(parsed.themes.map(({ id }) => id), "theme ID");
   unique(parsed.templates.map(({ id }) => id), "template ID");
+  unique(parsed.profiles.map(({ id }) => id), "profile ID");
   unique(parsed.assets, "asset path");
 
-  const files = new Set(parsed.files);
-  for (const theme of parsed.themes) {
-    if (!theme.entry.startsWith("src/") || !theme.entry.endsWith(".ts") ||
-        !files.has(theme.entry)) {
-      throw new Error(`Theme entry is not a declared TypeScript payload: ${theme.entry}`);
-    }
-  }
-  for (const template of parsed.templates) {
-    if (!template.stylesheet.startsWith("src/") || !template.stylesheet.endsWith(".css") ||
-        !files.has(template.stylesheet)) {
-      throw new Error(`Template stylesheet is not a declared CSS payload: ${template.stylesheet}`);
-    }
-  }
-  for (const asset of parsed.assets) {
-    if (!asset.startsWith("public/") || !files.has(asset)) {
-      throw new Error(`Asset is not a declared public payload: ${asset}`);
-    }
-  }
-  if (parsed.seed && (!parsed.seed.startsWith("seed/") || !parsed.seed.endsWith(".json") ||
-      !files.has(parsed.seed))) {
-    throw new Error(`Seed is not a declared JSON payload: ${parsed.seed}`);
-  }
+  validateManifestPayloads(parsed);
 
   const targets = parsed.files.map((path) => targetForPayload(parsed.id, path));
   unique(targets, "workspace target");
   return {
     ...parsed,
     themes: ordered(parsed.themes, ({ id }) => id),
-    templates: ordered(parsed.templates, ({ id }) => id),
+    templates: ordered(parsed.templates.map((template) => ({ ...template,
+      supportedProfiles: ordered(template.supportedProfiles, ({ id }) => id) })), ({ id }) => id),
+    profiles: ordered(parsed.profiles, ({ id }) => id),
     assets: [...parsed.assets].sort(),
     files: [...parsed.files].sort(),
   };
@@ -232,6 +279,28 @@ export function validateThemeModules(manifest, files) {
   }
 }
 
+export function validateProfileDefinitions(manifest, files) {
+  return manifest.profiles.map((profile) => {
+    const bytes = files.get(profile.schema);
+    if (!bytes) throw new Error(`Profile schema is missing: ${profile.schema}`);
+    if (bytes.length > PROFILE_LIMITS.fileBytes) {
+      throw new Error(`Profile schema exceeds the 256 KiB limit: ${profile.schema}`);
+    }
+    const source = bytes.toString("utf8");
+    if (!Buffer.from(source, "utf8").equals(bytes)) {
+      throw new Error(`Profile schema is not UTF-8: ${profile.schema}`);
+    }
+    let input;
+    try { input = JSON.parse(source); }
+    catch { throw new Error(`Profile schema is not valid JSON: ${profile.schema}`); }
+    const definition = parseDirectoryProfileDefinition(input);
+    if (definition.id !== profile.id || definition.version !== profile.version) {
+      throw new Error(`Profile identity or version does not match the manifest: ${profile.schema}`);
+    }
+    return { ...profile, digest: profileDigest(definition) };
+  });
+}
+
 function sourceFilePaths(root) {
   const paths = [];
   function visit(directory) {
@@ -277,7 +346,8 @@ export function readSourcePackage(source) {
     files.set(path, readFileSync(absolute));
   }
   validateThemeModules(manifest, files);
-  return { manifest, files, manifestBytes: canonicalJson(manifest), root };
+  const profiles = validateProfileDefinitions(manifest, files);
+  return { manifest, files, profiles, manifestBytes: canonicalJson(manifest), root };
 }
 
 export function readStarterIdentity(root = process.cwd()) {

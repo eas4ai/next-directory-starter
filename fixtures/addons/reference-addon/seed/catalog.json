@@ -1,13 +1,45 @@
 {
+  "profile": {
+    "id": "reference-addon.ai-tools",
+    "version": "1.0.0"
+  },
   "listings": [
     {
       "slug": "reference-tool",
       "title": "Reference Tool",
       "summary": "A sample listing installed only through the explicit add-on seed command.",
-      "description": "Reference Tool proves that an add-on can carry repeatable sample catalog data without mutating the database during source installation.",
+      "description": "Reference Tool proves that an add-on can carry typed profile data without mutating the database during installation.",
       "category": "Reference",
       "url": "https://example.com/reference-tool",
-      "status": "published"
+      "status": "published",
+      "profileValues": {
+        "reference-addon.ai-tools.tagline": "A production ready AI tool",
+        "reference-addon.ai-tools.starting-price": {
+          "amountMinor": 1900,
+          "currency": "USD"
+        },
+        "reference-addon.ai-tools.platforms": [
+          "web",
+          "mac"
+        ],
+        "reference-addon.ai-tools.open-source": false,
+        "reference-addon.ai-tools.website": "https://example.com/reference-tool",
+        "reference-addon.ai-tools.headquarters": {
+          "countryCode": "US",
+          "region": "NY",
+          "locality": "New York"
+        },
+        "reference-addon.ai-tools.integrations": [
+          {
+            "id": "reference-api",
+            "values": {
+              "name": "Reference API",
+              "url": "https://example.com/reference-tool/api",
+              "native": true
+            }
+          }
+        ]
+      }
     }
   ]
 }

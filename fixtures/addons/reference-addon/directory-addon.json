@@ -18,15 +18,31 @@
     {
       "id": "reference-addon",
       "name": "Reference Grid",
-      "stylesheet": "src/template.css"
+      "stylesheet": "src/template.css",
+      "supportedProfiles": [
+        {
+          "id": "reference-addon.ai-tools",
+          "range": "^1.0.0"
+        }
+      ]
     }
   ],
-  "assets": ["public/reference-mark.svg"],
+  "assets": [
+    "public/reference-mark.svg"
+  ],
   "seed": "seed/catalog.json",
   "files": [
     "public/reference-mark.svg",
     "seed/catalog.json",
+    "src/ai-tools.profile.json",
     "src/template.css",
     "src/theme.ts"
+  ],
+  "profiles": [
+    {
+      "id": "reference-addon.ai-tools",
+      "version": "1.0.0",
+      "schema": "src/ai-tools.profile.json"
+    }
   ]
 }

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { addonProfileDefinitions, addonProfileMetadata } from "@/addons/generated";
 import { canAdmin, requireCurrentActor } from "@/lib/admin";
 import { recordAudit } from "@/lib/audit";
 import { migrateCatalog } from "@/lib/catalog-migrations";
@@ -86,6 +87,23 @@ function definitionRow(profileId: string, version: string): DefinitionRow {
   return row;
 }
 
+function installedDefinitions(): { definition: DirectoryProfileDefinition; addonId: string;
+  digest: string }[] {
+  if (addonProfileDefinitions.length !== addonProfileMetadata.length) {
+    throw new Error("Installed directory profile registry is inconsistent");
+  }
+  return addonProfileDefinitions.map((input, index) => {
+    const definition = parseDirectoryProfileDefinition(input) as DirectoryProfileDefinition;
+    const metadata = addonProfileMetadata[index];
+    const digest = profileDigest(definition) as string;
+    if (!metadata || metadata.profileId !== definition.id ||
+        metadata.version !== definition.version || metadata.digest !== digest) {
+      throw new Error(`Installed directory profile registry changed: ${definition.id}`);
+    }
+    return { definition, addonId: metadata.addonId, digest };
+  });
+}
+
 function reference(profileId: string | null, version: string | null): StoredProfileReference | null {
   if (!profileId || !version) return null;
   const row = definitionRow(profileId, version);
@@ -115,7 +133,7 @@ export function availableDirectoryProfiles(): StoredProfileSummary[] {
   const rows = database.prepare(`SELECT profile_id, version, name, digest, source_kind,
       source_id, definition_json, created_at
     FROM directory_profile_definitions ORDER BY profile_id, version`).all() as DefinitionRow[];
-  return rows.map((row) => ({
+  const stored = rows.map((row) => ({
     profileId: row.profile_id,
     version: row.version,
     digest: row.digest,
@@ -125,12 +143,42 @@ export function availableDirectoryProfiles(): StoredProfileSummary[] {
     createdAt: row.created_at,
     active: active.has(`${row.profile_id}\0${row.version}`),
   }));
+  const storedKeys = new Map(stored.map((profile) =>
+    [`${profile.profileId}\0${profile.version}`, profile]));
+  for (const installed of installedDefinitions()) {
+    const key = `${installed.definition.id}\0${installed.definition.version}`;
+    const existing = storedKeys.get(key);
+    if (existing) {
+      if (existing.digest !== installed.digest) {
+        throw new Error(`Installed directory profile conflicts with its stored snapshot: ` +
+          `${installed.definition.id}@${installed.definition.version}`);
+      }
+      continue;
+    }
+    stored.push({
+      profileId: installed.definition.id,
+      version: installed.definition.version,
+      digest: installed.digest,
+      name: installed.definition.name,
+      sourceKind: "addon",
+      sourceId: installed.addonId,
+      createdAt: "",
+      active: false,
+    });
+  }
+  return stored.sort((left, right) => left.profileId.localeCompare(right.profileId) ||
+    left.version.localeCompare(right.version));
 }
 
-export function storedDirectoryProfileDefinition(profileId: string,
+export function availableDirectoryProfileDefinition(profileId: string,
   version: string): DirectoryProfileDefinition {
-  if (!profileId || !version) throw new Error("A stored profile ID and version are required");
-  return readDefinition(profileId, version);
+  const row = database.prepare(`SELECT 1 FROM directory_profile_definitions
+    WHERE profile_id = ? AND version = ?`).get(profileId, version);
+  if (row) return readDefinition(profileId, version);
+  const installed = installedDefinitions().find(({ definition }) =>
+    definition.id === profileId && definition.version === version);
+  if (!installed) throw new Error(`Directory profile is unavailable: ${profileId}@${version}`);
+  return installed.definition;
 }
 
 function readDefinition(profileId: string, version: string): DirectoryProfileDefinition {

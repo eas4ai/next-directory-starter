@@ -72,7 +72,11 @@ function copyFixture(root, id = "reference-addon") {
     manifest.name = `Reference ${id}`;
     manifest.themes = manifest.themes.map((theme) => ({ ...theme, id, name: `Theme ${id}` }));
     manifest.templates = manifest.templates.map((template) =>
-      ({ ...template, id, name: `Template ${id}` }));
+      ({ ...template, id, name: `Template ${id}`,
+        supportedProfiles: template.supportedProfiles?.map((profile) => ({ ...profile,
+          id: profile.id.replace("reference-addon.", `${id}.`) })) ?? [] }));
+    manifest.profiles = manifest.profiles?.map((profile) => ({ ...profile,
+      id: profile.id.replace("reference-addon.", `${id}.`) })) ?? [];
     writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
     for (const path of [join(destination, "src/theme.ts"), join(destination, "src/template.css")]) {
       let source = readFileSync(path, "utf8").replaceAll("reference-addon", id);
@@ -80,6 +84,11 @@ function copyFixture(root, id = "reference-addon") {
         source = source.replace('name: "Reference Add-on"', `name: "Theme ${id}"`);
       }
       writeFileSync(path, source);
+    }
+    for (const path of [join(destination, "src/ai-tools.profile.json"),
+      join(destination, "seed/catalog.json")]) {
+      writeFileSync(path, readFileSync(path, "utf8")
+        .replaceAll("reference-addon.ai-tools", `${id}.ai-tools`));
     }
   }
   return destination;
@@ -256,6 +265,7 @@ requirementTest("ADD-002 installs and removes owned files transactionally throug
 
     expectSuccess(run(source, ["install", archive]), "install reference archive");
     assert.ok(existsSync(join(source, "src/addons/reference-addon/theme.ts")));
+    assert.ok(existsSync(join(source, "src/addons/reference-addon/ai-tools.profile.json")));
     assert.ok(existsSync(join(source, "public/addons/reference-addon/reference-mark.svg")));
     const generated = readFileSync(join(source, "src/addons/generated.ts"), "utf8");
     assert.match(generated, /reference-addon/);
@@ -263,6 +273,11 @@ requirementTest("ADD-002 installs and removes owned files transactionally throug
       /reference-addon/);
     const lock = JSON.parse(readFileSync(join(source, ".directory-starter/addons.lock.json"), "utf8"));
     assert.equal(lock.addons[0].id, "reference-addon");
+    assert.deepEqual(lock.addons[0].profiles.map(({ id, version }) => ({ id, version })), [{
+      id: "reference-addon.ai-tools", version: "1.0.0",
+    }]);
+    assert.match(generated, /addonProfileDefinitions/);
+    assert.match(generated, /reference-addon\.ai-tools/);
     assert.ok(lock.addons[0].files.every((file) => /^[a-f0-9]{64}$/.test(file.sha256)));
 
     const interruptedRemoval = run(source, ["remove", "reference-addon"], {
@@ -356,6 +371,20 @@ requirementTest("ADD-003 reference add-on completes a clean build seed and remov
     assert.equal(existsSync(databasePath), false, "installation opened the operator database");
 
     expectSuccess(npm(source, ["run", "db:migrate"], env), "migrate add-on seed database");
+    const discover = spawnSync(process.execPath, ["--import", "tsx", "--input-type=module", "--eval",
+      `const imported = await import("./src/lib/directory-profiles.ts");
+       const availableDirectoryProfiles = imported.availableDirectoryProfiles ??
+         imported.default?.availableDirectoryProfiles;
+       const available = availableDirectoryProfiles();
+       if (!available.some((profile) => profile.profileId === "reference-addon.ai-tools" &&
+           profile.version === "1.0.0" && profile.sourceId === "reference-addon")) {
+         throw new Error("installed profile is not discoverable");
+       }`], {
+      cwd: source,
+      encoding: "utf8",
+      env: { ...process.env, CI: "1", NODE_ENV: "test", ...env },
+    });
+    expectSuccess(discover, "discover installed profile");
     const build = npm(source, ["run", "build"], env, 420_000);
     expectSuccess(build, "build installed reference add-on");
     expectSuccess(npm(source, ["run", "addon:seed", "--", "reference-addon"], env),

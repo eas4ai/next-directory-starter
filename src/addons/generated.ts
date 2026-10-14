@@ -1,4 +1,7 @@
 import type { ThemeDefinition } from "@/lib/theme-sdk";
+import type { DirectoryProfileDefinition } from "@/lib/directory-profile-types";
 
 export const addonThemeDefinitions: ThemeDefinition[] = [];
 export const addonTemplateOptions: readonly { id: string; name: string }[] = [];
+export const addonProfileDefinitions: readonly DirectoryProfileDefinition[] = [];
+export const addonProfileMetadata: readonly { addonId: string; profileId: string; version: string; digest: string; schema: string }[] = [];
