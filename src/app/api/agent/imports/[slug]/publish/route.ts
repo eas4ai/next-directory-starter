@@ -1,5 +1,6 @@
 import { canManageCatalog, sameOrigin, sessionUser } from "@/lib/admin";
 import { publishAgentImport } from "@/lib/agent-imports";
+import { HttpError, httpErrorResponse } from "@/lib/http-error";
 
 export async function POST(request: Request, context: { params: Promise<{ slug: string }> }) {
   const user = await sessionUser(request.headers);
@@ -7,7 +8,8 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
   if (!sameOrigin(request)) return Response.json({ error: "Invalid origin" }, { status: 403 });
   try {
     return Response.json(publishAgentImport(user.id, (await context.params).slug));
-  } catch {
+  } catch (error) {
+    if (error instanceof HttpError) return httpErrorResponse(error);
     return Response.json({ error: "Import cannot be published" }, { status: 404 });
   }
 }
