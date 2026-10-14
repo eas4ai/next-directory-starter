@@ -1,4 +1,6 @@
-import { createWriteStream, readFileSync, renameSync, rmSync } from "node:fs";
+import {
+  closeSync, createWriteStream, fstatSync, openSync, readFileSync, renameSync, rmSync,
+} from "node:fs";
 import { mkdir, readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { arrayBuffer } from "node:stream/consumers";
@@ -6,7 +8,8 @@ import { pipeline } from "node:stream/promises";
 import yauzl from "yauzl";
 import yazl from "yazl";
 import {
-  INTEGRITY_NAME, MANIFEST_NAME, MAX_FILE_BYTES, MAX_FILES, MAX_PACKAGE_BYTES,
+  INTEGRITY_NAME, MANIFEST_NAME, MAX_ARCHIVE_BYTES, MAX_FILE_BYTES, MAX_FILES,
+  MAX_PACKAGE_BYTES,
   canonicalJson, integritySchema, normalizePayloadPath, parseManifest, readSourcePackage, sha256,
   validateThemeModules,
 } from "./manifest.mjs";
@@ -81,8 +84,8 @@ function requireRegularEntry(entry) {
   if (entry.uncompressedSize > MAX_FILE_BYTES) throw new Error(`ZIP entry is too large: ${entry.fileName}`);
 }
 
-async function archiveFiles(path) {
-  const zip = await yauzl.openPromise(path, {
+async function archiveFiles(bytes) {
+  const zip = await yauzl.fromBufferPromise(bytes, {
     autoClose: true,
     decodeStrings: true,
     strictFileNames: true,
@@ -109,6 +112,24 @@ async function archiveFiles(path) {
   return files;
 }
 
+function readBoundedArchive(path) {
+  const descriptor = openSync(path, "r");
+  try {
+    const before = fstatSync(descriptor);
+    if (!before.isFile()) throw new Error("Add-on archive must be a regular file");
+    if (before.size > MAX_ARCHIVE_BYTES) throw new Error("Add-on archive is too large");
+    const bytes = readFileSync(descriptor);
+    const after = fstatSync(descriptor);
+    if (bytes.length !== before.size || after.size !== before.size ||
+        after.mtimeMs !== before.mtimeMs || after.ino !== before.ino || after.dev !== before.dev) {
+      throw new Error("Add-on archive changed while it was being read");
+    }
+    return bytes;
+  } finally {
+    closeSync(descriptor);
+  }
+}
+
 function parseJson(bytes, label) {
   try {
     return JSON.parse(bytes.toString("utf8"));
@@ -119,8 +140,8 @@ function parseJson(bytes, label) {
 
 export async function readArchive(input) {
   const path = resolve(input);
-  const archiveBytes = readFileSync(path);
-  const entries = await archiveFiles(path);
+  const archiveBytes = readBoundedArchive(path);
+  const entries = await archiveFiles(archiveBytes);
   const manifestBytes = entries.get(MANIFEST_NAME);
   const integrityBytes = entries.get(INTEGRITY_NAME);
   if (!manifestBytes || !integrityBytes) throw new Error("Archive is missing manifest or integrity metadata");

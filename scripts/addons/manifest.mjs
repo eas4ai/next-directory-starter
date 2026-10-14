@@ -12,6 +12,7 @@ export const INTEGRITY_NAME = ".integrity.json";
 export const MAX_FILES = 512;
 export const MAX_FILE_BYTES = 10 * 1024 * 1024;
 export const MAX_PACKAGE_BYTES = 50 * 1024 * 1024;
+export const MAX_ARCHIVE_BYTES = MAX_PACKAGE_BYTES + 2 * 1024 * 1024;
 
 const idPattern = /^[a-z][a-z0-9-]*$/;
 const payloadPattern = /^[a-z0-9][a-z0-9._-]*(?:\/[a-z0-9][a-z0-9._-]*)*$/;

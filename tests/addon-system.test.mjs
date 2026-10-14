@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createHash, randomBytes } from "node:crypto";
 import {
   cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync,
-  readlinkSync, rmSync, symlinkSync, writeFileSync,
+  readlinkSync, rmSync, symlinkSync, truncateSync, writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
@@ -176,6 +176,13 @@ requirementTest("ADD-001 validates deterministic packages before workspace write
       .replace('id: "identity-mismatch-addon"', 'id: "studio"'));
     expectFailure(run(repository, ["pack", mismatched, join(temporary, "mismatched.zip")]),
       "manifest and runtime theme identity mismatch");
+
+    const oversized = join(temporary, "oversized.zip");
+    writeFileSync(oversized, "");
+    truncateSync(oversized, 53 * 1024 * 1024);
+    const oversizedResult = run(repository, ["validate", oversized]);
+    expectFailure(oversizedResult, "oversized raw archive");
+    assert.match(oversizedResult.stderr, /archive is too large/i);
 
     const corrupt = join(temporary, "corrupt.zip");
     const bytes = readFileSync(first);
