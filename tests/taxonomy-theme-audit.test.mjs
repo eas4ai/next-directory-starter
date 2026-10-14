@@ -17,6 +17,12 @@ test('taxonomy and theme changes record atomic actor audit events', async () => 
     const { defaultThemePreset, getThemePreset, saveThemePreset } =
       await import('../src/lib/theme.ts');
     migrateCatalog();
+    database.exec(`CREATE TABLE IF NOT EXISTS "user" (
+      id TEXT PRIMARY KEY, role TEXT, banned INTEGER NOT NULL DEFAULT 0,
+      emailVerified INTEGER NOT NULL DEFAULT 0
+    )`);
+    database.prepare(`INSERT INTO "user" (id, role, banned, emailVerified)
+      VALUES ('administrator', 'admin', 0, 1)`).run();
 
     createTaxon('category', 'Original', 'administrator');
     renameTaxon('category', 'Original', 'Renamed', 'administrator');
@@ -42,13 +48,25 @@ test('taxonomy and theme changes record atomic actor audit events', async () => 
         Number.isFinite(Date.parse(event.occurredAt))), `${action} audit event is missing`);
     }
 
-    assert.throws(() => createTaxon('tag', 'Rolled back', ''), /Audit event/);
-    assert.equal(listTaxa('tag').some(({ name }) => name === 'Rolled back'), false);
+    createTaxon('tag', 'Protected', 'administrator');
+    database.prepare(`UPDATE "user" SET role = 'user' WHERE id = 'administrator'`).run();
+    assert.throws(() => createTaxon('tag', 'Revoked create', 'administrator'), /Forbidden/);
+    assert.equal(listTaxa('tag').some(({ name }) => name === 'Revoked create'), false);
+    database.prepare(`UPDATE "user" SET role = 'taxonomy', banned = 1
+      WHERE id = 'administrator'`).run();
+    assert.throws(() => renameTaxon('tag', 'Protected', 'Revoked rename', 'administrator'), /Forbidden/);
+    assert.equal(listTaxa('tag').some(({ name }) => name === 'Protected'), true);
+    database.prepare(`UPDATE "user" SET banned = 0, emailVerified = 0
+      WHERE id = 'administrator'`).run();
+    assert.throws(() => deleteTaxon('tag', 'Protected', 'administrator'), /Forbidden/);
+    assert.equal(listTaxa('tag').some(({ name }) => name === 'Protected'), true);
     const rolledBackTheme = {
       ...changedTheme,
       theme: changedTheme.theme === 'blue' ? 'red' : 'blue',
     };
-    assert.throws(() => saveThemePreset(rolledBackTheme, ''), /Audit event/);
+    database.prepare(`UPDATE "user" SET role = 'taxonomy', emailVerified = 1
+      WHERE id = 'administrator'`).run();
+    assert.throws(() => saveThemePreset(rolledBackTheme, 'administrator'), /Forbidden/);
     assert.deepEqual(getThemePreset(), changedTheme);
   } finally {
     database?.close();

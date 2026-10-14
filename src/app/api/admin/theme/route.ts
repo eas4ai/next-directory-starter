@@ -1,4 +1,5 @@
 import { canAdmin, sessionUser } from "@/lib/admin";
+import { httpErrorResponse } from "@/lib/http-error";
 import { requestJson, requestJsonErrorResponse } from "@/lib/request-json";
 import { getThemePreset, parseThemePreset, saveThemePreset } from "@/lib/theme";
 
@@ -31,6 +32,10 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid theme choice" }, { status: 400 });
   }
 
-  saveThemePreset(preset, user.id);
-  return Response.json({ preset });
+  try {
+    saveThemePreset(preset, user.id);
+    return Response.json({ preset });
+  } catch (error) {
+    return httpErrorResponse(error);
+  }
 }
