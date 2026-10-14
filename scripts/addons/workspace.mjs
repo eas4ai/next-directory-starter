@@ -455,7 +455,7 @@ function mutateWorkspace(root, operations) {
 }
 
 function lockEntry(packageValue) {
-  const { manifest, files, manifestBytes, archiveSha256 } = packageValue;
+  const { manifest, files, manifestBytes, archiveSha256, profiles } = packageValue;
   return {
     id: manifest.id,
     name: manifest.name,
@@ -464,6 +464,7 @@ function lockEntry(packageValue) {
     manifestSha256: sha256(manifestBytes),
     themes: manifest.themes,
     templates: manifest.templates,
+    profiles,
     ...(manifest.seed ? { seed: manifest.seed } : {}),
     files: manifest.files.map((source) => {
       const bytes = files.get(source);
@@ -490,6 +491,24 @@ function registryOperations(lock) {
   ];
 }
 
+function requireUniqueContributions(lock, builtIns, packageValue) {
+  const installedThemes = new Set(lock.addons.flatMap(({ themes }) => themes.map(({ id }) => id)));
+  const installedTemplates = new Set(lock.addons.flatMap(({ templates }) => templates.map(({ id }) => id)));
+  const installedProfiles = new Set(lock.addons.flatMap(({ profiles = [] }) =>
+    profiles.map(({ id }) => id)));
+  for (const { id } of packageValue.manifest.themes) {
+    if (builtIns.themes.has(id) || installedThemes.has(id)) throw new Error(`Theme ID collision: ${id}`);
+  }
+  for (const { id } of packageValue.manifest.templates) {
+    if (builtIns.templates.has(id) || installedTemplates.has(id)) {
+      throw new Error(`Template ID collision: ${id}`);
+    }
+  }
+  for (const { id } of packageValue.profiles) {
+    if (installedProfiles.has(id)) throw new Error(`Profile ID collision: ${id}`);
+  }
+}
+
 export async function installAddon(rootInput, archiveInput) {
   const root = resolve(rootInput);
   return withOperationLock(root, async () => {
@@ -503,16 +522,7 @@ export async function installAddon(rootInput, archiveInput) {
     if (lock.addons.some(({ id }) => id === manifest.id)) {
       throw new Error(`Add-on is already installed: ${manifest.id}`);
     }
-    const installedThemes = new Set(lock.addons.flatMap(({ themes }) => themes.map(({ id }) => id)));
-    const installedTemplates = new Set(lock.addons.flatMap(({ templates }) => templates.map(({ id }) => id)));
-    for (const { id } of manifest.themes) {
-      if (builtIns.themes.has(id) || installedThemes.has(id)) throw new Error(`Theme ID collision: ${id}`);
-    }
-    for (const { id } of manifest.templates) {
-      if (builtIns.templates.has(id) || installedTemplates.has(id)) {
-        throw new Error(`Template ID collision: ${id}`);
-      }
-    }
+    requireUniqueContributions(lock, builtIns, packageValue);
 
     const entry = lockEntry(packageValue);
     const ownedTargets = new Set(lock.addons.flatMap(({ files }) => files.map(({ target }) => target)));

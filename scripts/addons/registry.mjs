@@ -1,5 +1,6 @@
 import { lstatSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import semver from "semver";
 import { z } from "zod";
 import { canonicalJson, normalizePayloadPath, targetForPayload } from "./manifest.mjs";
 
@@ -8,6 +9,7 @@ export const GENERATED_TYPESCRIPT_PATH = "src/addons/generated.ts";
 export const GENERATED_CSS_PATH = "src/addons/generated.css";
 
 const id = z.string().regex(/^[a-z][a-z0-9-]*$/);
+const profileId = z.string().regex(/^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$/);
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
 const sourcePath = z.string().superRefine((value, context) => {
   try {
@@ -41,6 +43,17 @@ const lockTemplateSchema = z.object({
   id,
   name: z.string().trim().min(1).max(120),
   stylesheet: sourcePath,
+  supportedProfiles: z.array(z.object({
+    id: profileId,
+    range: z.string().refine((value) => semver.validRange(value) !== null),
+  }).strict()).max(40).optional(),
+}).strict();
+
+const lockProfileSchema = z.object({
+  id: profileId,
+  version: z.string().refine((value) => semver.valid(value) !== null),
+  schema: sourcePath,
+  digest,
 }).strict();
 
 const lockAddonSchema = z.object({
@@ -51,6 +64,7 @@ const lockAddonSchema = z.object({
   manifestSha256: digest,
   themes: z.array(lockThemeSchema).max(40),
   templates: z.array(lockTemplateSchema).max(40),
+  profiles: z.array(lockProfileSchema).max(40).optional(),
   seed: sourcePath.optional(),
   files: z.array(lockFileSchema).min(1),
 }).strict();
@@ -69,6 +83,8 @@ const addonLockSchema = z.object({
     "installed theme ID");
   unique(lock.addons.flatMap(({ templates }) => templates.map(({ id: templateId }) => templateId)),
     "installed template ID");
+  unique(lock.addons.flatMap(({ profiles = [] }) => profiles.map(({ id: installedProfileId }) =>
+    installedProfileId)), "installed profile ID");
   unique(lock.addons.flatMap(({ files }) => files.map(({ target }) => target)),
     "owned target");
   for (const addon of lock.addons) {
@@ -80,6 +96,7 @@ const addonLockSchema = z.object({
     if (new Set(expectedTargets).size !== expectedTargets.length ||
         addon.themes.some(({ entry }) => !sources.has(entry)) ||
         addon.templates.some(({ stylesheet }) => !sources.has(stylesheet)) ||
+        (addon.profiles ?? []).some(({ schema }) => !sources.has(schema)) ||
         (addon.seed && !sources.has(addon.seed))) {
       context.addIssue({ code: "custom", message: `Invalid contributions for ${addon.id}` });
     }
@@ -109,22 +126,14 @@ export function readAddonLock(root = process.cwd()) {
   return lock;
 }
 
-function relativeModulePath(addonId, source) {
+function relativeSourcePath(addonId, source, extension, label, stripExtension = false) {
   const target = targetForPayload(addonId, source);
   const prefix = "src/addons/";
-  if (!target.startsWith(prefix) || !target.endsWith(".ts")) {
-    throw new Error(`Invalid theme module target: ${target}`);
+  if (!target.startsWith(prefix) || !target.endsWith(extension)) {
+    throw new Error(`Invalid ${label} target: ${target}`);
   }
-  return `./${target.slice(prefix.length, -3)}`;
-}
-
-function relativeStylesheetPath(addonId, source) {
-  const target = targetForPayload(addonId, source);
-  const prefix = "src/addons/";
-  if (!target.startsWith(prefix) || !target.endsWith(".css")) {
-    throw new Error(`Invalid template stylesheet target: ${target}`);
-  }
-  return `./${target.slice(prefix.length)}`;
+  const end = stripExtension ? -extension.length : undefined;
+  return `./${target.slice(prefix.length, end)}`;
 }
 
 export function generateRegistries(lock) {
@@ -134,15 +143,24 @@ export function generateRegistries(lock) {
   const templates = addons.flatMap((addon) =>
     addon.templates.map((template) => ({ addon, template })))
     .sort((left, right) => left.template.id.localeCompare(right.template.id));
+  const profiles = addons.flatMap((addon) =>
+    (addon.profiles ?? []).map((profile) => ({ addon, profile })))
+    .sort((left, right) => left.profile.id.localeCompare(right.profile.id));
 
-  const imports = themes.map(({ addon, theme }, index) =>
-    `import addonThemeSource${index} from ${JSON.stringify(relativeModulePath(addon.id, theme.entry))};`);
+  const themeImports = themes.map(({ addon, theme }, index) =>
+    `import addonThemeSource${index} from ${JSON.stringify(relativeSourcePath(addon.id,
+      theme.entry, ".ts", "theme module", true))};`);
+  const profileImports = profiles.map(({ addon, profile }, index) =>
+    `import addonProfileSource${index} from ${JSON.stringify(relativeSourcePath(addon.id,
+      profile.schema, ".json", "profile schema"))};`);
   const authoritativeThemes = themes.map(({ theme }, index) =>
     `const addonTheme${index}: ThemeDefinition = { ...addonThemeSource${index}, id: ${JSON.stringify(
       theme.id)}, name: ${JSON.stringify(theme.name)} };`);
   const typescript = [
     'import type { ThemeDefinition } from "@/lib/theme-sdk";',
-    ...(imports.length ? ["", ...imports] : []),
+    'import type { DirectoryProfileDefinition } from "@/lib/directory-profile-types";',
+    ...((themeImports.length || profileImports.length)
+      ? ["", ...themeImports, ...profileImports] : []),
     ...(authoritativeThemes.length ? ["", ...authoritativeThemes] : []),
     "",
     `export const addonThemeDefinitions: ThemeDefinition[] = [${themes.map((_, index) =>
@@ -151,11 +169,23 @@ export function generateRegistries(lock) {
       ? `export const addonTemplateOptions = [${templates.map(({ template }) =>
         `{ id: ${JSON.stringify(template.id)}, name: ${JSON.stringify(template.name)} }`).join(", ")}] as const;`
       : "export const addonTemplateOptions: readonly { id: string; name: string }[] = [];",
+    profiles.length
+      ? `export const addonProfileDefinitions = [${profiles.map((_, index) =>
+        `addonProfileSource${index} as unknown as DirectoryProfileDefinition`).join(", ")}];`
+      : "export const addonProfileDefinitions: readonly DirectoryProfileDefinition[] = [];",
+    profiles.length
+      ? `export const addonProfileMetadata = [${profiles.map(({ addon, profile }) =>
+        `{ addonId: ${JSON.stringify(addon.id)}, profileId: ${JSON.stringify(profile.id)}, ` +
+        `version: ${JSON.stringify(profile.version)}, digest: ${JSON.stringify(profile.digest)}, ` +
+        `schema: ${JSON.stringify(profile.schema)} }`).join(", ")}] as const;`
+      : "export const addonProfileMetadata: readonly { addonId: string; profileId: string; " +
+        "version: string; digest: string; schema: string }[] = [];",
     "",
   ].join("\n");
 
   const cssImports = templates.map(({ addon, template }) =>
-    `@import ${JSON.stringify(relativeStylesheetPath(addon.id, template.stylesheet))};`);
+    `@import ${JSON.stringify(relativeSourcePath(addon.id, template.stylesheet,
+      ".css", "template stylesheet"))};`);
   const css = ["/* Generated by scripts/addons.mjs. */", ...cssImports, ""].join("\n");
   return { typescript, css };
 }

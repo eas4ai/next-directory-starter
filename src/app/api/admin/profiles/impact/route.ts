@@ -1,6 +1,6 @@
 import { canAdmin, sameOrigin, sessionUser } from "@/lib/admin";
 import {
-  archivedProfileValueCount, profileImpact, storedDirectoryProfileDefinition,
+  archivedProfileValueCount, availableDirectoryProfileDefinition, profileImpact,
 } from "@/lib/directory-profiles";
 import type { ProfileMigrationPlan } from "@/lib/directory-profile-types";
 import { requestJson, requestJsonErrorResponse } from "@/lib/request-json";
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Profile, version, and revision are required" }, { status: 400 });
   }
   try {
-    const definition = storedDirectoryProfileDefinition(input.profileId, input.version);
+    const definition = availableDirectoryProfileDefinition(input.profileId, input.version);
     return Response.json({ impact: profileImpact({ definition,
       expectedRevision: input.expectedRevision as number,
       migration: input.migration as ProfileMigrationPlan | undefined }), definition });

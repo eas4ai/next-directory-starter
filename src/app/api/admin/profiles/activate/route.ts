@@ -1,6 +1,6 @@
 import { canAdmin, sameOrigin, sessionUser } from "@/lib/admin";
 import {
-  activateDirectoryProfile, availableDirectoryProfiles, storedDirectoryProfileDefinition,
+  activateDirectoryProfile, availableDirectoryProfileDefinition, availableDirectoryProfiles,
 } from "@/lib/directory-profiles";
 import type { ProfileMigrationPlan } from "@/lib/directory-profile-types";
 import { requestJson, requestJsonErrorResponse } from "@/lib/request-json";
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     const profile = availableDirectoryProfiles().find((candidate) =>
       candidate.profileId === input.profileId && candidate.version === input.version);
     if (!profile) throw new Error("Stored directory profile is missing");
-    const definition = storedDirectoryProfileDefinition(input.profileId, input.version);
+    const definition = availableDirectoryProfileDefinition(input.profileId, input.version);
     const state = activateDirectoryProfile({ definition, sourceKind: profile.sourceKind,
       sourceId: profile.sourceId ?? undefined, expectedRevision: input.expectedRevision as number,
       migration: input.migration as ProfileMigrationPlan | undefined, actorUserId: user.id });

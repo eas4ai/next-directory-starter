@@ -1652,7 +1652,7 @@ requirementTest("PRF-004 preserves profiles across packages, seeds, imports, and
         seed.listings[2].profileValues["vendor.ai-tools.screenshot"] =
           "123e4567-e89b-12d3-a456-426614174999";
         const before = seedSnapshot(api.database);
-        assert.throws(attempt(seed), /media|owned|listing/i);
+        assert.throws(attempt(seed), /media|owned/i);
         assert.deepEqual(seedSnapshot(api.database), before);
       });
       await seedTest.test("applies an equal seed digest once and reports every retry as existing", () => {
@@ -1715,7 +1715,7 @@ requirementTest("PRF-004 preserves profiles across packages, seeds, imports, and
   });
 
   await t.test("preserves every profile table and rejects corrupted restored profile state",
-    async (operationTest) => {
+    async () => {
       const temporary = mkdtempSync(join(tmpdir(), "directory-profile-recovery-"));
       const api = await profileTestContext();
       resetProfileTables(api.database);
@@ -1805,22 +1805,20 @@ requirementTest("PRF-004 preserves profiles across packages, seeds, imports, and
           ["profile media file", null],
         ];
         for (const [name, corrupt] of corruptions) {
-          await operationTest.test(`rejects corrupt ${name}`, () => {
-            const damaged = join(temporary, `damaged-${name.replaceAll(" ", "-")}`);
-            cpSync(backup, damaged, { recursive: true });
-            if (corrupt) {
-              const database = new Database(join(damaged, "database.db"));
-              try { corrupt(database); } finally { database.close(); }
-            } else {
-              rmSync(join(damaged, "media", `${mediaId}.webp`));
-            }
-            refreshBackupManifest(damaged);
-            const target = join(temporary, `rejected-${name.replaceAll(" ", "-")}`);
-            expectCommandFailure(command(repository, process.execPath,
-              ["scripts/restore.mjs", "--backup", damaged, "--target", target], operationsEnv),
-            `corrupt ${name}`, /profile|definition|value|media|migration|integrity|reference/i);
-            assert.equal(existsSync(target), false, `corrupt ${name} produced a restore target`);
-          });
+          const damaged = join(temporary, `damaged-${name.replaceAll(" ", "-")}`);
+          cpSync(backup, damaged, { recursive: true });
+          if (corrupt) {
+            const database = new Database(join(damaged, "database.db"));
+            try { corrupt(database); } finally { database.close(); }
+          } else {
+            rmSync(join(damaged, "media", `${mediaId}.webp`));
+          }
+          refreshBackupManifest(damaged);
+          const target = join(temporary, `rejected-${name.replaceAll(" ", "-")}`);
+          expectCommandFailure(command(repository, process.execPath,
+            ["scripts/restore.mjs", "--backup", damaged, "--target", target], operationsEnv),
+          `corrupt ${name}`, /profile|definition|value|media|migration|integrity|reference/i);
+          assert.equal(existsSync(target), false, `corrupt ${name} produced a restore target`);
         }
       } finally {
         rmSync(temporary, { recursive: true, force: true });
