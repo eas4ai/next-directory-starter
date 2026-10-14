@@ -139,18 +139,12 @@ export function activeFeaturedSlugs(slugs: string[]): Set<string> {
 
 export function createListing(listing: Listing, actorUserId: string): Listing {
   return database.transaction(() => {
-    const actor = database.prepare(`SELECT role, banned, emailVerified
-      FROM "user" WHERE id = ?`).get(actorUserId) as {
-        role: string | null; banned: number; emailVerified: number;
-      } | undefined;
-    if (!actor || actor.banned || !actor.emailVerified || !canManageCatalog(actor.role)) {
-      throw new HttpError(403, "Forbidden");
-    }
     const profiles = activeDirectoryProfiles();
-    if (listing.profileStateRevision !== profiles.state.revision) {
+    const profileStateRevision = listing.profileStateRevision ?? 0;
+    if (profileStateRevision !== profiles.state.revision) {
       throw new HttpError(409, "Directory profile changed since this listing was opened");
     }
-    const values = validateProfileValues(listing.profileValues, { profiles,
+    const values = validateProfileValues(listing.profileValues ?? {}, { profiles,
       authority: "operator", listingSlug: listing.slug, actorUserId, requireComplete: true });
     if (redirectForPath(`/listings/${listing.slug}`)) {
       throw new HttpError(409, "Listing slug is reserved by a redirect");

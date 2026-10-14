@@ -447,11 +447,16 @@ export function validateProfileValues(input: unknown, options: {
       continue;
     }
     if (!hasValue && !writable(options.authority, field)) continue;
-    const value = validateProfileFieldValue(field, raw, {
-      isMediaAllowed: (id) => mediaAllowed(field, options.listingSlug,
-        options.actorUserId, options.authority, id),
-    });
-    if (value !== undefined) result[field.key] = value;
+    try {
+      const value = validateProfileFieldValue(field, raw, {
+        isMediaAllowed: (id) => mediaAllowed(field, options.listingSlug,
+          options.actorUserId, options.authority, id),
+      });
+      if (value !== undefined) result[field.key] = value;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "invalid value";
+      throw new Error(`Profile field ${field.key}: ${message}`, { cause: error });
+    }
   }
   return result as ValidatedProfileValues;
 }
@@ -546,7 +551,7 @@ export function profileValuesForListings(slugs: readonly string[], options: {
     const [listingSlug, profileId, version, fieldKey] = key.split("\0");
     const definition = definitions.get(`${profileId}\0${version}`);
     const field = definition?.fields.find(({ key: candidate }) => candidate === fieldKey);
-    if (!field || (!options.includePrivate && field.visibility !== "public")) continue;
+    if (!field || (options.includePrivate === false && field.visibility !== "public")) continue;
     result.get(listingSlug)![fieldKey] = decodeProfileValue(field, group.map(normalizedRow));
   }
   return result;

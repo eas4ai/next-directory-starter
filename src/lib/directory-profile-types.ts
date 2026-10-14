@@ -58,7 +58,7 @@ export type CanonicalProfileValue = unknown;
 export type ProfileValueSet = Record<string, unknown>;
 declare const validatedProfileValues: unique symbol;
 export type ValidatedProfileValues = ProfileValueSet & {
-  readonly [validatedProfileValues]?: true;
+  readonly [validatedProfileValues]: true;
 };
 
 export type NormalizedProfileRow = {
