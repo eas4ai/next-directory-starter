@@ -1,0 +1,20 @@
+[
+  {
+    "slug": "example-tool",
+    "title": "Example Tool",
+    "summary": "A sample link for your directory",
+    "description": "A sample link for your directory that operators can replace.",
+    "category": "Tools",
+    "url": "https://example.org/tool",
+    "status": "published"
+  },
+  {
+    "slug": "hidden-draft",
+    "title": "Hidden Draft",
+    "summary": "An unpublished example",
+    "description": "This draft must not appear on public pages.",
+    "category": "Tools",
+    "url": "https://example.org/draft",
+    "status": "draft"
+  }
+]

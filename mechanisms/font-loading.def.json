@@ -1,0 +1,14 @@
+{
+  "command": "node --import tsx mechanisms/check-font-loading.mjs",
+  "requirements": ["THM-005"],
+  "results": "per-requirement",
+  "inputs": [
+    "mechanisms/check-font-loading.mjs", "mechanisms/font-loading.def.json",
+    "package.json", "package-lock.json", "public", "src",
+    "tests/admin-theme.test.mjs"
+  ],
+  "identity": {
+    "env": [],
+    "tools": { "node": "node --version", "npm": "npm --version" }
+  }
+}
