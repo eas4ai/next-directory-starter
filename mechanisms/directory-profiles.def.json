@@ -1,18 +1,18 @@
 {
-  "command": "node mechanisms/check-addon-system.mjs",
-  "requirements": ["ADD-001", "ADD-002", "ADD-003"],
+  "command": "node mechanisms/check-directory-profiles.mjs",
+  "requirements": ["PRF-001", "PRF-002", "PRF-003", "PRF-004"],
   "results": "per-requirement",
   "inputs": [
     "docs/operator-manual.md",
     "fixtures/addons",
-    "mechanisms/addon-system.def.json",
-    "mechanisms/check-addon-system.mjs",
+    "mechanisms/check-directory-profiles.mjs",
+    "mechanisms/directory-profiles.def.json",
     "mechanisms/tap-results.mjs",
     "package.json",
     "package-lock.json",
     "scripts",
     "src",
-    "tests/addon-system.test.mjs"
+    "tests/directory-profiles.test.mjs"
   ],
   "identity": {
     "env": [],
