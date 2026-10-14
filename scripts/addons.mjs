@@ -10,7 +10,8 @@ function usage() {
   node scripts/addons.mjs pack <source-directory> <output.zip>
   node scripts/addons.mjs validate <archive-or-source>
   node scripts/addons.mjs install <archive.zip>
-  node scripts/addons.mjs remove <add-on-id>`;
+  node scripts/addons.mjs remove <add-on-id>
+  node --import tsx scripts/addons.mjs seed <installed-add-on-id>`;
 }
 
 function exactArgs(args, count, command) {
@@ -50,6 +51,13 @@ async function main() {
     exactArgs(args, 1, command);
     const result = removeAddon(process.cwd(), args[0]);
     process.stdout.write(`Removed ${result.id}@${result.version} (${result.files} files)\n`);
+    return;
+  }
+  if (command === "seed") {
+    exactArgs(args, 1, command);
+    const { seedInstalledAddon } = await import("../src/lib/addon-seed.ts");
+    const count = seedInstalledAddon(process.cwd(), args[0]);
+    process.stdout.write(`Seeded ${count} listing${count === 1 ? "" : "s"} from ${args[0]}\n`);
     return;
   }
   throw new Error(command ? `Unknown add-on command: ${command}\n${usage()}` : usage());

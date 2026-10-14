@@ -257,11 +257,13 @@ requirementTest("ADD-003 reference add-on completes a clean build seed and remov
     expectSuccess(run(source, ["install", archive]), "install reference add-on");
     assert.equal(existsSync(databasePath), false, "installation opened the operator database");
 
+    expectSuccess(npm(source, ["run", "db:migrate"], env), "migrate add-on seed database");
     const build = npm(source, ["run", "build"], env, 420_000);
     expectSuccess(build, "build installed reference add-on");
-    expectSuccess(npm(source, ["run", "db:migrate"], env), "migrate add-on seed database");
     expectSuccess(npm(source, ["run", "addon:seed", "--", "reference-addon"], env),
       "explicitly seed reference add-on");
+    expectSuccess(npm(source, ["run", "addon:seed", "--", "reference-addon"], env),
+      "repeat reference add-on seed");
     const database = new Database(databasePath, { readonly: true });
     try {
       assert.equal(database.prepare("SELECT name FROM listings WHERE slug = ?")
