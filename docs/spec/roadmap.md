@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: redirect-reserved-routes
+Current: paddle-recovery-purchase-binding
 
 ## public-starter-and-theme
 
@@ -627,3 +627,9 @@ Delivers backlog item import-card-category-entities: Audit 2026-10-11 (L1, verif
 Requirements: SEO-008
 
 Delivers backlog item redirect-reserved-routes: Audit 2026-10-11 (L2, verified). protectedRoute in src/lib/seo-redirects.ts omits /social-card, /og, /brand-assets and /theme.css. An admin can save a redirect from /social-card, and every advertised card URL then returns the homepage. Reserve every live route prefix, ideally from one shared list.
+
+## paddle-recovery-purchase-binding
+
+Requirements: COM-009
+
+Delivers backlog item paddle-recovery-purchase-binding: Audit 2026-10-11 (L3, reported). Resource-less Paddle recovery accepts an operator-supplied transaction id and checks its terms but not customData.purchaseId (src/lib/payment-reconciliation.ts:141). An operator who mixes up two reservations with identical terms binds the wrong payment to a purchase. Require the transaction's purchase metadata to match the target before binding.
