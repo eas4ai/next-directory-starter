@@ -1,8 +1,10 @@
 import {
   chmodSync, closeSync, fsyncSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync,
-  readdirSync, renameSync, rmSync, rmdirSync, writeFileSync,
+  readdirSync, renameSync, rmSync, rmdirSync, writeFileSync, linkSync,
 } from "node:fs";
+import { randomBytes } from "node:crypto";
 import { dirname, join, relative, resolve, sep } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { readArchive } from "./archive.mjs";
 import {
   canonicalJson, normalizePayloadPath, readStarterIdentity, sha256, targetForPayload,
@@ -13,6 +15,8 @@ import {
 } from "./registry.mjs";
 
 const TRANSACTION_PATH = ".directory-starter/addons.transaction.json";
+const OPERATION_LOCK_PATH = ".directory-starter/addons.operation.lock";
+const LOCK_WAIT_MS = 30_000;
 
 function workspacePath(root, path) {
   return join(root, ...path.split("/"));
@@ -225,6 +229,102 @@ function parseTransactionJournal(bytes) {
   return value;
 }
 
+function parseOperationLock(bytes) {
+  let value;
+  try { value = JSON.parse(bytes.toString("utf8")); }
+  catch { return null; }
+  if (!value || typeof value !== "object" || Array.isArray(value) || value.schemaVersion !== 1 ||
+      !Number.isInteger(value.pid) || value.pid < 1 ||
+      typeof value.token !== "string" || !/^[a-f0-9]{32}$/.test(value.token) ||
+      typeof value.startedAt !== "string" || Number.isNaN(Date.parse(value.startedAt)) ||
+      !canonicalJson(value).equals(bytes)) return null;
+  return value;
+}
+
+function processIsAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return Boolean(error && typeof error === "object" && error.code === "EPERM");
+  }
+}
+
+function tryCreateOperationLock(root, owner) {
+  const path = workspacePath(root, OPERATION_LOCK_PATH);
+  let descriptor;
+  try {
+    descriptor = openSync(path, "wx", 0o600);
+    writeFileSync(descriptor, canonicalJson(owner));
+    fsyncSync(descriptor);
+    return true;
+  } catch (error) {
+    if (!error || typeof error !== "object" || error.code !== "EEXIST") throw error;
+    return false;
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+  }
+}
+
+async function acquireOperationLock(root) {
+  const owner = {
+    schemaVersion: 1,
+    pid: process.pid,
+    token: randomBytes(16).toString("hex"),
+    startedAt: new Date().toISOString(),
+  };
+  const path = workspacePath(root, OPERATION_LOCK_PATH);
+  const deadline = Date.now() + LOCK_WAIT_MS;
+  while (Date.now() < deadline) {
+    if (tryCreateOperationLock(root, owner)) {
+      syncDirectory(dirname(path));
+      return owner;
+    }
+    const status = lstatOptional(path);
+    if (!status) continue;
+    if (!status.isFile() || status.isSymbolicLink()) {
+      throw new Error("Add-on operation lock must be a regular file");
+    }
+    const existing = parseOperationLock(readFileSync(path));
+    if (existing && !processIsAlive(existing.pid)) {
+      rmSync(path, { force: true });
+      syncDirectory(dirname(path));
+      continue;
+    }
+    if (!existing && Date.now() - status.mtimeMs > 2_000) {
+      throw new Error("Add-on operation lock is corrupt");
+    }
+    await delay(50);
+  }
+  throw new Error("Timed out waiting for another add-on operation");
+}
+
+function releaseOperationLock(root, owner) {
+  const path = workspacePath(root, OPERATION_LOCK_PATH);
+  const current = parseOperationLock(readFileSync(path));
+  if (!current || current.token !== owner.token || current.pid !== owner.pid) {
+    throw new Error("Add-on operation lock ownership changed");
+  }
+  rmSync(path);
+  syncDirectory(dirname(path));
+}
+
+async function withOperationLock(root, action) {
+  const owner = await acquireOperationLock(root);
+  try {
+    if (process.env.NODE_ENV === "test" && process.env.DIRECTORY_ADDON_TEST_HOLD_LOCK_MS) {
+      const duration = Number(process.env.DIRECTORY_ADDON_TEST_HOLD_LOCK_MS);
+      if (!Number.isInteger(duration) || duration < 1 || duration > 10_000) {
+        throw new Error("Invalid test lock hold duration");
+      }
+      await delay(duration);
+    }
+    return await action();
+  } finally {
+    releaseOperationLock(root, owner);
+  }
+}
+
 function removeRestoredTarget(path) {
   const status = lstatOptional(path);
   if (!status) return;
@@ -234,7 +334,7 @@ function removeRestoredTarget(path) {
   rmSync(path, { force: true });
 }
 
-export function recoverAddonTransaction(rootInput) {
+export function recoverAddonTransaction(rootInput, selectedTargets = null) {
   const root = resolve(rootInput);
   const journalPath = workspacePath(root, TRANSACTION_PATH);
   const status = lstatOptional(journalPath);
@@ -245,6 +345,7 @@ export function recoverAddonTransaction(rootInput) {
   const journal = parseTransactionJournal(readFileSync(journalPath));
   const errors = [];
   for (const entry of [...journal.entries].reverse()) {
+    if (selectedTargets && !selectedTargets.has(entry.target)) continue;
     try {
       const destination = workspacePath(root, entry.target);
       removeRestoredTarget(destination);
@@ -293,6 +394,11 @@ function mutateWorkspace(root, operations) {
     }
     const createdDirectories = [...new Set(operations.filter(({ bytes }) => bytes !== null)
       .flatMap(({ target }) => missingParentDirectories(root, target)))];
+    for (const operation of operations) {
+      if (operation.exclusive && lstatOptional(workspacePath(root, operation.target))) {
+        throw new Error(`Workspace target collision: ${operation.target}`);
+      }
+    }
     const journal = {
       schemaVersion: 1,
       stage: stage.slice(dirname(root).length + 1),
@@ -310,11 +416,19 @@ function mutateWorkspace(root, operations) {
       const destination = workspacePath(root, operation.target);
       if (operation.bytes === null) {
         rmSync(destination);
+        applied.push(operation.target);
       } else {
         createdParentDirectories(root, operation.target);
-        renameSync(workspacePath(stage, operation.target), destination);
+        const staged = workspacePath(stage, operation.target);
+        if (operation.exclusive) {
+          linkSync(staged, destination);
+          applied.push(operation.target);
+          rmSync(staged);
+        } else {
+          renameSync(staged, destination);
+          applied.push(operation.target);
+        }
       }
-      applied.push(operation.target);
       if (exitAfter !== null && applied.length >= exitAfter) {
         process.kill(process.pid, "SIGKILL");
       }
@@ -327,7 +441,7 @@ function mutateWorkspace(root, operations) {
     journalWritten = false;
   } catch (error) {
     if (journalWritten) {
-      try { recoverAddonTransaction(root); }
+      try { recoverAddonTransaction(root, new Set(applied)); }
       catch (recoveryError) {
         throw new AggregateError([error, recoveryError], "Add-on transaction failed and needs recovery");
       }
@@ -378,59 +492,63 @@ function registryOperations(lock) {
 
 export async function installAddon(rootInput, archiveInput) {
   const root = resolve(rootInput);
-  recoverAddonTransaction(root);
-  const starter = readStarterIdentity(root);
-  const packageValue = await readArchive(archiveInput);
-  validateCompatibility(packageValue.manifest, starter);
-  const lock = readAddonLock(root);
-  const builtIns = verifyWorkspace(root, lock);
-  const manifest = packageValue.manifest;
-  if (lock.addons.some(({ id }) => id === manifest.id)) {
-    throw new Error(`Add-on is already installed: ${manifest.id}`);
-  }
-  const installedThemes = new Set(lock.addons.flatMap(({ themes }) => themes.map(({ id }) => id)));
-  const installedTemplates = new Set(lock.addons.flatMap(({ templates }) => templates.map(({ id }) => id)));
-  for (const { id } of manifest.themes) {
-    if (builtIns.themes.has(id) || installedThemes.has(id)) throw new Error(`Theme ID collision: ${id}`);
-  }
-  for (const { id } of manifest.templates) {
-    if (builtIns.templates.has(id) || installedTemplates.has(id)) {
-      throw new Error(`Template ID collision: ${id}`);
+  return withOperationLock(root, async () => {
+    recoverAddonTransaction(root);
+    const starter = readStarterIdentity(root);
+    const packageValue = await readArchive(archiveInput);
+    validateCompatibility(packageValue.manifest, starter);
+    const lock = readAddonLock(root);
+    const builtIns = verifyWorkspace(root, lock);
+    const manifest = packageValue.manifest;
+    if (lock.addons.some(({ id }) => id === manifest.id)) {
+      throw new Error(`Add-on is already installed: ${manifest.id}`);
     }
-  }
+    const installedThemes = new Set(lock.addons.flatMap(({ themes }) => themes.map(({ id }) => id)));
+    const installedTemplates = new Set(lock.addons.flatMap(({ templates }) => templates.map(({ id }) => id)));
+    for (const { id } of manifest.themes) {
+      if (builtIns.themes.has(id) || installedThemes.has(id)) throw new Error(`Theme ID collision: ${id}`);
+    }
+    for (const { id } of manifest.templates) {
+      if (builtIns.templates.has(id) || installedTemplates.has(id)) {
+        throw new Error(`Template ID collision: ${id}`);
+      }
+    }
 
-  const entry = lockEntry(packageValue);
-  const ownedTargets = new Set(lock.addons.flatMap(({ files }) => files.map(({ target }) => target)));
-  for (const file of entry.files) {
-    requireAvailableParent(root, file.target);
-    if (ownedTargets.has(file.target) || lstatOptional(workspacePath(root, file.target))) {
-      throw new Error(`Workspace target collision: ${file.target}`);
+    const entry = lockEntry(packageValue);
+    const ownedTargets = new Set(lock.addons.flatMap(({ files }) => files.map(({ target }) => target)));
+    for (const file of entry.files) {
+      requireAvailableParent(root, file.target);
+      if (ownedTargets.has(file.target) || lstatOptional(workspacePath(root, file.target))) {
+        throw new Error(`Workspace target collision: ${file.target}`);
+      }
     }
-  }
-  const nextLock = sortedLock([...lock.addons, entry]);
-  const payload = entry.files.map(({ source, target }) =>
-    ({ target, bytes: packageValue.files.get(source) }));
-  mutateWorkspace(root, [...payload, ...registryOperations(nextLock)]);
-  return { id: entry.id, version: entry.version, files: entry.files.length };
+    const nextLock = sortedLock([...lock.addons, entry]);
+    const payload = entry.files.map(({ source, target }) =>
+      ({ target, bytes: packageValue.files.get(source), exclusive: true }));
+    mutateWorkspace(root, [...payload, ...registryOperations(nextLock)]);
+    return { id: entry.id, version: entry.version, files: entry.files.length };
+  });
 }
 
-export function removeAddon(rootInput, addonId) {
+export async function removeAddon(rootInput, addonId) {
   const root = resolve(rootInput);
-  recoverAddonTransaction(root);
-  readStarterIdentity(root);
-  const lock = readAddonLock(root);
-  verifyWorkspace(root, lock);
-  const entry = lock.addons.find(({ id }) => id === addonId);
-  if (!entry) throw new Error(`Add-on is not installed: ${addonId}`);
-  const nextLock = sortedLock(lock.addons.filter(({ id }) => id !== addonId));
-  const removals = entry.files.map(({ target }) => ({ target, bytes: null }));
-  mutateWorkspace(root, [...removals, ...registryOperations(nextLock)]);
-  for (const { target } of [...entry.files].reverse()) {
-    let directory = dirname(workspacePath(root, target));
-    while (directory !== root && relative(root, directory).split(sep)[0] !== "..") {
-      try { rmdirSync(directory); } catch { break; }
-      directory = dirname(directory);
+  return withOperationLock(root, async () => {
+    recoverAddonTransaction(root);
+    readStarterIdentity(root);
+    const lock = readAddonLock(root);
+    verifyWorkspace(root, lock);
+    const entry = lock.addons.find(({ id }) => id === addonId);
+    if (!entry) throw new Error(`Add-on is not installed: ${addonId}`);
+    const nextLock = sortedLock(lock.addons.filter(({ id }) => id !== addonId));
+    const removals = entry.files.map(({ target }) => ({ target, bytes: null }));
+    mutateWorkspace(root, [...removals, ...registryOperations(nextLock)]);
+    for (const { target } of [...entry.files].reverse()) {
+      let directory = dirname(workspacePath(root, target));
+      while (directory !== root && relative(root, directory).split(sep)[0] !== "..") {
+        try { rmdirSync(directory); } catch { break; }
+        directory = dirname(directory);
+      }
     }
-  }
-  return { id: entry.id, version: entry.version, files: entry.files.length };
+    return { id: entry.id, version: entry.version, files: entry.files.length };
+  });
 }
