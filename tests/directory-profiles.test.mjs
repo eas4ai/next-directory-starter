@@ -108,6 +108,65 @@ function completeProfile(overrides = {}) {
   };
 }
 
+function authoringProfile(overrides = {}) {
+  const profile = structuredClone(completeProfile(overrides));
+  const tagline = profile.fields.find(({ key }) => key === "vendor.ai-tools.tagline");
+  tagline.writeAuthority = "operator";
+  const notes = profile.fields.find(({ key }) => key === "vendor.ai-tools.notes");
+  notes.visibility = "private";
+  notes.placement = "hidden";
+  notes.searchable = false;
+  const updated = profile.fields.find(({ key }) => key === "vendor.ai-tools.updated");
+  updated.writeAuthority = "operator";
+  profile.fields.push({ ...commonField("vendor.ai-tools.system-note", "System note", "short-text",
+    { minLength: 0, maxLength: 120 }), writeAuthority: "system", visibility: "staff",
+    placement: "hidden", searchable: false });
+  profile.fields.find(({ key }) => key === "vendor.ai-tools.pricing-model").required = true;
+  return profile;
+}
+
+function completeProfileValues({ includeOperator = true, includeSystem = true,
+  mediaId = "123e4567-e89b-12d3-a456-426614174000" } = {}) {
+  return {
+    ...(includeOperator ? { "vendor.ai-tools.tagline": "A concise tagline" } : {}),
+    "vendor.ai-tools.notes": "**Private** owner notes",
+    "vendor.ai-tools.open-source": true,
+    "vendor.ai-tools.team-size": 42,
+    "vendor.ai-tools.rating": "4.25",
+    "vendor.ai-tools.starting-price": { amountMinor: 1299, currency: "USD" },
+    "vendor.ai-tools.pricing-model": "paid",
+    "vendor.ai-tools.platforms": ["web", "mac"],
+    "vendor.ai-tools.docs": "https://example.com/docs",
+    "vendor.ai-tools.launched": "2026-10-14",
+    ...(includeOperator ? { "vendor.ai-tools.updated": "2026-10-14T16:00:00.000Z" } : {}),
+    "vendor.ai-tools.availability": { start: "2026-10-01", end: "2026-10-31" },
+    "vendor.ai-tools.setup-time": 7200,
+    "vendor.ai-tools.headquarters": { countryCode: "US", region: "NY",
+      locality: "New York", latitude: 40.7128, longitude: -74.006 },
+    "vendor.ai-tools.screenshot": mediaId,
+    "vendor.ai-tools.integrations": [{ id: "integration-slack", values: {
+      name: "Slack", url: "https://example.com/slack", native: true,
+    } }],
+    ...(includeSystem ? { "vendor.ai-tools.system-note": "Automated classification" } : {}),
+  };
+}
+
+function listingInput(slug, profileValues, profileStateRevision, overrides = {}) {
+  return {
+    slug,
+    name: `Profile ${slug}`,
+    summary: "A listing with complete typed profile values.",
+    description: "The core and profile record must move through one revision.",
+    category: "Tools",
+    url: `https://example.com/${slug}`,
+    status: "draft",
+    revision: 1,
+    profileValues,
+    profileStateRevision,
+    ...overrides,
+  };
+}
+
 function reorderedObject(value) {
   if (Array.isArray(value)) return value.map(reorderedObject);
   if (!value || typeof value !== "object") return value;
@@ -165,6 +224,9 @@ function resetProfileTables(database) {
     DELETE FROM submissions;
     DELETE FROM owner_drafts;
     DELETE FROM audit_events;
+    DELETE FROM media_assignments;
+    DELETE FROM media_cleanup_queue;
+    DELETE FROM media_assets;
     DELETE FROM listings;
     DELETE FROM categories;`);
   database.prepare(`INSERT INTO directory_profile_state
@@ -212,6 +274,19 @@ function insertValue(database, {
     VALUES (?, ?, ?, ?, ?, '', 0, ?, ?, ?, ?, ?, ?)`)
     .run(slug, profileId, version, fieldKey, itemId, valueType, textValue,
       integerValue, currency, archivedAt, "2026-10-14T00:00:00.000Z");
+}
+
+function insertProfileMedia(database, { id = "123e4567-e89b-12d3-a456-426614174000",
+  slug = "profile-listing", fieldKey = "vendor.ai-tools.screenshot",
+  uploadedBy = "profile-owner", state = "draft" } = {}) {
+  database.prepare(`INSERT INTO media_assets
+    (id, target_kind, target_slug, uploaded_by, alt, width, height, created_at)
+    VALUES (?, 'listing', ?, ?, 'Profile image', 1200, 800, ?)`)
+    .run(id, slug, uploadedBy, "2026-10-14T00:00:00.000Z");
+  database.prepare(`INSERT INTO directory_profile_media
+    (asset_id, listing_slug, field_key, item_id, state, uploaded_by, created_at)
+    VALUES (?, ?, ?, 'value', ?, ?, ?)`)
+    .run(id, slug, fieldKey, state, uploadedBy, "2026-10-14T00:00:00.000Z");
 }
 
 requirementTest("PRF-001 activates immutable versioned directory-profile definitions", async (t) => {
@@ -528,26 +603,200 @@ requirementTest("PRF-001 activates immutable versioned directory-profile definit
   });
 });
 
-requirementTest("PRF-002 validates profile values with the complete listing revision", () => {
-  const profileValues = {
-    "reference-addon.ai-tools": {
-      pricingModel: "usage-based",
-    },
-  };
-  const listing = parseListing({
-    slug: "profile-aware-listing",
-    name: "Profile aware listing",
-    summary: "A valid listing carrying typed profile values.",
-    description: "The profile values must remain attached to this validated revision.",
-    category: "Developer tools",
-    url: "https://example.com/profile-aware-listing",
-    status: "draft",
-    revision: 1,
-    profileValues,
+requirementTest("PRF-002 validates profile values with the complete listing revision", async (t) => {
+  await t.test("validates complete typed records, authority, safety, and owned media", async () => {
+    const api = await profileTestContext();
+    resetProfileTables(api.database);
+    activate(api, authoringProfile(), 0);
+    insertListing(api.database, "profile-values", "draft");
+    insertProfileMedia(api.database, { slug: "profile-values" });
+    const valuesApi = await import("../src/lib/profile-values.ts");
+    assert.equal(typeof valuesApi.validateProfileValues, "function",
+      "complete profile-value validation is missing");
+    const profiles = api.activeDirectoryProfiles();
+    const allTypes = completeProfileValues();
+    const validated = valuesApi.validateProfileValues(allTypes, {
+      profiles, authority: "system", listingSlug: "profile-values",
+      actorUserId: "profile-admin", requireComplete: true,
+    });
+    assert.deepEqual(validated, allTypes);
+
+    const ownerValues = completeProfileValues({ includeOperator: false, includeSystem: false });
+    assert.deepEqual(valuesApi.validateProfileValues(ownerValues, {
+      profiles, authority: "owner", listingSlug: "profile-values",
+      actorUserId: "profile-owner", requireComplete: true,
+    }), ownerValues);
+    assert.throws(() => valuesApi.validateProfileValues({ ...ownerValues,
+      "vendor.ai-tools.tagline": "Owner override" }, {
+      profiles, authority: "owner", listingSlug: "profile-values",
+      actorUserId: "profile-owner", requireComplete: true,
+    }), /authority|permission|operator/i);
+    assert.throws(() => valuesApi.validateProfileValues({ ...allTypes,
+      "vendor.ai-tools.notes": "<script>private sentinel</script>" }, {
+      profiles, authority: "system", listingSlug: "profile-values",
+      actorUserId: "profile-admin", requireComplete: true,
+    }), /Markdown|active|unsafe/i);
+    assert.throws(() => valuesApi.validateProfileValues({ ...allTypes,
+      "vendor.ai-tools.docs": "javascript:alert(1)" }, {
+      profiles, authority: "system", listingSlug: "profile-values",
+      actorUserId: "profile-admin", requireComplete: true,
+    }), /URL|protocol|safe/i);
+    assert.throws(() => valuesApi.validateProfileValues({ ...allTypes,
+      "vendor.ai-tools.screenshot": "223e4567-e89b-42d3-a456-426614174000" }, {
+      profiles, authority: "system", listingSlug: "profile-values",
+      actorUserId: "profile-admin", requireComplete: true,
+    }), /media|owned|available/i);
+    assert.throws(() => valuesApi.validateProfileValues({ ...allTypes,
+      "vendor.ai-tools.unknown": "private leak sentinel" }, {
+      profiles, authority: "system", listingSlug: "profile-values",
+      actorUserId: "profile-admin", requireComplete: true,
+    }), /unknown|field/i);
+    const missing = { ...ownerValues };
+    delete missing["vendor.ai-tools.pricing-model"];
+    assert.throws(() => valuesApi.validateProfileValues(missing, {
+      profiles, authority: "owner", listingSlug: "profile-values",
+      actorUserId: "profile-owner", requireComplete: true,
+    }), /pricing-model|required/i);
   });
-  assert.ok(listing, "the core listing fixture must remain valid");
-  assert.deepEqual(listing.profileValues, profileValues,
-    "server listing validation drops profile values from the revision");
+
+  await t.test("stores core and normalized values atomically and hydrates listings in a batch", async () => {
+    const api = await profileTestContext();
+    resetProfileTables(api.database);
+    activate(api, authoringProfile(), 0);
+    const profileValues = completeProfileValues({ includeSystem: false,
+      mediaId: undefined });
+    delete profileValues["vendor.ai-tools.screenshot"];
+    const parsed = parseListing(listingInput("admin-profile", profileValues, 1));
+    assert.ok(parsed, "the complete core and profile listing must parse");
+    assert.deepEqual(parsed.profileValues, profileValues,
+      "server listing validation drops profile values from the revision");
+    assert.equal(parsed.profileStateRevision, 1);
+    const listingApi = await import("../src/lib/listings.ts");
+    const valuesApi = await import("../src/lib/profile-values.ts");
+    listingApi.createListing(parsed, "profile-admin");
+    assert.deepEqual(valuesApi.profileValuesForListings(["admin-profile"]).get("admin-profile"),
+      profileValues);
+    const before = profileSnapshot(api.database);
+    const coreBefore = listingApi.listingBySlug("admin-profile");
+    assert.throws(() => listingApi.updateListing({ ...coreBefore, profileValues: {
+      ...profileValues, "vendor.ai-tools.notes": "<script>rollback sentinel</script>",
+    }, profileStateRevision: 1 }, "profile-admin", coreBefore.revision), /Markdown|active|unsafe/i);
+    assert.deepEqual(listingApi.listingBySlug("admin-profile"), coreBefore);
+    assert.deepEqual(profileSnapshot(api.database), before);
+
+    const slugs = ["admin-profile"];
+    for (let index = 0; index < 100; index += 1) {
+      const slug = `batch-${String(index).padStart(3, "0")}`;
+      listingApi.createListing(parseListing(listingInput(slug, profileValues, 1)), "profile-admin");
+      slugs.push(slug);
+    }
+    const originalPrepare = api.database.prepare;
+    let valueQueries = 0;
+    api.database.prepare = function countedPrepare(sql) {
+      if (String(sql).includes("directory_profile_values")) valueQueries += 1;
+      return originalPrepare.call(this, sql);
+    };
+    let hydrated;
+    try { hydrated = listingApi.allListings(); }
+    finally { api.database.prepare = originalPrepare; }
+    assert.equal(hydrated.length, 101);
+    assert.ok(hydrated.every((listing) => listing.profileValues?.["vendor.ai-tools.pricing-model"] === "paid"));
+    assert.ok(valueQueries <= 2, `listing hydration issued ${valueQueries} profile-value queries`);
+  });
+
+  await t.test("renders accessible type controls without disclosing protected fields", async () => {
+    const api = await profileTestContext();
+    resetProfileTables(api.database);
+    activate(api, authoringProfile(), 0);
+    const modulePath = join(repository, "src/components/profile-field-editor.tsx");
+    assert.ok(existsSync(modulePath), "generated profile field editor is missing");
+    const React = await import("react");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { ProfileFieldEditor } = await import(pathToFileURL(modulePath).href);
+    const profile = api.parseDirectoryProfileDefinition(authoringProfile());
+    const operatorHtml = renderToStaticMarkup(React.createElement(ProfileFieldEditor, {
+      fields: profile.fields, values: completeProfileValues(), authority: "operator",
+      mediaEndpoint: "/api/profile-media/profile-values", errors: {}, onChange() {},
+    }));
+    for (const text of ["Tagline help", "Notes help", "Open source", "Team size",
+      "Rating", "Starting price", "Pricing model", "Platforms", "Documentation",
+      "Launched", "Updated", "Availability", "Setup time", "Headquarters",
+      "Screenshot", "Integrations", "Add integration", "Move integration-slack up",
+      "Remove integration-slack"]) assert.match(operatorHtml, new RegExp(text, "i"));
+    for (const type of ["checkbox", "number", "url", "date", "datetime-local"]) {
+      assert.match(operatorHtml, new RegExp(`type=["']${type}["']`, "i"));
+    }
+    assert.match(operatorHtml, /<textarea/i);
+    assert.match(operatorHtml, /aria-describedby=/i);
+    assert.match(operatorHtml, /<fieldset/i);
+    const ownerHtml = renderToStaticMarkup(React.createElement(ProfileFieldEditor, {
+      fields: profile.fields, values: completeProfileValues({ includeOperator: false,
+        includeSystem: false }), authority: "owner", mediaEndpoint: "/api/profile-media/profile-values",
+      errors: {}, onChange() {},
+    }));
+    assert.doesNotMatch(ownerHtml, /Tagline help|Updated help/);
+  });
+
+  await t.test("publishes one exact owner snapshot and rejects stale or unauthorized moderation", async () => {
+    const api = await profileTestContext();
+    resetProfileTables(api.database);
+    activate(api, authoringProfile(), 0);
+    api.database.prepare("INSERT INTO categories (name) VALUES ('Tools')").run();
+    const moderation = await import("../src/lib/moderation.ts");
+    const valuesApi = await import("../src/lib/profile-values.ts");
+    const ownerValues = completeProfileValues({ includeOperator: false, includeSystem: false });
+    delete ownerValues["vendor.ai-tools.screenshot"];
+    moderation.createOwnerListing("profile-owner", listingInput("owner-profile", ownerValues, 1));
+    assert.throws(() => moderation.updateOwnerListing("profile-owner", "owner-profile", {
+      profileValues: { ...ownerValues, "vendor.ai-tools.tagline": "Forbidden owner edit" },
+      profileStateRevision: 1,
+    }), /authority|operator|permission/i);
+    const proposedValues = { ...ownerValues, "vendor.ai-tools.team-size": 77 };
+    moderation.updateOwnerListing("profile-owner", "owner-profile", {
+      profileValues: proposedValues, profileStateRevision: 1,
+    });
+    const submission = moderation.submitOwnerListing("profile-owner", "owner-profile");
+    const stored = JSON.parse(api.database.prepare("SELECT payload FROM submissions WHERE id = ?")
+      .get(submission.id).payload);
+    assert.deepEqual(stored.profileValues, proposedValues);
+    assert.equal(stored.profileStateRevision, 1);
+    const nextProfile = authoringProfile({ version: "1.1.0" });
+    activate(api, nextProfile, 1);
+    const before = profileSnapshot(api.database);
+    const listingBefore = api.database.prepare("SELECT * FROM listings WHERE slug = 'owner-profile'").get();
+    for (const actor of ["profile-owner", "profile-banned", "profile-unverified"]) {
+      assert.throws(() => moderation.decideSubmission(submission.id, actor, "approve", "No"),
+        /Forbidden|permission|verified|stale|profile/i);
+      assert.deepEqual(api.database.prepare("SELECT * FROM listings WHERE slug = 'owner-profile'").get(),
+        listingBefore);
+      assert.deepEqual(profileSnapshot(api.database), before);
+    }
+    assert.throws(() => moderation.decideSubmission(submission.id, "profile-moderator", "approve", "Good"),
+      /profile|schema|revision|changed/i);
+    assert.equal(api.database.prepare("SELECT status FROM submissions WHERE id = ?")
+      .get(submission.id).status, "pending");
+    moderation.decideSubmission(submission.id, "profile-moderator", "reject", "Refresh profile");
+    moderation.updateOwnerListing("profile-owner", "owner-profile", {
+      profileValues: proposedValues, profileStateRevision: 2,
+    });
+    const current = moderation.submitOwnerListing("profile-owner", "owner-profile");
+    moderation.decideSubmission(current.id, "profile-moderator", "approve", "Good");
+    assert.deepEqual(valuesApi.profileValuesForListings(["owner-profile"])
+      .get("owner-profile"), proposedValues);
+    assert.equal(api.database.prepare(`SELECT COUNT(*) AS count FROM audit_events
+      WHERE action = 'moderation.approve' AND target = 'owner-profile'`).get().count, 1);
+
+    const rejectedValues = { ...proposedValues, "vendor.ai-tools.team-size": 88 };
+    moderation.updateOwnerListing("profile-owner", "owner-profile", {
+      profileValues: rejectedValues, profileStateRevision: 2,
+    });
+    const rejected = moderation.submitOwnerListing("profile-owner", "owner-profile");
+    moderation.decideSubmission(rejected.id, "profile-moderator", "reject", "Needs evidence");
+    assert.deepEqual(JSON.parse(api.database.prepare("SELECT payload FROM owner_drafts WHERE slug = ?")
+      .get("owner-profile").payload).profileValues, rejectedValues);
+    assert.deepEqual(valuesApi.profileValuesForListings(["owner-profile"])
+      .get("owner-profile"), proposedValues);
+  });
 });
 
 requirementTest("PRF-003 parses bounded public profile facets and stable sorts", async () => {
