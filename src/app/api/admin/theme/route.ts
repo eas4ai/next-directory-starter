@@ -1,9 +1,9 @@
-import { isAdmin } from "@/lib/admin";
+import { canAdmin, sessionUser } from "@/lib/admin";
 import { requestJson, requestJsonErrorResponse } from "@/lib/request-json";
 import { getThemePreset, parseThemePreset, saveThemePreset } from "@/lib/theme";
 
 export async function GET(request: Request) {
-  if (!(await isAdmin(request.headers))) {
+  if (!canAdmin((await sessionUser(request.headers))?.role)) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -11,7 +11,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!(await isAdmin(request.headers))) {
+  const user = await sessionUser(request.headers);
+  if (!user || !canAdmin(user.role)) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
   const siteOrigin = new URL(process.env.BETTER_AUTH_URL ?? request.url).origin;
@@ -30,6 +31,6 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid theme choice" }, { status: 400 });
   }
 
-  saveThemePreset(preset);
+  saveThemePreset(preset, user.id);
   return Response.json({ preset });
 }
