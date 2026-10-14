@@ -26,6 +26,8 @@ export const PROFILE_FIELD_TYPES = Object.freeze([
 const namespacePattern = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$/;
 const childKeyPattern = /^[a-z][a-z0-9-]*$/;
 const choicePattern = /^[a-z0-9][a-z0-9._-]{0,79}$/;
+const itemIdPattern = /^[a-z0-9][a-z0-9._-]{0,119}$/i;
+const mediaIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/;
 const decimalPattern = /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/;
 
@@ -257,24 +259,41 @@ function decimalToScaled(value, scale) {
   return Number(signed);
 }
 
-function validateScalarDefault(field, value) {
+function decimalFromScaled(value, scale) {
+  const negative = value < 0;
+  const digits = String(Math.abs(value)).padStart(scale + 1, "0");
+  const whole = scale ? digits.slice(0, -scale) : digits;
+  const fraction = scale ? `.${digits.slice(-scale)}` : "";
+  return `${negative ? "-" : ""}${whole}${fraction}`;
+}
+
+function valueObject(value, allowed, label) {
+  const object = plainObject(value, label);
+  const unknown = Object.keys(object).find((key) => !allowed.includes(key));
+  if (unknown) throw new Error(`Unknown ${label} property: ${unknown}`);
+  return object;
+}
+
+function normalizeScalarDefault(field, value) {
   const { type, constraints } = field;
   if (type === "short-text" || type === "markdown") {
-    if (typeof value !== "string" || value.length < constraints.minLength ||
-        value.length > constraints.maxLength || (type === "markdown" && !safeMarkdown(value))) {
+    if (typeof value !== "string") throw new Error(`Invalid ${type} default`);
+    const normalized = type === "short-text" ? value.trim().normalize("NFC") : value.normalize("NFC");
+    if (normalized.length < constraints.minLength || normalized.length > constraints.maxLength ||
+        (type === "markdown" && !safeMarkdown(normalized))) {
       throw new Error(`Invalid ${type} default`);
     }
-    return;
+    return normalized;
   }
   if (type === "boolean") {
     if (typeof value !== "boolean") throw new Error("Invalid boolean default");
-    return;
+    return value;
   }
   if (type === "integer") {
     if (!Number.isSafeInteger(value) || value < constraints.min || value > constraints.max) {
       throw new Error("Invalid integer default");
     }
-    return;
+    return value;
   }
   if (type === "decimal") {
     const scaled = decimalToScaled(value, constraints.scale);
@@ -282,21 +301,21 @@ function validateScalarDefault(field, value) {
         scaled > decimalToScaled(constraints.max, constraints.scale)) {
       throw new Error("Invalid decimal default");
     }
-    return;
+    return decimalFromScaled(scaled, constraints.scale);
   }
   if (type === "money") {
-    if (!value || typeof value !== "object" || Array.isArray(value) ||
-        !Number.isSafeInteger(value.amountMinor) || value.amountMinor < constraints.minMinor ||
-        value.amountMinor > constraints.maxMinor || typeof value.currency !== "string" ||
-        !constraints.currencies.includes(value.currency.toUpperCase())) {
+    const object = valueObject(value, ["amountMinor", "currency"], "money default");
+    const currency = typeof object.currency === "string" ? object.currency.toUpperCase() : "";
+    if (!Number.isSafeInteger(object.amountMinor) || object.amountMinor < constraints.minMinor ||
+        object.amountMinor > constraints.maxMinor || !constraints.currencies.includes(currency)) {
       throw new Error("Invalid money default");
     }
-    return;
+    return { amountMinor: object.amountMinor, currency };
   }
   if (type === "single-choice") {
     if (typeof value !== "string" || !constraints.choices.some((choiceValue) =>
       choiceValue.value === value)) throw new Error("Invalid choice default");
-    return;
+    return value;
   }
   if (type === "multiple-choice") {
     if (!Array.isArray(value) || new Set(value).size !== value.length ||
@@ -304,17 +323,19 @@ function validateScalarDefault(field, value) {
           !constraints.choices.some((choiceValue) => choiceValue.value === entry))) {
       throw new Error("Invalid multiple-choice default");
     }
-    return;
+    const selected = new Set(value);
+    return constraints.choices.map(({ value: choiceValue }) => choiceValue)
+      .filter((choiceValue) => selected.has(choiceValue));
   }
   if (type === "url") {
     if (!safeUrl(value)) throw new Error("Invalid URL default");
-    return;
+    return new URL(value).href;
   }
   if (type === "date") {
     if (!validDate(value) || value < constraints.min || value > constraints.max) {
       throw new Error("Invalid date default");
     }
-    return;
+    return value;
   }
   if (type === "datetime") {
     if (!validDateTime(value)) throw new Error("Invalid datetime default");
@@ -322,38 +343,69 @@ function validateScalarDefault(field, value) {
     if (normalized < constraints.min || normalized > constraints.max) {
       throw new Error("Invalid datetime default");
     }
-    return;
+    return normalized;
   }
   if (type === "date-range") {
-    if (!value || typeof value !== "object" || !validDate(value.start) ||
-        !validDate(value.end) || value.start > value.end ||
-        value.start < constraints.min || value.end > constraints.max) {
+    const object = valueObject(value, ["start", "end"], "date-range default");
+    if (!validDate(object.start) || !validDate(object.end) || object.start > object.end ||
+        object.start < constraints.min || object.end > constraints.max) {
       throw new Error("Invalid date-range default");
     }
-    return;
+    return { start: object.start, end: object.end };
   }
   if (type === "duration") {
     if (!Number.isSafeInteger(value) || value < constraints.minSeconds ||
         value > constraints.maxSeconds) throw new Error("Invalid duration default");
-    return;
+    return value;
   }
   if (type === "location") {
-    if (!value || typeof value !== "object" || typeof value.countryCode !== "string" ||
-        !constraints.countries.includes(value.countryCode.toUpperCase())) {
+    const object = valueObject(value, ["countryCode", "region", "locality", "latitude", "longitude"],
+      "location default");
+    const countryCode = typeof object.countryCode === "string" ? object.countryCode.toUpperCase() : "";
+    const region = typeof object.region === "string" ? object.region.trim().normalize("NFC") : undefined;
+    const locality = typeof object.locality === "string" ? object.locality.trim().normalize("NFC") : undefined;
+    const hasLatitude = object.latitude !== undefined;
+    const hasLongitude = object.longitude !== undefined;
+    if (!constraints.countries.includes(countryCode) || (region?.length ?? 0) > 120 ||
+        (locality?.length ?? 0) > 120 || hasLatitude !== hasLongitude ||
+        (hasLatitude && (typeof object.latitude !== "number" || !Number.isFinite(object.latitude) ||
+          object.latitude < -90 || object.latitude > 90 || typeof object.longitude !== "number" ||
+          !Number.isFinite(object.longitude) || object.longitude < -180 || object.longitude > 180))) {
       throw new Error("Invalid location default");
     }
-    return;
+    return { countryCode, ...(region ? { region } : {}), ...(locality ? { locality } : {}),
+      ...(hasLatitude ? { latitude: Math.round(object.latitude * 1_000_000) / 1_000_000,
+        longitude: Math.round(object.longitude * 1_000_000) / 1_000_000 } : {}) };
   }
   if (type === "media") {
-    if (typeof value !== "string" || !/^[0-9a-f-]{36}$/.test(value)) {
+    if (typeof value !== "string" || !mediaIdPattern.test(value)) {
       throw new Error("Invalid media default");
     }
-    return;
+    return value.toLowerCase();
   }
   if (type === "group") {
     if (!Array.isArray(value) || value.length < constraints.minItems ||
         value.length > constraints.maxItems) throw new Error("Invalid group default");
-    return;
+    const ids = new Set();
+    return value.map((entry, index) => {
+      const item = valueObject(entry, ["id", "values"], `group default item ${index + 1}`);
+      if (typeof item.id !== "string" || !itemIdPattern.test(item.id) || ids.has(item.id)) {
+        throw new Error("Invalid or duplicate group default item identity");
+      }
+      ids.add(item.id);
+      const supplied = valueObject(item.values, constraints.children.map(({ key }) => key),
+        `group default item ${item.id}`);
+      const values = {};
+      for (const child of constraints.children) {
+        const childValue = supplied[child.key] ?? child.default;
+        if (childValue === undefined) {
+          if (child.required) throw new Error(`Group default requires ${child.label}`);
+          continue;
+        }
+        values[child.key] = normalizeScalarDefault(child, childValue);
+      }
+      return { id: item.id, values };
+    });
   }
   throw new Error(`Unsupported default type: ${type}`);
 }
@@ -361,17 +413,22 @@ function validateScalarDefault(field, value) {
 function validateDefault(field) {
   if (!("default" in field)) return;
   if (field.cardinality === "many" && !["multiple-choice", "group"].includes(field.type)) {
-    if (!Array.isArray(field.default) || field.default.length > PROFILE_LIMITS.groupItems) {
+    const maximum = field.type === "media" ? field.constraints.maxItems : PROFILE_LIMITS.groupItems;
+    if (!Array.isArray(field.default) || field.default.length > maximum) {
       throw new Error(`Invalid ${field.type} multiple default`);
     }
-    for (const entry of field.default) {
-      if (!entry || typeof entry !== "object" || Array.isArray(entry) ||
-          typeof entry.id !== "string") throw new Error(`Invalid ${field.type} multiple default item`);
-      validateScalarDefault(field, entry.value);
-    }
+    const ids = new Set();
+    field.default = field.default.map((entry) => {
+      const item = valueObject(entry, ["id", "value"], `${field.type} multiple default item`);
+      if (typeof item.id !== "string" || !itemIdPattern.test(item.id) || ids.has(item.id)) {
+        throw new Error(`Invalid or duplicate ${field.type} multiple default item identity`);
+      }
+      ids.add(item.id);
+      return { id: item.id, value: normalizeScalarDefault(field, item.value) };
+    });
     return;
   }
-  validateScalarDefault(field, field.default);
+  field.default = normalizeScalarDefault(field, field.default);
 }
 
 function validateProfileRelationships(profile) {

@@ -259,7 +259,8 @@ export function validateProfileFieldValue(field: DirectoryProfileField,
     return undefined;
   }
   if (field.cardinality === "many" && !["multiple-choice", "group"].includes(field.type)) {
-    if (!Array.isArray(input) || input.length > 25) {
+    const maximum = field.type === "media" ? integerConstraint(field, "maxItems") : 25;
+    if (!Array.isArray(input) || input.length > maximum) {
       throw new Error(`${field.label} must be a bounded repeated value`);
     }
     const ids = new Set<string>();
@@ -412,8 +413,10 @@ export function reindexProfileSearch(listingSlug: string, profiles: ActiveProfil
           text_value, integer_value, real_value, currency, date_start, date_end,
           country_code, region, locality, latitude_e6, longitude_e6, media_id
         FROM directory_profile_values
-        WHERE listing_slug = ? AND profile_id = ? AND field_key = ? AND archived_at IS NULL
-        ORDER BY position, item_id, child_key`).all(listingSlug, definition.id, field.key) as
+        WHERE listing_slug = ? AND profile_id = ? AND definition_version = ?
+          AND field_key = ? AND archived_at IS NULL
+        ORDER BY position, item_id, child_key`).all(
+          listingSlug, definition.id, definition.version, field.key) as
         StoredValueRow[];
       if (!rows.length) continue;
       const decoded = decodeProfileValue(field, rows.map(normalizedRow));

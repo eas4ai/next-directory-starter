@@ -40,6 +40,7 @@ export function overviewDestinations(role: string | null | undefined): { href: s
   if (canAdmin(role)) destinations.push(
     { href: "/admin/accounts", label: "Accounts and roles" },
     { href: "/admin/seo", label: "Search settings" },
+    { href: "/admin/profiles", label: "Directory profiles" },
     { href: "/admin/theme", label: "Theme" },
     { href: "/admin/branding", label: "Branding" },
     { href: "/admin/audit", label: "Audit history" },
