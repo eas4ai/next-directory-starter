@@ -3,6 +3,7 @@ import { parseListing } from "@/lib/catalog-input";
 import { allListings, createListing, listingBySlug } from "@/lib/listings";
 import { HttpError, httpErrorResponse } from "@/lib/http-error";
 import { requestJson, requestJsonErrorResponse } from "@/lib/request-json";
+import { ProfileValueError } from "@/lib/profile-values";
 
 export async function GET(request: Request) {
   const user = await sessionUser(request.headers);
@@ -19,7 +20,7 @@ export async function POST(request: Request) {
   }
   let input: unknown;
   try {
-    input = await requestJson(request, 8192);
+    input = await requestJson(request, 256 * 1024);
   } catch (error) {
     return requestJsonErrorResponse(error);
   }
@@ -33,6 +34,8 @@ export async function POST(request: Request) {
     const created = createListing(listing, user.id);
     return Response.json({ listing: created }, { status: 201 });
   } catch (error) {
+    if (error instanceof ProfileValueError) return Response.json({ error: error.message,
+      errors: { [error.fieldKey]: error.message } }, { status: error.status });
     if (error instanceof HttpError) return httpErrorResponse(error);
     if (error instanceof Error && error.message.includes("UNIQUE constraint")) {
       return Response.json({ error: "Slug already exists" }, { status: 409 });

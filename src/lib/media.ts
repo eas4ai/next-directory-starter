@@ -2,11 +2,13 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import sharp from "sharp";
-import { canEditArticles, canModerate } from "@/lib/admin";
+import { canAdmin, canEditArticles, canManageCatalog, canModerate } from "@/lib/admin";
 import { database } from "@/lib/database";
 import { DEFAULT_DATABASE_URL, parseDatabaseUrl } from "@/lib/database-url.mjs";
 import { migrateCatalog } from "@/lib/catalog-migrations";
 import { HttpError, httpErrorResponse } from "@/lib/http-error";
+import { activeDirectoryProfiles } from "@/lib/directory-profiles";
+import type { DirectoryProfileField, ProfileValueSet } from "@/lib/directory-profile-types";
 
 migrateCatalog();
 
@@ -64,11 +66,15 @@ export function drainMediaCleanupQueue(): void {
 
 function queueUnreferencedMediaAsset(id: string, queuedAt: string): void {
   const orphan = database.prepare(`SELECT 1 FROM media_assets a WHERE a.id = ?
-    AND NOT EXISTS (SELECT 1 FROM media_assignments m WHERE m.asset_id = a.id)`).get(id);
+    AND NOT EXISTS (SELECT 1 FROM media_assignments m WHERE m.asset_id = a.id)
+    AND NOT EXISTS (SELECT 1 FROM directory_profile_media p WHERE p.asset_id = a.id)
+    AND NOT EXISTS (SELECT 1 FROM directory_profile_values v WHERE v.media_id = a.id)`).get(id);
   if (!orphan) return;
   queueMediaFileCleanup.run(id, queuedAt);
   database.prepare(`DELETE FROM media_assets WHERE id = ?
-    AND NOT EXISTS (SELECT 1 FROM media_assignments WHERE asset_id = ?)`).run(id, id);
+    AND NOT EXISTS (SELECT 1 FROM media_assignments WHERE asset_id = ?)
+    AND NOT EXISTS (SELECT 1 FROM directory_profile_media WHERE asset_id = ?)
+    AND NOT EXISTS (SELECT 1 FROM directory_profile_values WHERE media_id = ?)`).run(id, id, id, id);
 }
 
 function consumePrivateUpload(actorId: string, now: string): void {
@@ -135,33 +141,39 @@ export async function readBoundedImage(request: Request): Promise<Buffer> {
   return Buffer.concat(chunks, total);
 }
 
-export async function uploadPrivateImage(input: {
-  kind: MediaKind; slug: string; actorId: string; actorRole: string | null | undefined;
-  bytes: Buffer; mimeType: string; alt: string;
-}): Promise<MediaAsset> {
-  ensureUploadPermission(input.kind, input.slug, input.actorId, input.actorRole);
-  if (!Buffer.isBuffer(input.bytes) || input.bytes.length === 0 ||
-      input.bytes.length > MAX_IMAGE_BYTES) throw new MediaError(413, "Image size exceeds limit");
-  const expected = mimeFormat[input.mimeType as keyof typeof mimeFormat];
+async function normalizePrivateImage(bytes: Buffer, mimeType: string, altInput: string): Promise<{
+  output: Buffer; alt: string; width: number; height: number;
+}> {
+  if (!Buffer.isBuffer(bytes) || bytes.length === 0 || bytes.length > MAX_IMAGE_BYTES) {
+    throw new MediaError(413, "Image size exceeds limit");
+  }
+  const expected = mimeFormat[mimeType as keyof typeof mimeFormat];
   if (!expected) throw new MediaError(400, "Unsupported image type");
-  const alt = input.alt.trim();
+  const alt = altInput.trim();
   if (!alt || alt.length > 160) throw new MediaError(400, "Image alt text is required");
-  let output: Buffer;
-  let width: number;
-  let height: number;
   try {
-    const decoder = sharp(input.bytes, { limitInputPixels: 4096 * 4096, failOn: "warning" });
+    const decoder = sharp(bytes, { limitInputPixels: 4096 * 4096, failOn: "warning" });
     const metadata = await decoder.metadata();
     if (metadata.format !== expected || !metadata.width || !metadata.height ||
         metadata.width > 4096 || metadata.height > 4096 || (metadata.pages ?? 1) !== 1) {
       throw new MediaError(400, "Invalid image format or dimensions");
     }
-    ({ data: output, info: { width, height } } = await decoder.rotate().webp({ quality: 82 })
-      .toBuffer({ resolveWithObject: true }));
+    const { data: output, info: { width, height } } = await decoder.rotate()
+      .webp({ quality: 82 }).toBuffer({ resolveWithObject: true });
+    return { output, alt, width, height };
   } catch (error) {
     if (error instanceof MediaError) throw error;
     throw new MediaError(400, "Invalid image data");
   }
+}
+
+export async function uploadPrivateImage(input: {
+  kind: MediaKind; slug: string; actorId: string; actorRole: string | null | undefined;
+  bytes: Buffer; mimeType: string; alt: string;
+}): Promise<MediaAsset> {
+  ensureUploadPermission(input.kind, input.slug, input.actorId, input.actorRole);
+  const { output, alt, width, height } = await normalizePrivateImage(
+    input.bytes, input.mimeType, input.alt);
   const id = randomUUID();
   const directory = mediaDirectory();
   const file = mediaFilePath(id);
@@ -223,6 +235,90 @@ export async function uploadPrivateImage(input: {
   return { id, kind: input.kind, slug: input.slug, alt, width, height };
 }
 
+function mediaField(fieldKey: string): DirectoryProfileField {
+  if (!fieldKey || fieldKey.length > 160) throw new MediaError(400, "Invalid profile field");
+  const field = activeDirectoryProfiles().definitions.flatMap(({ fields }) => fields)
+    .find(({ key }) => key === fieldKey);
+  const supportsMedia = field?.type === "media" || (field?.type === "group" &&
+    (field.constraints.children as { type?: string }[]).some(({ type }) => type === "media"));
+  if (!field || !supportsMedia) throw new MediaError(400, "Profile field does not accept media");
+  return field;
+}
+
+function ensureProfileMediaPermission(listingSlug: string, fieldKey: string, itemId: string,
+  actorUserId: string, actorRole: string | null | undefined): DirectoryProfileField {
+  if (!/^[a-z0-9][a-z0-9._-]{0,119}$/i.test(itemId)) {
+    throw new MediaError(400, "Invalid profile media item");
+  }
+  const field = mediaField(fieldKey);
+  const actor = database.prepare(`SELECT role, banned, emailVerified FROM "user" WHERE id = ?`)
+    .get(actorUserId) as { role: string | null; banned: number; emailVerified: number } | undefined;
+  if (!actor || actor.banned || !actor.emailVerified || actor.role !== (actorRole ?? null)) {
+    throw new MediaError(403, "Profile media permission required");
+  }
+  const listing = database.prepare("SELECT owner_user_id, status FROM listings WHERE slug = ?")
+    .get(listingSlug) as { owner_user_id: string | null; status: string } | undefined;
+  if (!listing) throw new MediaError(404, "Listing not found");
+  if (listing.status === "suspended") throw new MediaError(409, "Suspended listing cannot be edited");
+  const pending = Boolean(database.prepare(
+    "SELECT 1 FROM submissions WHERE slug = ? AND status = 'pending'").get(listingSlug));
+  const owner = listing.owner_user_id === actorUserId && field.writeAuthority === "owner" && !pending;
+  const staff = field.writeAuthority !== "system" && (canAdmin(actor.role) ||
+    (listing.owner_user_id === null && canManageCatalog(actor.role)) ||
+    (pending && canModerate(actor.role)));
+  if (!owner && !staff) throw new MediaError(403, "Profile media permission required");
+  return field;
+}
+
+export async function uploadProfileMedia(input: {
+  listingSlug: string; fieldKey: string; itemId: string; actorUserId: string;
+  actorRole: string | null | undefined; bytes: Buffer; mimeType: string; alt: string;
+}): Promise<MediaAsset> {
+  ensureProfileMediaPermission(input.listingSlug, input.fieldKey, input.itemId,
+    input.actorUserId, input.actorRole);
+  const { output, alt, width, height } = await normalizePrivateImage(
+    input.bytes, input.mimeType, input.alt);
+  const id = randomUUID();
+  const file = mediaFilePath(id);
+  const queuedAt = new Date().toISOString();
+  queueMediaFileCleanup.run(id, queuedAt);
+  try {
+    mkdirSync(mediaDirectory(), { recursive: true });
+    writeFileSync(file, output, { flag: "wx" });
+  } catch (error) {
+    drainMediaCleanupQueue();
+    throw error;
+  }
+  try {
+    database.transaction(() => {
+      ensureProfileMediaPermission(input.listingSlug, input.fieldKey, input.itemId,
+        input.actorUserId, input.actorRole);
+      const now = new Date().toISOString();
+      consumePrivateUpload(input.actorUserId, now);
+      const displaced = database.prepare(`SELECT asset_id FROM directory_profile_media
+        WHERE listing_slug = ? AND field_key = ? AND item_id = ? AND state = 'draft'`)
+        .get(input.listingSlug, input.fieldKey, input.itemId) as { asset_id: string } | undefined;
+      if (displaced) database.prepare("DELETE FROM directory_profile_media WHERE asset_id = ?")
+        .run(displaced.asset_id);
+      database.prepare(`INSERT INTO media_assets
+        (id, target_kind, target_slug, uploaded_by, alt, width, height, created_at)
+        VALUES (?, 'listing', ?, ?, ?, ?, ?, ?)`).run(id, input.listingSlug,
+        input.actorUserId, alt, width, height, now);
+      database.prepare(`INSERT INTO directory_profile_media
+        (asset_id, listing_slug, field_key, item_id, state, uploaded_by, created_at)
+        VALUES (?, ?, ?, ?, 'draft', ?, ?)`).run(id, input.listingSlug, input.fieldKey,
+        input.itemId, input.actorUserId, now);
+      if (displaced) queueUnreferencedMediaAsset(displaced.asset_id, now);
+      database.prepare("DELETE FROM media_cleanup_queue WHERE asset_id = ?").run(id);
+    }).immediate();
+  } catch (error) {
+    drainMediaCleanupQueue();
+    throw error;
+  }
+  drainMediaCleanupQueue();
+  return { id, kind: "listing", slug: input.listingSlug, alt, width, height };
+}
+
 type MediaRow = { id: string; target_kind: MediaKind; target_slug: string;
   alt: string; width: number; height: number };
 
@@ -238,6 +334,78 @@ export function assignedMedia(kind: MediaKind, slug: string, slot: "draft" | "pu
       AND a.target_kind = m.target_kind AND a.target_slug = m.target_slug`)
     .get(kind, slug, slot) as MediaRow | undefined;
   return row ? fromMediaRow(row) : undefined;
+}
+
+export function assignedProfileMedia(listingSlug: string, fieldKey: string,
+  itemId: string): MediaAsset | undefined {
+  const row = database.prepare(`SELECT a.id, a.target_kind, a.target_slug, a.alt, a.width, a.height
+    FROM directory_profile_media p JOIN media_assets a ON a.id = p.asset_id
+    WHERE p.listing_slug = ? AND p.field_key = ? AND p.item_id = ?
+    ORDER BY CASE p.state WHEN 'draft' THEN 0 ELSE 1 END LIMIT 1`)
+    .get(listingSlug, fieldKey, itemId) as MediaRow | undefined;
+  return row ? fromMediaRow(row) : undefined;
+}
+
+function profileMediaIds(values: ProfileValueSet): Set<string> {
+  const result = new Set<string>();
+  for (const definition of activeDirectoryProfiles().definitions) for (const field of definition.fields) {
+    const value = values[field.key];
+    if (field.type === "media") {
+      if (typeof value === "string") result.add(value);
+      else if (Array.isArray(value)) for (const entry of value) {
+        if (entry && typeof entry === "object" && typeof (entry as { value?: unknown }).value === "string") {
+          result.add((entry as { value: string }).value);
+        }
+      }
+    } else if (field.type === "group" && Array.isArray(value)) {
+      const mediaChildren = new Set((field.constraints.children as { key: string; type: string }[])
+        .filter(({ type }) => type === "media").map(({ key }) => key));
+      for (const entry of value) if (entry && typeof entry === "object") {
+        const childValues = (entry as { values?: Record<string, unknown> }).values;
+        if (!childValues) continue;
+        for (const key of mediaChildren) if (typeof childValues[key] === "string") {
+          result.add(childValues[key] as string);
+        }
+      }
+    }
+  }
+  return result;
+}
+
+export function promoteProfileMedia(listingSlug: string, values: ProfileValueSet): void {
+  const promote = () => {
+    const selected = profileMediaIds(values);
+    const rows = database.prepare(`SELECT asset_id FROM directory_profile_media
+      WHERE listing_slug = ? ORDER BY CASE state WHEN 'draft' THEN 0 ELSE 1 END`)
+      .all(listingSlug) as { asset_id: string }[];
+    const now = new Date().toISOString();
+    for (const { asset_id: assetId } of rows) if (!selected.has(assetId)) {
+      database.prepare("DELETE FROM directory_profile_media WHERE asset_id = ?").run(assetId);
+      queueUnreferencedMediaAsset(assetId, now);
+    }
+    for (const assetId of selected) {
+      const row = database.prepare(`SELECT field_key, item_id FROM directory_profile_media
+        WHERE asset_id = ? AND listing_slug = ?`).get(assetId, listingSlug) as
+        { field_key: string; item_id: string } | undefined;
+      if (!row) throw new MediaError(400, "Approved profile references unavailable media");
+      const displaced = database.prepare(`SELECT asset_id FROM directory_profile_media
+        WHERE listing_slug = ? AND field_key = ? AND item_id = ? AND state = 'public'
+          AND asset_id <> ?`).get(listingSlug, row.field_key, row.item_id, assetId) as
+        { asset_id: string } | undefined;
+      if (displaced) {
+        database.prepare("DELETE FROM directory_profile_media WHERE asset_id = ?")
+          .run(displaced.asset_id);
+        queueUnreferencedMediaAsset(displaced.asset_id, now);
+      }
+      database.prepare("UPDATE directory_profile_media SET state = 'public' WHERE asset_id = ?")
+        .run(assetId);
+    }
+  };
+  if (database.inTransaction) promote();
+  else {
+    database.transaction(promote).immediate();
+    drainMediaCleanupQueue();
+  }
 }
 
 export function promoteDraftMedia(kind: MediaKind, slug: string): void {
@@ -272,12 +440,12 @@ export function privateMediaAsset(id: string, actorId: string,
   if (row.target_kind === "listing") {
     const listing = database.prepare("SELECT owner_user_id FROM listings WHERE slug = ?")
       .get(row.target_slug) as { owner_user_id: string | null } | undefined;
-    const pendingReviewImage = canModerate(actorRole) && Boolean(database.prepare(`
-      SELECT 1 FROM submissions s JOIN media_assignments m
-        ON m.target_kind = 'listing' AND m.target_slug = s.slug
-       AND m.slot = 'draft' AND m.asset_id = ?
-      WHERE s.slug = ? AND s.status = 'pending'`).get(row.id, row.target_slug));
-    if (!listing || (listing.owner_user_id !== actorId && !pendingReviewImage)) {
+    const pending = Boolean(database.prepare(`SELECT 1 FROM submissions
+      WHERE slug = ? AND status = 'pending'`).get(row.target_slug));
+    const staffAccess = canAdmin(actorRole) ||
+      (listing?.owner_user_id === null && canManageCatalog(actorRole)) ||
+      (pending && canModerate(actorRole));
+    if (!listing || (listing.owner_user_id !== actorId && !staffAccess)) {
       throw new MediaError(404, "Image not found");
     }
   } else if (!canEditArticles(actorRole) ||
@@ -288,10 +456,23 @@ export function privateMediaAsset(id: string, actorId: string,
 }
 
 export function publicMediaAsset(id: string): MediaAsset | undefined {
-  const row = database.prepare(`SELECT a.id, a.target_kind, a.target_slug, a.alt, a.width, a.height
+  let row = database.prepare(`SELECT a.id, a.target_kind, a.target_slug, a.alt, a.width, a.height
     FROM media_assignments m JOIN media_assets a ON a.id = m.asset_id
     WHERE a.id = ? AND m.slot = 'public' AND a.target_kind = m.target_kind
       AND a.target_slug = m.target_slug`).get(id) as MediaRow | undefined;
+  if (!row) row = database.prepare(`SELECT a.id, a.target_kind, a.target_slug, a.alt, a.width, a.height
+    FROM directory_profile_media p
+    JOIN media_assets a ON a.id = p.asset_id AND a.target_kind = 'listing'
+      AND a.target_slug = p.listing_slug
+    JOIN listings l ON l.slug = p.listing_slug AND l.status = 'published'
+    JOIN directory_profile_values v ON v.listing_slug = p.listing_slug
+      AND v.field_key = p.field_key AND v.media_id = p.asset_id AND v.archived_at IS NULL
+    JOIN directory_profile_state s ON s.id = 1
+    WHERE p.asset_id = ? AND p.state = 'public'
+      AND ((v.profile_id = s.base_profile_id AND v.definition_version = s.base_profile_version)
+        OR (v.profile_id = s.site_profile_id AND v.definition_version = s.site_profile_version))
+      AND NOT EXISTS (SELECT 1 FROM "user" u WHERE u.id = l.owner_user_id AND u.banned = 1)
+    LIMIT 1`).get(id) as MediaRow | undefined;
   if (!row) return undefined;
   const eligible = row.target_kind === "listing"
     ? database.prepare(`SELECT 1 FROM listings l WHERE l.slug = ? AND l.status = 'published'

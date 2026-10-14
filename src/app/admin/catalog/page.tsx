@@ -8,6 +8,7 @@ import { CatalogEditor } from "./catalog-editor";
 import { connection } from "next/server";
 import { getSiteConfig } from "@/lib/site-config";
 import Link from "next/link";
+import { activeDirectoryProfiles } from "@/lib/directory-profiles";
 
 export async function generateMetadata(): Promise<Metadata> {
   await connection();
@@ -21,6 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function CatalogPage() {
   const user = await sessionUser(await headers());
   if (!canManageCatalog(user?.role)) notFound();
+  const profiles = activeDirectoryProfiles();
   return (
     <main className="mx-auto w-full theme-page-width px-6 py-10">
       <h1 className="text-3xl font-semibold tracking-tight">Catalog</h1>
@@ -35,7 +37,10 @@ export default async function CatalogPage() {
         {overviewDestinations(user?.role).filter(({ href }) => href !== "/admin/catalog")
           .map(({ href, label }) => <Link key={href} href={href} className="underline">{label}</Link>)}
       </nav>
-      <CatalogEditor initialListings={allListings(!canAdmin(user?.role))} canSuspend={canModerate(user?.role)} />
+      <CatalogEditor initialListings={allListings(!canAdmin(user?.role))}
+        canSuspend={canModerate(user?.role)}
+        profileFields={profiles.definitions.flatMap(({ fields }) => fields)}
+        profileStateRevision={profiles.state.revision} />
     </main>
   );
 }

@@ -8,14 +8,18 @@ import Link from "next/link";
 import type { Listing } from "@/lib/listings";
 import { ImageUploader } from "@/components/image-uploader";
 import type { SeoOverrides } from "@/lib/seo-settings";
+import { ProfileFieldEditor } from "@/components/profile-field-editor";
+import type { DirectoryProfileField, ProfileValueSet } from "@/lib/directory-profile-types";
 
 type OwnerItem = Listing & { hasDraft: boolean; pending: boolean };
 
-function ListingFields({ value, seo, includeSlug }: { value?: Listing; seo?: SeoOverrides; includeSlug?: boolean }) {
+function ListingFields({ value, seo, includeSlug, onSlug }: {
+  value?: Listing; seo?: SeoOverrides; includeSlug?: boolean; onSlug?: (slug: string) => void;
+}) {
   return (
     <div className="grid gap-4">
       <div className="grid gap-4 sm:grid-cols-2">
-        {includeSlug && <label className="grid gap-2 text-sm font-medium">Slug<Input name="slug" required pattern="[a-z0-9]+(-[a-z0-9]+)*" maxLength={80} /></label>}
+        {includeSlug && <label className="grid gap-2 text-sm font-medium">Slug<Input name="slug" required pattern="[a-z0-9]+(-[a-z0-9]+)*" maxLength={80} onChange={(event) => onSlug?.(event.target.value)} /></label>}
         <label className="grid gap-2 text-sm font-medium">Name<Input name="name" defaultValue={value?.name} required maxLength={120} /></label>
         <label className="grid gap-2 text-sm font-medium">Category<Input name="category" defaultValue={value?.category} required maxLength={80} /></label>
         <label className="grid gap-2 text-sm font-medium">External URL<Input name="url" type="url" defaultValue={value?.url} required maxLength={2048} /></label>
@@ -48,12 +52,26 @@ function ListingFields({ value, seo, includeSlug }: { value?: Listing; seo?: Seo
   );
 }
 
-export function OwnerEditor({ initialListings }: { initialListings: OwnerItem[] }) {
+export function OwnerEditor({ initialListings, profileFields, profileStateRevision }: {
+  initialListings: OwnerItem[]; profileFields: DirectoryProfileField[]; profileStateRevision: number;
+}) {
   const router = useRouter();
   const [editing, setEditing] = useState<Listing | null>(null);
   const [editingSeo, setEditingSeo] = useState<SeoOverrides | undefined>();
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
+  const [newSlug, setNewSlug] = useState("");
+  const [newValues, setNewValues] = useState<ProfileValueSet>(() => Object.fromEntries(
+    profileFields.filter((field) => field.default !== undefined && field.writeAuthority === "owner")
+      .map((field) => [field.key, field.default])));
+  const [editValues, setEditValues] = useState<ProfileValueSet>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  async function responseError(response: Response, fallback: string) {
+    const body = await response.json() as { error?: string; errors?: Record<string, string> };
+    setFieldErrors(body.errors ?? {});
+    setMessage(body.error ?? fallback);
+  }
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -63,13 +81,14 @@ export function OwnerEditor({ initialListings }: { initialListings: OwnerItem[] 
     try {
       const response = await fetch("/api/owner/listings", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(Object.fromEntries(new FormData(form))),
+        body: JSON.stringify({ ...Object.fromEntries(new FormData(form)),
+          profileValues: newValues, profileStateRevision }),
       });
       if (!response.ok) {
-        setMessage((await response.json()).error ?? "Could not save the draft.");
-        return;
+        return responseError(response, "Could not save the draft.");
       }
       form.reset();
+      setNewSlug("");
       setMessage("Draft saved. Submit it when it is ready for review.");
       router.refresh();
     } catch {
@@ -89,6 +108,7 @@ export function OwnerEditor({ initialListings }: { initialListings: OwnerItem[] 
       }
       const data = await response.json() as { listing: Listing; proposal: Listing | null; seo: SeoOverrides };
       setEditing(data.proposal ?? data.listing);
+      setEditValues((data.proposal ?? data.listing).profileValues ?? {});
       setEditingSeo(data.seo);
     } catch {
       setMessage("Could not connect to the server. Try again.");
@@ -103,14 +123,16 @@ export function OwnerEditor({ initialListings }: { initialListings: OwnerItem[] 
     try {
       const response = await fetch(`/api/owner/listings/${encodeURIComponent(editing.slug)}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))),
+        body: JSON.stringify({ ...Object.fromEntries(new FormData(event.currentTarget)),
+          profileValues: editValues,
+          profileStateRevision: editing.profileStateRevision ?? profileStateRevision }),
       });
       if (!response.ok) {
-        setMessage((await response.json()).error ?? "Could not save changes.");
-        return;
+        return responseError(response, "Could not save changes.");
       }
       const data = await response.json() as { listing: Listing };
       setEditing(data.listing);
+      setEditValues(data.listing.profileValues ?? editValues);
       setMessage("Changes saved privately. Submit them for review when ready.");
       router.refresh();
     } catch {
@@ -143,7 +165,14 @@ export function OwnerEditor({ initialListings }: { initialListings: OwnerItem[] 
     <div className="mt-8 space-y-10">
       <form onSubmit={create} className="space-y-4 rounded-lg border p-6">
         <h2 className="text-xl font-semibold">New private draft</h2>
-        <ListingFields includeSlug />
+        <ListingFields includeSlug onSlug={setNewSlug} />
+        {profileFields.length > 0 && <fieldset className="grid gap-4 rounded-md border p-4">
+          <legend className="px-1 text-sm font-semibold">Directory profile</legend>
+          <ProfileFieldEditor fields={profileFields} values={newValues} authority="owner"
+            mediaEndpoint={`/api/profile-media/${encodeURIComponent(newSlug)}`}
+            errors={fieldErrors} onChange={setNewValues} />
+          <p className="text-xs text-muted-foreground">Save the draft before uploading profile media.</p>
+        </fieldset>}
         <Button type="submit" disabled={pending}>Save draft</Button>
       </form>
       {message && <p role="status" className="text-sm text-muted-foreground">{message}</p>}
@@ -172,6 +201,12 @@ export function OwnerEditor({ initialListings }: { initialListings: OwnerItem[] 
             <Button type="button" variant="ghost" onClick={() => setEditing(null)}>Close</Button>
           </div>
           <ListingFields value={editing} seo={editingSeo} />
+          {profileFields.length > 0 && <fieldset className="grid gap-4 rounded-md border p-4">
+            <legend className="px-1 text-sm font-semibold">Directory profile</legend>
+            <ProfileFieldEditor fields={profileFields} values={editValues} authority="owner"
+              mediaEndpoint={`/api/profile-media/${encodeURIComponent(editing.slug)}`}
+              errors={fieldErrors} onChange={setEditValues} />
+          </fieldset>}
           <ImageUploader kind="listing" slug={editing.slug} onUploaded={() => router.refresh()} />
           <Button type="submit" disabled={pending}>Save changes</Button>
         </form>
