@@ -48,6 +48,19 @@ const json = (body, cookie, method = 'POST') => ({ method, body: JSON.stringify(
   headers: { Origin: origin, 'Content-Type': 'application/json',
     ...(cookie ? { Cookie: cookie } : {}) } });
 
+async function assertMarkdownHead(path, expectedBody, label) {
+  const get = await request(path);
+  const body = await get.text();
+  const head = await request(path, { method: 'HEAD' });
+  const headBody = await head.text();
+  const headers = ['content-type', 'cache-control', 'x-robots-tag',
+    'x-content-type-options', 'vary'];
+  if (get.status !== 200 || head.status !== get.status || body !== expectedBody || headBody !== '' ||
+      headers.some((name) => head.headers.get(name) !== get.headers.get(name))) {
+    throw new Error(`${label} HEAD did not match its GET status and Markdown headers`);
+  }
+}
+
 async function check(id, run) {
   try { await run(); results[id] = true; }
   catch (error) { process.stderr.write(`${id}: ${error.message}\n`); }
@@ -420,6 +433,7 @@ try {
     if ((await request('/markdown/listings/hidden-draft')).status !== 404) {
       throw new Error('Draft Markdown twin was publicly reachable');
     }
+    await assertMarkdownHead('/listings/example-tool.md', body, 'Listing Markdown');
     const html = await (await request('/listings/example-tool')).text();
     if (!html.includes('text/markdown') || !html.includes('/markdown/listings/example-tool')) {
       throw new Error('Public HTML did not advertise its Markdown twin');
@@ -434,6 +448,7 @@ try {
         !articleHtml.includes('/markdown/articles/new-seo-article')) {
       throw new Error('Published article Markdown twin did not match its HTML source');
     }
+    await assertMarkdownHead('/articles/new-seo-article.md', articleBody, 'Article Markdown');
     const current = await request('/api/admin/articles/new-seo-article',
       { headers: { Cookie: adminCookie } });
     const version = (await current.json()).article.version;
@@ -447,18 +462,23 @@ try {
     }
     const published = await request('/api/admin/articles/new-seo-article',
       json({ action: 'publish', version: stagedVersion }, adminCookie, 'PATCH'));
+    const publishedArticle = published.ok ? (await published.json()).article : null;
     if (!published.ok || !(await (await request('/markdown/articles/new-seo-article')).text())
       .includes('PRIVATE NEXT BODY')) {
       throw new Error('Markdown did not switch to the published article revision');
     }
     const unpublished = await request('/api/admin/articles/new-seo-article',
-      json({ status: 'draft' }, adminCookie, 'PATCH'));
-    if (!unpublished.ok || (await request('/markdown/articles/new-seo-article')).status !== 404) {
+      json({ action: 'unpublish', version: publishedArticle?.version }, adminCookie, 'PATCH'));
+    const unpublishedHead = await request('/articles/new-seo-article.md', { method: 'HEAD' });
+    if (!unpublished.ok || (await request('/markdown/articles/new-seo-article')).status !== 404 ||
+        unpublishedHead.status !== 404 || (await unpublishedHead.text()) !== '') {
       throw new Error('Unpublished article retained its Markdown twin');
     }
     const suspended = await request('/api/admin/listings/example-tool/suspend',
       json({ reason: 'SEO visibility check' }, adminCookie));
-    if (!suspended.ok || (await request('/markdown/listings/example-tool')).status !== 404) {
+    const suspendedHead = await request('/listings/example-tool.md', { method: 'HEAD' });
+    if (!suspended.ok || (await request('/markdown/listings/example-tool')).status !== 404 ||
+        suspendedHead.status !== 404 || (await suspendedHead.text()) !== '') {
       throw new Error('Suspended listing retained its Markdown twin');
     }
   });
