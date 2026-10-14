@@ -1,0 +1,28 @@
+{
+  "command": "node mechanisms/check-public-crawl-responsive.mjs",
+  "cwd": null,
+  "requirements": ["SEO-003", "SEO-004", "SEO-005", "DIR-005"],
+  "results": "per-requirement",
+  "inputs": [
+    ".env.example",
+    "README.md",
+    "fixtures/sample-listings.json",
+    "mechanisms/check-public-crawl-responsive.mjs",
+    "mechanisms/public-crawl-responsive.def.json",
+    "package.json",
+    "package-lock.json",
+    "public",
+    "scripts",
+    "src"
+  ],
+  "identity": {
+    "tools": {
+      "node": "node --version",
+      "npm": "npm --version",
+      "chrome": "google-chrome --version"
+    },
+    "env": [],
+    "image": null
+  },
+  "documents": []
+}
