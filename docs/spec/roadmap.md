@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: mcp-preview-bearer
+Current: operator-manual
 
 ## public-starter-and-theme
 
@@ -367,16 +367,18 @@ builder's review audits every material claim against source.
 
 Requirements: DOC-002
 
-Delivery: write `docs/operator-manual.md` with executable, source-verified
-operator steps for the ten areas in the manual brief. Link it from the README.
-Describe the confirmed `.env.local`/CLI database-path mismatch and the current
-same-environment workaround while its product fix waits in the backlog.
+Delivery: audit and complete `docs/operator-manual.md` with executable,
+source-verified operator steps for the ten areas in the manual brief. Keep it
+linked from the README. Reconcile every procedure with the current product,
+including consistent `.env.local` and CLI database selection, container and
+reverse-proxy operation, account boundaries, agent access, and optional billing.
 
 Done-when: each procedure is grounded in implementation code or an executable
 script, names its actor and success check, and makes external-provider and
 persistent-storage dependencies explicit. A mechanism checks chapter coverage,
 source links, commands and high-risk boundaries; the builder and adversary
-review the remaining semantic claims against source.
+review every remaining semantic claim against current source and observed
+commands.
 
 ## cli-env-local-mismatch
 
