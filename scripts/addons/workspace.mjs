@@ -1,15 +1,18 @@
 import {
-  lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync,
-  rmdirSync, writeFileSync,
+  chmodSync, closeSync, fsyncSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync,
+  readdirSync, renameSync, rmSync, rmdirSync, writeFileSync,
 } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { readArchive } from "./archive.mjs";
 import {
-  canonicalJson, readStarterIdentity, sha256, targetForPayload, validateCompatibility,
+  canonicalJson, normalizePayloadPath, readStarterIdentity, sha256, targetForPayload,
+  validateCompatibility,
 } from "./manifest.mjs";
 import {
   GENERATED_CSS_PATH, GENERATED_TYPESCRIPT_PATH, LOCK_PATH, generateRegistries, readAddonLock,
 } from "./registry.mjs";
+
+const TRANSACTION_PATH = ".directory-starter/addons.transaction.json";
 
 function workspacePath(root, path) {
   return join(root, ...path.split("/"));
@@ -107,6 +110,16 @@ function createdParentDirectories(root, target) {
   return missing;
 }
 
+function missingParentDirectories(root, target) {
+  const missing = [];
+  let current = root;
+  for (const part of target.split("/").slice(0, -1)) {
+    current = join(current, part);
+    if (!lstatOptional(current)) missing.push(relative(root, current).split(sep).join("/"));
+  }
+  return missing;
+}
+
 function snapshotDestination(root, target) {
   const path = workspacePath(root, target);
   const status = lstatOptional(path);
@@ -124,6 +137,141 @@ function testFailureLimit() {
   return value;
 }
 
+function testExitLimit() {
+  if (process.env.NODE_ENV !== "test" || !process.env.DIRECTORY_ADDON_TEST_EXIT_AFTER) return null;
+  const value = Number(process.env.DIRECTORY_ADDON_TEST_EXIT_AFTER);
+  if (!Number.isInteger(value) || value < 1) throw new Error("Invalid test exit injection count");
+  return value;
+}
+
+function syncFile(path) {
+  const descriptor = openSync(path, "r");
+  try { fsyncSync(descriptor); } finally { closeSync(descriptor); }
+}
+
+function syncDirectory(path) {
+  let descriptor;
+  try {
+    descriptor = openSync(path, "r");
+    fsyncSync(descriptor);
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+  }
+}
+
+function writeTransactionJournal(root, journal) {
+  const path = workspacePath(root, TRANSACTION_PATH);
+  const temporary = `${path}.${process.pid}.tmp`;
+  writeFileSync(temporary, canonicalJson(journal), { flag: "wx", mode: 0o600 });
+  try {
+    syncFile(temporary);
+    renameSync(temporary, path);
+    syncDirectory(dirname(path));
+  } catch (error) {
+    rmSync(temporary, { force: true });
+    throw error;
+  }
+}
+
+function validTransactionTarget(target) {
+  if (target === LOCK_PATH || target === GENERATED_TYPESCRIPT_PATH ||
+      target === GENERATED_CSS_PATH) return true;
+  try {
+    return normalizePayloadPath(target) === target &&
+      /^(?:src|public)\/addons\/[a-z][a-z0-9-]*\//.test(target);
+  } catch {
+    return false;
+  }
+}
+
+function parseTransactionJournal(bytes) {
+  let value;
+  try { value = JSON.parse(bytes.toString("utf8")); }
+  catch { throw new Error("Invalid add-on transaction journal JSON"); }
+  if (!value || typeof value !== "object" || Array.isArray(value) ||
+      value.schemaVersion !== 1 ||
+      typeof value.stage !== "string" || !/^\.directory-addon-stage-[A-Za-z0-9]+$/.test(value.stage) ||
+      !Array.isArray(value.entries) || value.entries.length === 0 ||
+      !Array.isArray(value.createdDirectories)) {
+    throw new Error("Invalid add-on transaction journal");
+  }
+  const targets = new Set();
+  let restoredBytes = 0;
+  for (const entry of value.entries) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry) ||
+        !validTransactionTarget(entry.target) || targets.has(entry.target) ||
+        !(entry.previous === null || typeof entry.previous === "string") ||
+        !Number.isInteger(entry.mode) || entry.mode < 0 || entry.mode > 0o777) {
+      throw new Error("Invalid add-on transaction journal entry");
+    }
+    if (typeof entry.previous === "string") {
+      if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
+        entry.previous)) throw new Error("Invalid transaction snapshot encoding");
+      restoredBytes += Buffer.byteLength(entry.previous, "base64");
+      if (restoredBytes > 2 * 50 * 1024 * 1024) throw new Error("Transaction journal is too large");
+    }
+    targets.add(entry.target);
+  }
+  const allowedDirectories = new Set([...targets].flatMap((target) => {
+    const parts = target.split("/").slice(0, -1);
+    return parts.map((_, index) => parts.slice(0, index + 1).join("/"));
+  }));
+  if (new Set(value.createdDirectories).size !== value.createdDirectories.length ||
+      value.createdDirectories.some((path) => typeof path !== "string" ||
+        !allowedDirectories.has(path))) {
+    throw new Error("Invalid transaction directory list");
+  }
+  if (!canonicalJson(value).equals(bytes)) throw new Error("Add-on transaction journal is not canonical");
+  return value;
+}
+
+function removeRestoredTarget(path) {
+  const status = lstatOptional(path);
+  if (!status) return;
+  if (status.isDirectory() && !status.isSymbolicLink()) {
+    throw new Error(`Cannot restore add-on transaction over directory: ${path}`);
+  }
+  rmSync(path, { force: true });
+}
+
+export function recoverAddonTransaction(rootInput) {
+  const root = resolve(rootInput);
+  const journalPath = workspacePath(root, TRANSACTION_PATH);
+  const status = lstatOptional(journalPath);
+  if (!status) return false;
+  if (!status.isFile() || status.isSymbolicLink()) {
+    throw new Error("Add-on transaction journal must be a regular file");
+  }
+  const journal = parseTransactionJournal(readFileSync(journalPath));
+  const errors = [];
+  for (const entry of [...journal.entries].reverse()) {
+    try {
+      const destination = workspacePath(root, entry.target);
+      removeRestoredTarget(destination);
+      if (entry.previous !== null) {
+        requireAvailableParent(root, entry.target);
+        mkdirSync(dirname(destination), { recursive: true });
+        writeFileSync(destination, Buffer.from(entry.previous, "base64"), { mode: entry.mode });
+        chmodSync(destination, entry.mode);
+      }
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  for (const path of [...journal.createdDirectories].reverse()) {
+    try { rmdirSync(workspacePath(root, path)); } catch (error) {
+      if (!error || typeof error !== "object" || !["ENOENT", "ENOTEMPTY"].includes(error.code)) {
+        errors.push(error);
+      }
+    }
+  }
+  if (errors.length) throw new AggregateError(errors, "Could not recover add-on transaction");
+  rmSync(journalPath);
+  syncDirectory(dirname(journalPath));
+  rmSync(join(dirname(root), journal.stage), { recursive: true, force: true });
+  return true;
+}
+
 function mutateWorkspace(root, operations) {
   const uniqueTargets = new Set(operations.map(({ target }) => target));
   if (uniqueTargets.size !== operations.length || operations.at(-1)?.target !== LOCK_PATH) {
@@ -132,9 +280,10 @@ function mutateWorkspace(root, operations) {
   for (const { target } of operations) requireAvailableParent(root, target);
   const snapshots = new Map(operations.map(({ target }) => [target, snapshotDestination(root, target)]));
   const stage = mkdtempSync(join(dirname(root), ".directory-addon-stage-"));
-  const createdDirectories = [];
   const applied = [];
   const failAfter = testFailureLimit();
+  const exitAfter = testExitLimit();
+  let journalWritten = false;
   try {
     for (const operation of operations) {
       if (operation.bytes === null) continue;
@@ -142,35 +291,52 @@ function mutateWorkspace(root, operations) {
       mkdirSync(dirname(staged), { recursive: true });
       writeFileSync(staged, operation.bytes, { flag: "wx" });
     }
+    const createdDirectories = [...new Set(operations.filter(({ bytes }) => bytes !== null)
+      .flatMap(({ target }) => missingParentDirectories(root, target)))];
+    const journal = {
+      schemaVersion: 1,
+      stage: stage.slice(dirname(root).length + 1),
+      entries: operations.map(({ target }) => {
+        const previous = snapshots.get(target);
+        const status = lstatOptional(workspacePath(root, target));
+        return { target, previous: previous === null ? null : previous.toString("base64"),
+          mode: status ? status.mode & 0o777 : 0o644 };
+      }),
+      createdDirectories,
+    };
+    writeTransactionJournal(root, journal);
+    journalWritten = true;
     for (const operation of operations) {
       const destination = workspacePath(root, operation.target);
       if (operation.bytes === null) {
         rmSync(destination);
       } else {
-        createdDirectories.push(...createdParentDirectories(root, operation.target));
+        createdParentDirectories(root, operation.target);
         renameSync(workspacePath(stage, operation.target), destination);
       }
       applied.push(operation.target);
+      if (exitAfter !== null && applied.length >= exitAfter) {
+        process.kill(process.pid, "SIGKILL");
+      }
       if (failAfter !== null && applied.length >= failAfter) {
         throw new Error(`Injected add-on transaction failure after ${applied.length} mutation(s)`);
       }
     }
+    rmSync(workspacePath(root, TRANSACTION_PATH));
+    syncDirectory(dirname(workspacePath(root, TRANSACTION_PATH)));
+    journalWritten = false;
   } catch (error) {
-    for (const target of [...applied].reverse()) {
-      const destination = workspacePath(root, target);
-      const previous = snapshots.get(target);
-      if (previous === null) rmSync(destination, { force: true });
-      else {
-        mkdirSync(dirname(destination), { recursive: true });
-        writeFileSync(destination, previous);
+    if (journalWritten) {
+      try { recoverAddonTransaction(root); }
+      catch (recoveryError) {
+        throw new AggregateError([error, recoveryError], "Add-on transaction failed and needs recovery");
       }
-    }
-    for (const directory of [...new Set(createdDirectories)].reverse()) {
-      try { rmdirSync(directory); } catch { /* A pre-existing or non-empty directory stays. */ }
     }
     throw error;
   } finally {
-    rmSync(stage, { recursive: true, force: true });
+    if (!lstatOptional(workspacePath(root, TRANSACTION_PATH))) {
+      rmSync(stage, { recursive: true, force: true });
+    }
   }
 }
 
@@ -212,6 +378,7 @@ function registryOperations(lock) {
 
 export async function installAddon(rootInput, archiveInput) {
   const root = resolve(rootInput);
+  recoverAddonTransaction(root);
   const starter = readStarterIdentity(root);
   const packageValue = await readArchive(archiveInput);
   validateCompatibility(packageValue.manifest, starter);
@@ -249,6 +416,7 @@ export async function installAddon(rootInput, archiveInput) {
 
 export function removeAddon(rootInput, addonId) {
   const root = resolve(rootInput);
+  recoverAddonTransaction(root);
   readStarterIdentity(root);
   const lock = readAddonLock(root);
   verifyWorkspace(root, lock);
