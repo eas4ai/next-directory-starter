@@ -14,7 +14,11 @@ function expect(condition, message) {
 let passed = false;
 try {
   expect(run('git', ['cat-file', '-t', version]) === 'tag', `${version} is not an annotated tag`);
+  const tagObject = run('git', ['rev-parse', version]);
   const tagCommit = run('git', ['rev-parse', `${version}^{commit}`]);
+  const remoteTagObject = run('git', ['ls-remote', 'origin', `refs/tags/${version}`])
+    .split(/\s+/)[0];
+  expect(remoteTagObject === tagObject, `${version} annotated tag object differs on origin`);
   const remoteTag = run('git', ['ls-remote', 'origin', `refs/tags/${version}^{}`])
     .split(/\s+/)[0];
   expect(remoteTag === tagCommit, `${version} does not resolve to the same commit on origin`);
