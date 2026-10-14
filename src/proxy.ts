@@ -23,6 +23,19 @@ function wantsMarkdown(request: NextRequest, suffix: boolean): boolean {
   return llmUserAgent.test(request.headers.get("user-agent") ?? "");
 }
 
+function markdownResponse(
+  request: NextRequest,
+  suffix: boolean,
+  render: () => string,
+): NextResponse | null {
+  const supportedMethod = request.method === "GET" ||
+    (request.method === "HEAD" && suffix);
+  if (!supportedMethod || !wantsMarkdown(request, suffix)) return null;
+  return new NextResponse(request.method === "HEAD" ? null : render(), {
+    headers: markdownHeaders,
+  });
+}
+
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const requestId = randomUUID();
@@ -55,9 +68,8 @@ export async function proxy(request: NextRequest) {
       recordNotFound(path, requestId);
       return new NextResponse("Not Found", { status: 404 });
     }
-    if (request.method === "GET" && wantsMarkdown(request, suffix)) {
-      return new NextResponse(listingMarkdown(listing), { headers: markdownHeaders });
-    }
+    const markdown = markdownResponse(request, suffix, () => listingMarkdown(listing));
+    if (markdown) return markdown;
     return next(true);
   }
 
@@ -69,9 +81,8 @@ export async function proxy(request: NextRequest) {
       recordNotFound(path, requestId);
       return new NextResponse("Not Found", { status: 404 });
     }
-    if (request.method === "GET" && wantsMarkdown(request, suffix)) {
-      return new NextResponse(articleMarkdown(article), { headers: markdownHeaders });
-    }
+    const markdown = markdownResponse(request, suffix, () => articleMarkdown(article));
+    if (markdown) return markdown;
     return next(true);
   }
 
