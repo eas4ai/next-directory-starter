@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import Database from 'better-sqlite3';
 import sharp from 'sharp';
 
 const requirements = ['SEO-006', 'SEO-007', 'SEO-008', 'SEO-009', 'SEO-010'];
@@ -59,6 +60,15 @@ try {
     BETTER_AUTH_URL: origin, SITE_URL: origin };
   command(['run', 'db:migrate']);
   command(['run', 'db:seed']);
+  const fixtureDatabase = new Database(join(workspace, 'directory.db'));
+  try {
+    fixtureDatabase.prepare(`INSERT INTO agent_imports
+      (slug, actor_user_id, idempotency_key, source_url, source_excerpt, created_at)
+      VALUES ('example-tool', 'seo-check', 'reserved-route-card',
+        'https://example.org/source', 'Source excerpt', ?)`).run(new Date().toISOString());
+  } finally {
+    fixtureDatabase.close();
+  }
   const password = randomBytes(20).toString('hex');
   command(['run', 'account:provision', '--', '--email', 'seo-admin@example.invalid',
     '--password', password, '--role', 'admin', '--yes']);
