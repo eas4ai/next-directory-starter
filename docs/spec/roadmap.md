@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: import-card-category-entities
+Current: redirect-reserved-routes
 
 ## public-starter-and-theme
 
@@ -621,3 +621,9 @@ Delivers backlog item negative-route-test-gaps: Audit 2026-10-11 (M27, reported)
 Requirements: SEO-012
 
 Delivers backlog item import-card-category-entities: Audit 2026-10-11 (L1, verified; three reviewers). src/lib/agent-cards.ts escapes the category for XML at line 55 and then uppercases it at line 66, so R&D becomes R&AMP;D and Sharp rejects the SVG ('Entity AMP not defined'). Category names may contain ampersands. The import preview and /og/listings/<slug>.png throw. Uppercase before escaping, as social-cards.ts does.
+
+## redirect-reserved-routes
+
+Requirements: SEO-008
+
+Delivers backlog item redirect-reserved-routes: Audit 2026-10-11 (L2, verified). protectedRoute in src/lib/seo-redirects.ts omits /social-card, /og, /brand-assets and /theme.css. An admin can save a redirect from /social-card, and every advertised card URL then returns the homepage. Reserve every live route prefix, ideally from one shared list.
