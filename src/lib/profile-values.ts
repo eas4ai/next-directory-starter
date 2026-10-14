@@ -2,6 +2,7 @@ import { database } from "@/lib/database";
 import type {
   ActiveProfileSet, CanonicalProfileValue, DirectoryProfileField, NormalizedProfileRow,
   ProfileChildField, ProfileGroupItem, ProfileLocation, ProfileMoney, ProfileRepeatedValue,
+  ProfileValueSet, ValidatedProfileValues,
 } from "@/lib/directory-profile-types";
 
 type ValueContext = { isMediaAllowed?: (id: string) => boolean };
@@ -47,6 +48,17 @@ function safeUrl(value: unknown): value is string {
 function safeMarkdown(value: string): boolean {
   return !/<\s*\/?\s*[a-z!][^>]*>/i.test(value) &&
     !/\]\(\s*(?:javascript|data|vbscript):/i.test(value) && !value.includes("\0");
+}
+
+function strictValueObject(input: unknown, allowed: readonly string[], label: string):
+Record<string, unknown> {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new Error(`${label} must be an object`);
+  }
+  const value = input as Record<string, unknown>;
+  const unknown = Object.keys(value).find((key) => !allowed.includes(key));
+  if (unknown) throw new Error(`${label} has unknown property ${unknown}`);
+  return value;
 }
 
 function scaledDecimal(value: unknown, scale: number): number {
@@ -116,10 +128,7 @@ function validateScalar(field: DirectoryProfileField | ProfileChildField, input:
     return decimalString(value, scale);
   }
   if (field.type === "money") {
-    if (!input || typeof input !== "object" || Array.isArray(input)) {
-      throw new Error(`${field.label} must contain amountMinor and currency`);
-    }
-    const raw = input as Record<string, unknown>;
+    const raw = strictValueObject(input, ["amountMinor", "currency"], field.label);
     const currency = typeof raw.currency === "string" ? raw.currency.toUpperCase() : "";
     const allowed = constraints(field).currencies as string[];
     if (!Number.isSafeInteger(raw.amountMinor) ||
@@ -163,10 +172,7 @@ function validateScalar(field: DirectoryProfileField | ProfileChildField, input:
     return value;
   }
   if (field.type === "date-range") {
-    if (!input || typeof input !== "object" || Array.isArray(input)) {
-      throw new Error(`${field.label} must be a date range`);
-    }
-    const value = input as Record<string, unknown>;
+    const value = strictValueObject(input, ["start", "end"], field.label);
     if (!validDate(value.start) || !validDate(value.end) || value.start > value.end ||
         value.start < stringConstraint(field, "min") ||
         value.end > stringConstraint(field, "max")) {
@@ -182,10 +188,8 @@ function validateScalar(field: DirectoryProfileField | ProfileChildField, input:
     return input;
   }
   if (field.type === "location") {
-    if (!input || typeof input !== "object" || Array.isArray(input)) {
-      throw new Error(`${field.label} must be a structured location`);
-    }
-    const raw = input as Record<string, unknown>;
+    const raw = strictValueObject(input,
+      ["countryCode", "region", "locality", "latitude", "longitude"], field.label);
     const countryCode = typeof raw.countryCode === "string" ? raw.countryCode.toUpperCase() : "";
     const allowed = constraints(field).countries as string[];
     const region = typeof raw.region === "string" ? raw.region.trim().normalize("NFC") : undefined;
@@ -225,10 +229,7 @@ function validateScalar(field: DirectoryProfileField | ProfileChildField, input:
     const children = groupConstraints.children as ProfileChildField[];
     const ids = new Set<string>();
     return input.map((entry, index) => {
-      if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-        throw new Error(`${field.label} item ${index + 1} is invalid`);
-      }
-      const raw = entry as Record<string, unknown>;
+      const raw = strictValueObject(entry, ["id", "values"], `${field.label} item ${index + 1}`);
       if (typeof raw.id !== "string" || !itemIdPattern.test(raw.id) || ids.has(raw.id) ||
           !raw.values || typeof raw.values !== "object" || Array.isArray(raw.values)) {
         throw new Error(`${field.label} item identity is invalid or duplicate`);
@@ -254,7 +255,7 @@ function validateScalar(field: DirectoryProfileField | ProfileChildField, input:
 
 export function validateProfileFieldValue(field: DirectoryProfileField,
   input: unknown, context: ValueContext = {}): CanonicalProfileValue {
-  if (input === undefined || input === null || input === "") {
+  if (input === undefined) {
     if (field.required) throw new Error(`${field.label} is required`);
     return undefined;
   }
@@ -265,10 +266,8 @@ export function validateProfileFieldValue(field: DirectoryProfileField,
     }
     const ids = new Set<string>();
     return input.map((entry, index) => {
-      if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-        throw new Error(`${field.label} repeated item ${index + 1} is invalid`);
-      }
-      const raw = entry as Record<string, unknown>;
+      const raw = strictValueObject(entry, ["id", "value"],
+        `${field.label} repeated item ${index + 1}`);
       if (typeof raw.id !== "string" || !itemIdPattern.test(raw.id) || ids.has(raw.id)) {
         throw new Error(`${field.label} repeated item identity is invalid or duplicate`);
       }
@@ -390,6 +389,189 @@ type StoredValueRow = {
   country_code: string | null; region: string | null; locality: string | null;
   latitude_e6: number | null; longitude_e6: number | null; media_id: string | null;
 };
+
+type HydratedValueRow = StoredValueRow & {
+  listing_slug: string;
+  profile_id: string;
+  definition_version: string;
+  field_key: string;
+  archived_at: string | null;
+};
+
+function writable(authority: "operator" | "owner" | "system",
+  field: DirectoryProfileField): boolean {
+  if (authority === "system") return true;
+  if (authority === "operator") return field.writeAuthority !== "system";
+  return field.writeAuthority === "owner";
+}
+
+function profileFields(profiles: ActiveProfileSet): Map<string, DirectoryProfileField> {
+  return new Map(profiles.definitions.flatMap((definition) =>
+    definition.fields.map((field) => [field.key, field] as const)));
+}
+
+function mediaAllowed(field: DirectoryProfileField, listingSlug: string | undefined,
+  actorUserId: string | undefined, authority: "operator" | "owner" | "system", id: string): boolean {
+  if (!listingSlug || !actorUserId) return false;
+  const row = database.prepare(`SELECT uploaded_by FROM directory_profile_media
+    WHERE asset_id = ? AND listing_slug = ? AND field_key = ? AND state IN ('draft', 'public')`)
+    .get(id, listingSlug, field.key) as { uploaded_by: string } | undefined;
+  return Boolean(row && (authority !== "owner" || row.uploaded_by === actorUserId));
+}
+
+export function validateProfileValues(input: unknown, options: {
+  profiles: ActiveProfileSet;
+  authority: "operator" | "owner" | "system";
+  listingSlug?: string;
+  actorUserId?: string;
+  requireComplete: boolean;
+}): ValidatedProfileValues {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new Error("Profile values must be an object");
+  }
+  const supplied = input as ProfileValueSet;
+  const fields = profileFields(options.profiles);
+  const unknown = Object.keys(supplied).find((key) => !fields.has(key));
+  if (unknown) throw new Error(`Unknown profile field: ${unknown}`);
+  const result: ProfileValueSet = {};
+  for (const field of fields.values()) {
+    const hasValue = Object.hasOwn(supplied, field.key) && supplied[field.key] !== undefined;
+    if (hasValue && !writable(options.authority, field)) {
+      throw new Error(`Profile field ${field.key} is outside ${options.authority} write authority`);
+    }
+    const raw = hasValue ? supplied[field.key] : field.default;
+    if (raw === undefined) {
+      if (options.requireComplete && field.required && writable(options.authority, field)) {
+        throw new Error(`Profile field ${field.key} is required`);
+      }
+      continue;
+    }
+    if (!hasValue && !writable(options.authority, field)) continue;
+    try {
+      const value = validateProfileFieldValue(field, raw, {
+        isMediaAllowed: (id) => mediaAllowed(field, options.listingSlug,
+          options.actorUserId, options.authority, id),
+      });
+      if (value !== undefined) result[field.key] = value;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "invalid value";
+      throw new Error(`Profile field ${field.key}: ${message}`, { cause: error });
+    }
+  }
+  return result as ValidatedProfileValues;
+}
+
+function insertStoredValue(listingSlug: string, profileId: string, version: string,
+  fieldKey: string, row: NormalizedProfileRow, now: string): void {
+  database.prepare(`INSERT INTO directory_profile_values
+    (listing_slug, profile_id, definition_version, field_key, item_id, child_key,
+      position, value_type, text_value, integer_value, real_value, currency, date_start,
+      date_end, country_code, region, locality, latitude_e6, longitude_e6, media_id,
+      archived_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)`)
+    .run(listingSlug, profileId, version, fieldKey, row.itemId, row.childKey, row.position,
+      row.valueType, row.textValue, row.integerValue, row.realValue, row.currency,
+      row.dateStart, row.dateEnd, row.countryCode, row.region, row.locality,
+      row.latitudeE6, row.longitudeE6, row.mediaId, now);
+}
+
+export function replaceListingProfileValues(input: {
+  listingSlug: string;
+  values: ValidatedProfileValues;
+  profiles: ActiveProfileSet;
+}): void {
+  const now = new Date().toISOString();
+  const fields = profileFields(input.profiles);
+  for (const definition of input.profiles.definitions) {
+    database.prepare(`DELETE FROM directory_profile_values
+      WHERE listing_slug = ? AND profile_id = ? AND definition_version = ?
+        AND archived_at IS NULL`).run(input.listingSlug, definition.id, definition.version);
+  }
+  for (const [fieldKey, value] of Object.entries(input.values)) {
+    const field = fields.get(fieldKey);
+    if (!field) throw new Error(`Unknown validated profile field: ${fieldKey}`);
+    const definition = input.profiles.definitions.find(({ fields: candidates }) =>
+      candidates.some(({ key }) => key === fieldKey));
+    if (!definition) throw new Error(`Stored profile definition is missing for ${fieldKey}`);
+    for (const row of encodeProfileValue(field, value)) {
+      insertStoredValue(input.listingSlug, definition.id, definition.version, fieldKey, row, now);
+    }
+  }
+  reindexProfileSearch(input.listingSlug, input.profiles);
+}
+
+function storedDefinitionMap(rows: { profile_id: string; version: string;
+  definition_json: string }[]): Map<string, { fields: DirectoryProfileField[] }> {
+  return new Map(rows.map((row) => [`${row.profile_id}\0${row.version}`,
+    JSON.parse(row.definition_json) as { fields: DirectoryProfileField[] }]));
+}
+
+export function profileValuesForListings(slugs: readonly string[], options: {
+  includePrivate?: boolean;
+  includeArchived?: boolean;
+} = {}): Map<string, ProfileValueSet> {
+  const unique = [...new Set(slugs.filter(Boolean))];
+  const result = new Map(unique.map((slug) => [slug, {} as ProfileValueSet]));
+  if (!unique.length) return result;
+  const placeholders = unique.map(() => "?").join(", ");
+  const active = database.prepare(`SELECT base_profile_id, base_profile_version,
+      site_profile_id, site_profile_version FROM directory_profile_state WHERE id = 1`).get() as {
+        base_profile_id: string | null; base_profile_version: string | null;
+        site_profile_id: string | null; site_profile_version: string | null;
+      };
+  const activePairs = [[active.base_profile_id, active.base_profile_version],
+    [active.site_profile_id, active.site_profile_version]].filter(([id, version]) => id && version);
+  const activeWhere = activePairs.length ? activePairs.map(() =>
+    "(profile_id = ? AND definition_version = ?)").join(" OR ") : "0";
+  const activeArgs = activePairs.flat() as string[];
+  const rows = database.prepare(`SELECT listing_slug, profile_id, definition_version,
+      field_key, item_id, child_key, position, value_type, text_value, integer_value,
+      real_value, currency, date_start, date_end, country_code, region, locality,
+      latitude_e6, longitude_e6, media_id, archived_at
+    FROM directory_profile_values WHERE listing_slug IN (${placeholders}) AND
+      (${options.includeArchived ? `archived_at IS NOT NULL OR
+        (archived_at IS NULL AND (${activeWhere}))` : `archived_at IS NULL AND (${activeWhere})`})
+    ORDER BY archived_at IS NULL, updated_at, position, item_id, child_key`)
+    .all(...unique, ...activeArgs) as HydratedValueRow[];
+  if (!rows.length) return result;
+  const pairs = [...new Set(rows.map((row) => `${row.profile_id}\0${row.definition_version}`))]
+    .map((pair) => pair.split("\0"));
+  const pairWhere = pairs.map(() => "(profile_id = ? AND version = ?)").join(" OR ");
+  const definitions = storedDefinitionMap(database.prepare(`SELECT profile_id, version, definition_json
+    FROM directory_profile_definitions WHERE ${pairWhere}`).all(...pairs.flat()) as {
+      profile_id: string; version: string; definition_json: string;
+    }[]);
+  const groups = new Map<string, HydratedValueRow[]>();
+  for (const row of rows) {
+    const key = [row.listing_slug, row.profile_id, row.definition_version, row.field_key,
+      row.archived_at ? "archived" : "active"].join("\0");
+    groups.set(key, [...(groups.get(key) ?? []), row]);
+  }
+  for (const [key, group] of groups) {
+    const [listingSlug, profileId, version, fieldKey] = key.split("\0");
+    const definition = definitions.get(`${profileId}\0${version}`);
+    const field = definition?.fields.find(({ key: candidate }) => candidate === fieldKey);
+    if (!field || (options.includePrivate === false && field.visibility !== "public")) continue;
+    result.get(listingSlug)![fieldKey] = decodeProfileValue(field, group.map(normalizedRow));
+  }
+  return result;
+}
+
+export function assertListingProfilePublishable(listingSlug: string): void {
+  const state = database.prepare(`SELECT revision FROM directory_profile_state WHERE id = 1`).get() as
+    { revision: number };
+  const definitionRows = database.prepare(`SELECT definition_json FROM directory_profile_definitions d
+    JOIN directory_profile_state s ON s.id = 1
+    WHERE (d.profile_id = s.base_profile_id AND d.version = s.base_profile_version)
+       OR (d.profile_id = s.site_profile_id AND d.version = s.site_profile_version)`).all() as
+    { definition_json: string }[];
+  const profiles: ActiveProfileSet = { state: { revision: state.revision, base: null, site: null },
+    definitions: definitionRows.map(({ definition_json }) =>
+      JSON.parse(definition_json) as ActiveProfileSet["definitions"][number]) };
+  const values = profileValuesForListings([listingSlug], { includePrivate: true }).get(listingSlug) ?? {};
+  validateProfileValues(values, { profiles, authority: "system", listingSlug,
+    actorUserId: "system", requireComplete: true });
+}
 
 function normalizedRow(row: StoredValueRow): NormalizedProfileRow {
   return {

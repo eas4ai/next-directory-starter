@@ -55,6 +55,11 @@ export type ProfileLocation = {
 export type ProfileGroupItem = { id: string; values: Record<string, unknown> };
 export type ProfileRepeatedValue = { id: string; value: unknown };
 export type CanonicalProfileValue = unknown;
+export type ProfileValueSet = Record<string, unknown>;
+declare const validatedProfileValues: unique symbol;
+export type ValidatedProfileValues = ProfileValueSet & {
+  readonly [validatedProfileValues]: true;
+};
 
 export type NormalizedProfileRow = {
   itemId: string;
