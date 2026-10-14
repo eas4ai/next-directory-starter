@@ -26,7 +26,7 @@ export type Listing = {
   profileStateRevision: number;
 };
 
-type StoredListing = Omit<Listing, "profileValues" | "profileStateRevision"> & {
+export type StoredListing = Omit<Listing, "profileValues" | "profileStateRevision"> & {
   owner_user_id: string | null;
 };
 
@@ -49,6 +49,10 @@ function hydrateMany(rows: StoredListing[], includePrivate: boolean): Listing[] 
   const profileStateRevision = directoryProfileState().revision;
   return rows.map((row) => ({ ...row, profileValues: values.get(row.slug) ?? {},
     profileStateRevision }));
+}
+
+export function hydratePublicListings(rows: StoredListing[]): Listing[] {
+  return hydrateMany(rows, false);
 }
 
 export function publishedListingBySlug(slug: string): Listing | undefined {
@@ -110,18 +114,6 @@ export function searchPublishedListings({ q = "", category = "", page = "1" }: L
     .all(...args, LISTINGS_PER_PAGE, (pageNumber - 1) * LISTINGS_PER_PAGE) as StoredListing[];
   const listings = hydrateMany(rows, false);
   return { listings, total, page: pageNumber, pages };
-}
-
-export function activeFeaturedListings(search: Pick<ListingSearch, "q" | "category"> = {}): Listing[] {
-  const { where, args } = publicFilter(search.q ?? "", search.category ?? "");
-  const now = new Date().toISOString();
-  const rows = database.prepare(`SELECT l.* FROM listings l WHERE ${where}
-    AND EXISTS (SELECT 1 FROM entitlements e
-      JOIN purchases p ON p.id = e.purchase_id AND p.plan_mode = ?
-      WHERE e.listing_slug = l.slug
-      AND e.featured = 1 AND e.revoked_at IS NULL AND e.starts_at <= ? AND e.ends_at > ?)
-    ORDER BY l.name COLLATE NOCASE, l.slug LIMIT 6`).all(...args, checkoutMode(), now, now) as StoredListing[];
-  return hydrateMany(rows, false);
 }
 
 export function activeFeaturedSlugs(slugs: string[]): Set<string> {

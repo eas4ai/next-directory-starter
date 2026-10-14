@@ -916,7 +916,7 @@ async function setupDiscoveryCatalog() {
     const slug = index === 0 ? "alpha" : index === 1 ? "beta" : index === 2 ? "gamma"
       : `page-${String(index).padStart(2, "0")}`;
     const parsed = parseListing(listingInput(slug, publicProfileValues(index), 1, {
-      name: index < 3 ? "Stable name" : `Page ${String(index).padStart(2, "0")}`,
+      name: index < 3 ? "A stable name" : `Page ${String(index).padStart(2, "0")}`,
       summary: index === 0 ? "Core alpha summary" : `Core summary ${index}`,
       status: "published",
     }));
@@ -957,7 +957,7 @@ async function startProfileApp() {
       BETTER_AUTH_SECRET: "profile-browser-secret-at-least-32-characters-long" } });
   assert.equal(build.status, 0, build.stderr || build.stdout);
   const origin = "http://127.0.0.1:38763";
-  const child = spawn("npm", ["run", "start", "--", "-p", "38763"], { cwd: repository,
+  const child = spawn(join(repository, "node_modules/.bin/next"), ["start", "-p", "38763"], { cwd: repository,
     stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, SITE_URL: origin,
       BETTER_AUTH_URL: origin,
       BETTER_AUTH_SECRET: "profile-browser-secret-at-least-32-characters-long" } });
@@ -1040,7 +1040,7 @@ requirementTest("PRF-003 parses bounded public profile facets and stable sorts",
       "BANNED_PROFILE_SENTINEL"]) assert.deepEqual(slugs({ q: sentinel }), []);
     assert.deepEqual(slugs({ sort: "vendor.ai-tools.team-size:asc" }).slice(0, 3),
       ["alpha", "beta", "gamma"]);
-    assert.deepEqual(slugs({ sort: "vendor.ai-tools.team-size:desc" }).slice(-3),
+    assert.deepEqual(slugs({ sort: "vendor.ai-tools.team-size:desc", page: "2" }),
       ["gamma", "beta", "alpha"]);
     const page = discovery.searchProfileDirectory(discovery.parseProfileDirectoryQuery({}, profiles));
     assert.equal(page.total, 15);
@@ -1066,10 +1066,58 @@ requirementTest("PRF-003 parses bounded public profile facets and stable sorts",
     assert.match(sql, /directory_profile_search/i);
     assert.ok((sql.match(/directory_profile_values/g) ?? []).length < 20,
       "profile discovery performs unbounded per-listing value queries");
+
+    const explain = (input) => {
+      const calls = [];
+      api.database.prepare = function planPrepare(statementSql) {
+        const statement = originalPrepare.call(this, statementSql);
+        return new Proxy(statement, { get(target, property) {
+          const value = Reflect.get(target, property, target);
+          if (property !== "all" && property !== "get") {
+            return typeof value === "function" ? value.bind(target) : value;
+          }
+          return (...args) => {
+            calls.push({ sql: String(statementSql), args });
+            return value.apply(target, args);
+          };
+        } });
+      };
+      try {
+        discovery.searchProfileDirectory(discovery.parseProfileDirectoryQuery(input, profiles));
+      } finally { api.database.prepare = originalPrepare; }
+      const pageCall = calls.find(({ sql: statementSql }) => /^SELECT l\.\*/.test(statementSql));
+      assert.ok(pageCall, `missing page query for ${JSON.stringify(input)}`);
+      return originalPrepare.call(api.database, `EXPLAIN QUERY PLAN ${pageCall.sql}`)
+        .all(...pageCall.args).map(({ detail }) => detail).join("\n");
+    };
+    for (const [input, expectedIndex] of [
+      [{ "facet.vendor.ai-tools.pricing-model": "paid" }, "directory_profile_values_text"],
+      [{ "facet.vendor.ai-tools.platforms": ["web", "mac"] }, "directory_profile_values_text"],
+      [{ "facet.vendor.ai-tools.open-source": "true" }, "directory_profile_values_integer"],
+      [{ "min.vendor.ai-tools.team-size": "1" }, "directory_profile_values_integer"],
+      [{ "min.vendor.ai-tools.rating": "1.00" }, "directory_profile_values_integer"],
+      [{ "min.vendor.ai-tools.starting-price": "USD:1" }, "directory_profile_values_money"],
+      [{ "min.vendor.ai-tools.launched": "2025-01-01" }, "directory_profile_values_dates"],
+      [{ "min.vendor.ai-tools.availability": "2026-01-01" }, "directory_profile_values_dates"],
+      [{ "min.vendor.ai-tools.setup-time": "1" }, "directory_profile_values_integer"],
+      [{ "facet.vendor.ai-tools.headquarters": "US|NY|New York" },
+        "directory_profile_values_location"],
+      [{ q: "canvas" }, "directory_profile_search"],
+    ]) assert.match(explain(input), new RegExp(expectedIndex, "i"),
+      `${JSON.stringify(input)} does not use ${expectedIndex}`);
   });
 
   await t.test("renders public placements and alternate outputs without protected sentinels", async () => {
-    await setupDiscoveryCatalog();
+    const api = await setupDiscoveryCatalog();
+    const profileMediaId = "223e4567-e89b-12d3-a456-426614174000";
+    insertProfileMedia(api.database, { id: profileMediaId, slug: "alpha",
+      fieldKey: "vendor.ai-tools.screenshot", state: "public" });
+    api.database.prepare(`INSERT INTO directory_profile_values
+      (listing_slug, profile_id, definition_version, field_key, item_id, child_key,
+        position, value_type, media_id, archived_at, updated_at)
+      VALUES ('alpha', 'vendor.ai-tools', '1.0.0', 'vendor.ai-tools.screenshot',
+        'value', '', 0, 'media', ?, NULL, ?)`)
+      .run(profileMediaId, "2026-10-14T00:00:00.000Z");
     const facetsPath = join(repository, "src/components/profile-facets.tsx");
     assert.ok(existsSync(facetsPath), "server-rendered profile facet controls are missing");
     const React = await import("react");
@@ -1077,13 +1125,34 @@ requirementTest("PRF-003 parses bounded public profile facets and stable sorts",
     const { ProfileValuesView } = await import("../src/components/profile-values-view.tsx");
     const profile = discoveryProfile();
     const html = renderToStaticMarkup(React.createElement(ProfileValuesView, {
-      fields: profile.fields, values: publicProfileValues(0), mode: "public",
+      fields: profile.fields, values: publicProfileValues(0, {
+        "vendor.ai-tools.screenshot": profileMediaId,
+      }), mode: "public",
     }));
     for (const visible of ["Neural canvas exact phrase", "Paid", "Web", "macOS",
-      "$10.00", "1 hour", "New York", "Slack"]) assert.match(html, new RegExp(visible, "i"));
+      "$10.00", "1 hour", "New York", "Slack"]) assert.ok(
+      html.toLowerCase().includes(visible.toLowerCase()), `${visible} is not rendered`);
     assert.doesNotMatch(html, /PRIVATE_PROFILE_SENTINEL|System note|<script/i);
     assert.match(html, /dateTime=|datetime=/i);
     assert.match(html, /rel="noopener noreferrer"/i);
+    assert.match(html, /alt="Profile image"/i);
+    const compact = renderToStaticMarkup(React.createElement(ProfileValuesView, {
+      fields: profile.fields, values: publicProfileValues(0), mode: "public",
+      placements: ["card", "badge"],
+    }));
+    assert.match(compact, /Neural canvas exact phrase|Paid/i);
+    assert.doesNotMatch(compact, /Team size|Headquarters|Slack/i);
+    const hostileProfile = structuredClone(profile);
+    const hostileNotes = hostileProfile.fields.find(({ key }) => key === "vendor.ai-tools.notes");
+    hostileNotes.visibility = "public";
+    hostileNotes.placement = "detail";
+    const hostile = renderToStaticMarkup(React.createElement(ProfileValuesView, {
+      fields: hostileProfile.fields, values: publicProfileValues(0, {
+        "vendor.ai-tools.notes": "<script>alert(1)</script> [unsafe](javascript:alert(2))",
+        "vendor.ai-tools.docs": "javascript:alert(3)",
+      }), mode: "public",
+    }));
+    assert.doesNotMatch(hostile, /<script|javascript:|href="javascript/i);
     const { listingMarkdown } = await import("../src/lib/markdown-twins.ts");
     const listing = (await import("../src/lib/listings.ts")).publishedListingBySlug("alpha");
     const markdown = listingMarkdown(listing);
@@ -1127,16 +1196,20 @@ requirementTest("PRF-003 parses bounded public profile facets and stable sorts",
       const keyboard = await browser.newContext({ viewport: { width: 1024, height: 800 } });
       const keyboardPage = await keyboard.newPage();
       await keyboardPage.goto(`${origin}/listings`);
-      const controls = await keyboardPage.locator("form input, form select, form button, form a").count();
+      const formControls = keyboardPage.locator("form input, form select, form button, form a");
+      const controls = await formControls.count();
+      await formControls.evaluateAll((elements) => elements.forEach((element, index) => {
+        element.setAttribute("data-keyboard-index", String(index));
+      }));
       const focused = new Set();
-      for (let index = 0; index < controls + 4; index += 1) {
+      await formControls.first().focus();
+      for (let index = 0; index < controls * 4 && focused.size < controls; index += 1) {
+        const focusedIndex = await keyboardPage.evaluate(() =>
+          document.activeElement?.getAttribute("data-keyboard-index"));
+        if (focusedIndex !== null) focused.add(focusedIndex);
         await keyboardPage.keyboard.press("Tab");
-        focused.add(await keyboardPage.evaluate(() => {
-          const element = document.activeElement;
-          return element?.getAttribute("name") || element?.textContent?.trim() || element?.tagName || "";
-        }));
       }
-      assert.ok(focused.size >= controls, "not every discovery control is keyboard reachable");
+      assert.equal(focused.size, controls, "not every discovery control is keyboard reachable");
       await keyboard.close();
 
       for (const colorScheme of ["light", "dark"]) {

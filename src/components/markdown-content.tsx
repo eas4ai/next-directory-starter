@@ -8,10 +8,19 @@ export function MarkdownContent({ source }: { source: string }) {
         skipHtml
         remarkPlugins={[remarkGfm]}
         disallowedElements={["img"]}
+        urlTransform={(value) => {
+          if (/^(?:\/|#|\.\/|\.\.\/)/.test(value)) return value;
+          try {
+            return ["http:", "https:", "mailto:"].includes(new URL(value).protocol) ? value : "";
+          } catch {
+            return "";
+          }
+        }}
         components={{
-          a: ({ href, children }) => (
-            <a href={href} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">{children}</a>
-          ),
+          a: ({ href, children }) => href ? (
+            <a href={href} target="_blank" rel="noopener noreferrer"
+              className="underline underline-offset-2">{children}</a>
+          ) : <span>{children}</span>,
         }}
       >{source}</Markdown>
     </div>
