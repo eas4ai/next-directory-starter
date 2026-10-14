@@ -1,9 +1,0 @@
-{
-  "command": "node mechanisms/check-operator-manual.mjs",
-  "cwd": null,
-  "documents": [],
-  "identity": { "env": [], "image": null, "tools": { "node": "node --version" } },
-  "inputs": ["README.md", "docs/operator-manual.md", "mechanisms/check-operator-manual.mjs", "mechanisms/operator-manual.def.json", "package.json", "scripts", "src"],
-  "requirements": ["DOC-002"],
-  "results": "per-requirement"
-}
