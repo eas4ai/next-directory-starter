@@ -22,7 +22,12 @@ test('taxonomy and theme changes record atomic actor audit events', async () => 
     renameTaxon('category', 'Original', 'Renamed', 'administrator');
     createTaxon('tag', 'Unused', 'administrator');
     deleteTaxon('tag', 'Unused', 'administrator');
-    saveThemePreset(defaultThemePreset, 'administrator');
+    const changedTheme = {
+      ...defaultThemePreset,
+      theme: defaultThemePreset.theme === 'blue' ? 'red' : 'blue',
+    };
+    saveThemePreset(changedTheme, 'administrator');
+    assert.deepEqual(getThemePreset(), changedTheme);
 
     const events = database.prepare(`SELECT action, actor_user_id AS actor,
       target, occurred_at AS occurredAt FROM audit_events`).all();
@@ -39,10 +44,12 @@ test('taxonomy and theme changes record atomic actor audit events', async () => 
 
     assert.throws(() => createTaxon('tag', 'Rolled back', ''), /Audit event/);
     assert.equal(listTaxa('tag').some(({ name }) => name === 'Rolled back'), false);
-    const saved = getThemePreset();
-    const changed = { ...saved, theme: saved.theme === 'blue' ? 'red' : 'blue' };
-    assert.throws(() => saveThemePreset(changed, ''), /Audit event/);
-    assert.deepEqual(getThemePreset(), saved);
+    const rolledBackTheme = {
+      ...changedTheme,
+      theme: changedTheme.theme === 'blue' ? 'red' : 'blue',
+    };
+    assert.throws(() => saveThemePreset(rolledBackTheme, ''), /Audit event/);
+    assert.deepEqual(getThemePreset(), changedTheme);
   } finally {
     database?.close();
     if (previous === undefined) delete process.env.DATABASE_URL;
