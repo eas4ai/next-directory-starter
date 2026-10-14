@@ -129,7 +129,7 @@ The limit must be 1–50. The command reports attempted, sent, and failed counts
 
 ### Container deployment
 
-This Compose setup runs one application instance on one host. Install Docker Engine with Compose, then copy `.env.docker.example` to `.env.docker`. Set `SITE_URL` and `BETTER_AUTH_URL` to the public HTTPS origin and replace `BETTER_AUTH_SECRET` with a unique long random value. Keep `.env.docker` private. Set optional mail and payment variables there as described above. If provider profiles are saved, keep `BILLING_ENCRYPTION_KEY` stable and store its matching key file outside the repository. Compose fixes `DATABASE_URL` to `file:/app/data/directory.db` and `MEDIA_DIR` to `/app/data/media`; both live in its named volume. It maps port 3000 to `127.0.0.1` only, so configure a reverse proxy with HTTPS at the public origin. Change `DIRECTORY_PORT` if another local service uses 3000.
+This Compose setup runs one application instance on one host. Install Docker Engine with Compose, then copy `.env.docker.example` to `.env.docker`. Set `SITE_URL` and `BETTER_AUTH_URL` to the public HTTPS origin and replace `BETTER_AUTH_SECRET` with a unique long random value. Set `DIRECTORY_IMAGE` to a new immutable local tag for this revision, such as `next-directory-starter:2026-10-14-abc123`; never reuse that tag for another revision. Record the tag with the deployed code revision and retain the prior tagged image through each upgrade. Keep `.env.docker` private. Set optional mail and payment variables there as described above. If provider profiles are saved, keep `BILLING_ENCRYPTION_KEY` stable and store its matching key file outside the repository. Compose fixes `DATABASE_URL` to `file:/app/data/directory.db` and `MEDIA_DIR` to `/app/data/media`; both live in its named volume. It maps port 3000 to `127.0.0.1` only, so configure a reverse proxy with HTTPS at the public origin. Change `DIRECTORY_PORT` if another local service uses 3000.
 
 Set a hard request-body limit at that proxy. The largest application request is the agent screenshot JSON envelope, capped at 7,100,000 bytes, so an 8 MiB proxy limit admits valid screenshots while bounding every public request before it reaches Next.js. The application trusts the proxy-owned `X-Real-IP` header for authentication rate limits, so the public Nginx edge must overwrite both client-IP headers with its connection address. Keep the Compose port bound to loopback so a public caller cannot reach the application with a forged trusted header. For Nginx, add the following to the TLS server block that owns the public hostname, replace the certificate paths and hostname, then run `sudo nginx -t` before reloading Nginx. The `8m` value is 8 MiB. Nginx answers a larger request with `413 Request Entity Too Large` without forwarding its body to the application.
 
@@ -183,20 +183,22 @@ docker compose --env-file .env.docker run --rm --no-deps \
   --backup /backup/directory-YYYYMMDD --target /backup/directory-restore-check
 ```
 
-Before an upgrade, verify a backup and isolated restore, build the new revision, stop the service, run its migration, and start it. Keep the prior image and backup until you inspect public and authorized paths. Do not run two application containers against the same SQLite volume.
+Before an upgrade, verify a backup and isolated restore, record the currently deployed `DIRECTORY_IMAGE`, set a fresh immutable tag for the new revision in `.env.docker`, build the new revision, stop the service, run its migration, and start it. Keep the prior tagged image and backup until you inspect public and authorized paths. Do not run two application containers against the same SQLite volume.
 
-To recover from a failed upgrade, stop the service, check out the old code and image, and use a **new** Compose project. The following one-off command copies the verified restore into that project's empty volume. The host restore directory must be readable by container user ID 1000. Keep `BILLING_ENCRYPTION_KEY` in `.env.docker` equal to the restored `billing.key` value. Run all later Compose commands with `-p directory-recovery` to keep using this new volume. Start only after the original service has stopped, since both projects bind the same local port.
+To recover from a failed upgrade, stop the service, check out the old code, and use a **new** Compose project with the recorded prior image tag. Set `RECOVERY_IMAGE` to that exact tag and make `docker image inspect` succeed before touching the recovery volume. The `DIRECTORY_IMAGE="$RECOVERY_IMAGE"` prefix overrides the failed revision's value in `.env.docker`; use it on every `directory-recovery` command. The following one-off command copies the verified restore into that project's empty volume. The host restore directory must be readable by container user ID 1000. Keep `BILLING_ENCRYPTION_KEY` in `.env.docker` equal to the restored `billing.key` value. Run all later Compose commands with `-p directory-recovery` to keep using this new volume. Start only after the original service has stopped, since both projects bind the same local port.
 
 ```sh
+export RECOVERY_IMAGE='next-directory-starter:2026-10-01-abc123'
+docker image inspect "$RECOVERY_IMAGE"
 docker compose --env-file .env.docker down
-docker compose --env-file .env.docker -p directory-recovery run --rm --no-deps \
+DIRECTORY_IMAGE="$RECOVERY_IMAGE" docker compose --env-file .env.docker -p directory-recovery run --rm --no-deps \
   -v "$BACKUP_DIR:/backup:ro" web sh -eu -c '
     test ! -e /app/data/directory.db
     cp /backup/directory-restore-check/database.db /app/data/directory.db
     mkdir -p /app/data/media
     cp -a /backup/directory-restore-check/media/. /app/data/media/
   '
-docker compose --env-file .env.docker -p directory-recovery up -d --no-build
+DIRECTORY_IMAGE="$RECOVERY_IMAGE" docker compose --env-file .env.docker -p directory-recovery up -d --no-build
 ```
 
 Inspect public and authorized paths before routing traffic to the recovered service. The restore command intentionally never modifies the original volume; preserve it until recovery is verified. See the [backup](../scripts/backup.mjs) and [restore](../scripts/restore.mjs) scripts for their exact checks.

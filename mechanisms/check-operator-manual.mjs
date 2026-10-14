@@ -75,6 +75,9 @@ try {
     manual.includes('proxy_set_header X-Forwarded-For $remote_addr;') &&
     !manual.includes('$proxy_add_x_forwarded_for'),
     'Manual does not overwrite caller-controlled forwarding headers');
+  expect(manual.includes('docker image inspect "$RECOVERY_IMAGE"') &&
+    manual.match(/DIRECTORY_IMAGE="\$RECOVERY_IMAGE" docker compose/g)?.length >= 2,
+    'Manual does not pin the prior image for recovery');
   expect(manual.includes('BILLING_ENCRYPTION_KEY') && manual.includes('Isolated restore verified.') &&
     manual.includes('Backup created and verified.'), 'Manual omits backup recovery boundaries');
   passed = true;
