@@ -63,6 +63,9 @@ try {
     manual.includes('tsx'), 'Manual omits custom database CLI environment workaround');
   expect(manual.includes('WebMCP') && manual.includes('/api/mcp'),
     'Manual omits an agent access path');
+  expect(manual.includes('preview_card') && manual.includes('previewUrl') &&
+    manual.includes('site origin') && manual.includes('Authorization: Bearer <secret>'),
+    'Manual omits the bearer-authenticated remote preview fetch');
   expect(manual.includes('NOWPayments') && manual.includes('HTTPS') &&
     manual.includes('one-time'), 'Manual omits payment provider limits');
   expect(manual.includes('client_max_body_size 8m;') && manual.includes('7,100,000 bytes') &&
