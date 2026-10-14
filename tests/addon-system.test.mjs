@@ -7,7 +7,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import Database from "better-sqlite3";
 
 const repository = resolve(import.meta.dirname, "..");
@@ -24,6 +24,20 @@ function run(cwd, args, options = {}) {
     encoding: "utf8",
     timeout: options.timeout ?? 180_000,
     env: { ...process.env, CI: "1", ...options.env },
+  });
+}
+
+function runAsync(cwd, args, options = {}) {
+  return new Promise((resolveResult) => {
+    const child = spawn(process.execPath, ["scripts/addons.mjs", ...args], {
+      cwd,
+      env: { ...process.env, CI: "1", ...options.env },
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("close", (status, signal) => resolveResult({ status, signal, stdout, stderr }));
   });
 }
 
@@ -173,7 +187,7 @@ requirementTest("ADD-001 validates deterministic packages before workspace write
   }
 });
 
-requirementTest("ADD-002 installs and removes owned files transactionally through generated registries", () => {
+requirementTest("ADD-002 installs and removes owned files transactionally through generated registries", async () => {
   const temporary = mkdtempSync(join(tmpdir(), "directory-addon-install-"));
   try {
     const source = join(temporary, "starter");
@@ -201,6 +215,31 @@ requirementTest("ADD-002 installs and removes owned files transactionally throug
       "remove recovered reference add-on");
     assert.deepEqual(treeSnapshot(source), baseline,
       "recovery after interrupted install did not restore the starter");
+
+    const parallelSource = copyFixture(temporary, "parallel-addon");
+    const parallelArchive = join(temporary, "parallel.zip");
+    packageArchive(parallelSource, parallelArchive);
+    const firstInstall = runAsync(source, ["install", archive], {
+      env: { NODE_ENV: "test", DIRECTORY_ADDON_TEST_HOLD_LOCK_MS: "1000" },
+    });
+    const operationLockPath = join(source, ".directory-starter/addons.operation.lock");
+    let lockObserved = false;
+    for (let attempt = 0; attempt < 40 && !lockObserved; attempt += 1) {
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, 50));
+      lockObserved = existsSync(operationLockPath);
+    }
+    const secondInstall = runAsync(source, ["install", parallelArchive]);
+    const [firstResult, secondResult] = await Promise.all([firstInstall, secondInstall]);
+    assert.ok(lockObserved, "concurrent installation did not hold an operation lock");
+    expectSuccess(firstResult, "first concurrent install");
+    expectSuccess(secondResult, "second concurrent install");
+    const parallelLock = JSON.parse(readFileSync(
+      join(source, ".directory-starter/addons.lock.json"), "utf8"));
+    assert.deepEqual(parallelLock.addons.map(({ id }) => id), ["parallel-addon", "reference-addon"]);
+    expectSuccess(run(source, ["remove", "parallel-addon"]), "remove parallel add-on");
+    expectSuccess(run(source, ["remove", "reference-addon"]), "remove concurrent reference add-on");
+    assert.deepEqual(treeSnapshot(source), baseline,
+      "concurrent install serialization did not restore the starter");
 
     const failed = run(source, ["install", archive], {
       env: { NODE_ENV: "test", DIRECTORY_ADDON_TEST_FAIL_AFTER: "1" },

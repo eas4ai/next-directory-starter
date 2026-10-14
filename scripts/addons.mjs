@@ -49,7 +49,7 @@ async function main() {
   }
   if (command === "remove") {
     exactArgs(args, 1, command);
-    const result = removeAddon(process.cwd(), args[0]);
+    const result = await removeAddon(process.cwd(), args[0]);
     process.stdout.write(`Removed ${result.id}@${result.version} (${result.files} files)\n`);
     return;
   }
