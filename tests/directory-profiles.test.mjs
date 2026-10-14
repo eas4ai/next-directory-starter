@@ -135,6 +135,17 @@ async function profileTestContext() {
   return { database, ...api };
 }
 
+async function profileCodecContext() {
+  const schemaPath = join(repository, "scripts/addons/profile-schema.mjs");
+  const valuesPath = join(repository, "src/lib/profile-values.ts");
+  assert.ok(existsSync(schemaPath), "shared directory-profile runtime schema is missing");
+  assert.ok(existsSync(valuesPath), "typed directory-profile value codecs are missing");
+  return {
+    ...await import(pathToFileURL(schemaPath).href),
+    ...await import(pathToFileURL(valuesPath).href),
+  };
+}
+
 function resetProfileTables(database) {
   database.exec(`DELETE FROM directory_profile_search;
     DELETE FROM directory_profile_media;
@@ -197,8 +208,7 @@ function insertValue(database, {
 
 requirementTest("PRF-001 activates immutable versioned directory-profile definitions", async (t) => {
   await t.test("validates all field families and rejects invalid definitions", async () => {
-    const api = await profileTestContext();
-    resetProfileTables(api.database);
+    const api = await profileCodecContext();
     const parsed = api.parseDirectoryProfileDefinition(completeProfile());
     assert.deepEqual(parsed.fields.map(({ type }) => type), [
       "short-text", "markdown", "boolean", "integer", "decimal", "money",
@@ -222,12 +232,78 @@ requirementTest("PRF-001 activates immutable versioned directory-profile definit
   });
 
   await t.test("canonicalizes definitions and produces stable digests", async () => {
-    const api = await profileTestContext();
-    resetProfileTables(api.database);
+    const api = await profileCodecContext();
     const definition = completeProfile();
     assert.equal(api.profileDigest(definition), api.profileDigest(reorderedObject(definition)));
     assert.equal(api.canonicalProfileJson(definition), api.canonicalProfileJson(reorderedObject(definition)));
     assert.match(api.profileDigest(definition), /^[a-f0-9]{64}$/);
+  });
+
+  await t.test("normalizes and round-trips every typed field family", async () => {
+    const api = await profileCodecContext();
+    const profile = api.parseDirectoryProfileDefinition(completeProfile());
+    const values = new Map([
+      ["short-text", "A concise tagline"],
+      ["markdown", "**Safe** details"],
+      ["boolean", false],
+      ["integer", 42],
+      ["decimal", "4.25"],
+      ["money", { amountMinor: 1299, currency: "usd" }],
+      ["single-choice", "paid"],
+      ["multiple-choice", ["mac", "web"]],
+      ["url", "https://example.com/docs"],
+      ["date", "2026-10-14"],
+      ["datetime", "2026-10-14T12:00:00-04:00"],
+      ["date-range", { start: "2026-10-01", end: "2026-10-31" }],
+      ["duration", 7200],
+      ["location", { countryCode: "us", region: "NY", locality: "New York",
+        latitude: 40.7128, longitude: -74.006 }],
+      ["media", "123e4567-e89b-12d3-a456-426614174000"],
+      ["group", [{ id: "integration-slack", values: {
+        name: "Slack", url: "https://example.com/slack", native: true,
+      } }]],
+    ]);
+    const expected = new Map(values);
+    expected.set("money", { amountMinor: 1299, currency: "USD" });
+    expected.set("multiple-choice", ["web", "mac"]);
+    expected.set("datetime", "2026-10-14T16:00:00.000Z");
+    expected.set("location", { countryCode: "US", region: "NY", locality: "New York",
+      latitude: 40.7128, longitude: -74.006 });
+    for (const field of profile.fields) {
+      const value = api.validateProfileFieldValue(field, values.get(field.type), {
+        isMediaAllowed: (id) => id === "123e4567-e89b-12d3-a456-426614174000",
+      });
+      const rows = api.encodeProfileValue(field, value);
+      assert.deepEqual(api.decodeProfileValue(field, rows), expected.get(field.type),
+        `${field.type} did not round-trip through normalized rows`);
+    }
+    const integer = profile.fields.find(({ type }) => type === "integer");
+    assert.throws(() => api.validateProfileFieldValue(integer, Number.MAX_SAFE_INTEGER + 1, {}),
+      /integer|safe|maximum/i);
+    const dateRange = profile.fields.find(({ type }) => type === "date-range");
+    assert.throws(() => api.validateProfileFieldValue(dateRange,
+      { start: "2026-11-01", end: "2026-10-01" }, {}), /range|start|end/i);
+    const url = profile.fields.find(({ type }) => type === "url");
+    assert.throws(() => api.validateProfileFieldValue(url,
+      "https://user:secret@example.com", {}), /credential|URL/i);
+  });
+
+  await t.test("creates normalized profile storage idempotently", async () => {
+    const { database } = await import("../src/lib/database.ts");
+    profileDatabase = database;
+    const { migrateCatalog } = await import("../src/lib/catalog-migrations.ts");
+    migrateCatalog();
+    migrateCatalog();
+    const tables = new Set(database.prepare(`SELECT name FROM sqlite_master
+      WHERE type IN ('table', 'view')`).all().map(({ name }) => name));
+    for (const name of [
+      "directory_profile_definitions", "directory_profile_state", "directory_profile_values",
+      "directory_profile_changes", "directory_profile_media", "directory_profile_seed_runs",
+      "directory_profile_search",
+    ]) assert.ok(tables.has(name), `migration 33 did not create ${name}`);
+    assert.deepEqual(database.pragma("foreign_key_check"), []);
+    assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM directory_profile_state
+      WHERE id = 1 AND revision = 0`).get().count, 1);
   });
 
   await t.test("stores immutable definitions and protects activation", async () => {
