@@ -12,6 +12,11 @@ import Database from "better-sqlite3";
 
 const repository = resolve(import.meta.dirname, "..");
 const fixture = join(repository, "fixtures/addons/reference-addon");
+const selectedRequirement = process.env.ADDON_REQUIREMENT;
+
+function requirementTest(name, body) {
+  if (!selectedRequirement || name.startsWith(selectedRequirement)) test(name, body);
+}
 
 function run(cwd, args, options = {}) {
   return spawnSync(process.execPath, ["scripts/addons.mjs", ...args], {
@@ -97,7 +102,7 @@ function packageArchive(source, output) {
   expectSuccess(result, "pack add-on");
 }
 
-test("ADD-001 validates deterministic packages before workspace writes", () => {
+requirementTest("ADD-001 validates deterministic packages before workspace writes", () => {
   assert.ok(existsSync(join(repository, "scripts/addons.mjs")), "add-on CLI is missing");
   const temporary = mkdtempSync(join(tmpdir(), "directory-addon-contract-"));
   try {
@@ -147,7 +152,7 @@ test("ADD-001 validates deterministic packages before workspace writes", () => {
   }
 });
 
-test("ADD-002 installs and removes owned files transactionally through generated registries", () => {
+requirementTest("ADD-002 installs and removes owned files transactionally through generated registries", () => {
   const temporary = mkdtempSync(join(tmpdir(), "directory-addon-install-"));
   try {
     const source = join(temporary, "starter");
@@ -206,7 +211,7 @@ test("ADD-002 installs and removes owned files transactionally through generated
   }
 });
 
-test("ADD-003 reference add-on completes a clean build seed and removal round trip", () => {
+requirementTest("ADD-003 reference add-on completes a clean build seed and removal round trip", () => {
   const temporary = mkdtempSync(join(tmpdir(), "directory-addon-roundtrip-"));
   try {
     const source = join(temporary, "starter");
