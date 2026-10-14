@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import sharp from 'sharp';
 
 const requirements = ['SEO-006', 'SEO-007', 'SEO-008', 'SEO-009', 'SEO-010'];
 const results = Object.fromEntries(requirements.map((id) => [id, false]));
@@ -235,6 +236,35 @@ try {
       json({ source: '/old-tool', destination: 'https://outside.invalid/' }, adminCookie));
     if (external.status < 400 || external.status >= 500) {
       throw new Error(`Unsafe external redirect was accepted: HTTP ${external.status}`);
+    }
+    for (const source of ['/social-card', '/og', '/brand-assets', '/theme.css']) {
+      const reserved = await request('/api/admin/seo/redirects',
+        json({ source, destination: '/' }, adminCookie));
+      if (reserved.status < 400 || reserved.status >= 500) {
+        throw new Error(`Live route prefix was accepted as a redirect source: ${source}`);
+      }
+    }
+    const socialCard = await request('/social-card?path=/listings/example-tool');
+    const importCard = await request('/og/listings/example-tool.png');
+    const theme = await request('/theme.css');
+    if (socialCard.status !== 200 || socialCard.headers.get('content-type') !== 'image/png' ||
+        importCard.status !== 200 || importCard.headers.get('content-type') !== 'image/png' ||
+        theme.status !== 200 || !theme.headers.get('content-type')?.startsWith('text/css')) {
+      throw new Error(`Live route response was lost: ${socialCard.status}/${importCard.status}/${theme.status}`);
+    }
+    const imageInput = await sharp({ create: {
+      width: 2, height: 2, channels: 3, background: '#2563eb',
+    } }).png().toBuffer();
+    const uploaded = await request('/api/admin/branding/assets', {
+      method: 'POST', body: imageInput, headers: { Origin: origin, Cookie: adminCookie,
+        'Content-Type': 'image/png', 'X-Brand-Slot': 'logo' },
+    });
+    if (uploaded.status !== 201) throw new Error(`Brand asset fixture failed: HTTP ${uploaded.status}`);
+    const brandPath = (await uploaded.json()).branding?.logoUrl;
+    const brandAsset = typeof brandPath === 'string' ? await request(brandPath) : null;
+    if (!brandAsset || brandAsset.status !== 200 ||
+        brandAsset.headers.get('content-type') !== 'image/webp') {
+      throw new Error(`Live brand asset response was lost: ${brandAsset?.status ?? 'missing path'}`);
     }
     const saved = await request('/api/admin/seo/redirects',
       json({ source: '/old-tool', destination: '/listings/example-tool' }, adminCookie));

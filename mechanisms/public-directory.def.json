@@ -1,9 +1,0 @@
-{
-  "command": "node mechanisms/check-first.mjs directory",
-  "cwd": null,
-  "documents": [],
-  "identity": { "env": [], "image": null, "tools": { "node": "node --version", "npm": "npm --version" } },
-  "inputs": ["fixtures/sample-listings.json", "mechanisms/check-first.mjs", "mechanisms/public-directory.def.json", "package-lock.json", "package.json", "public", "src"],
-  "requirements": ["DIR-001", "DIR-002"],
-  "results": "per-requirement"
-}
