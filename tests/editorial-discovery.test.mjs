@@ -15,9 +15,9 @@ test('article discovery is published-only, filtered, bounded, and has independen
     const { createArticle, searchPublishedArticles } = await import('../src/lib/articles.ts');
     const { createTaxon, renameTaxon, deleteTaxon, listTaxa } = await import('../src/lib/taxonomy.ts');
     migrateCatalog();
-    createTaxon('article-category', 'News');
-    createTaxon('article-category', 'Guides');
-    createTaxon('tag', 'Launch');
+    createTaxon('article-category', 'News', 'editor');
+    createTaxon('article-category', 'Guides', 'editor');
+    createTaxon('tag', 'Launch', 'editor');
     assert.equal(listTaxa('category').some((item) => item.name === 'News'), false);
     for (let index = 0; index < 25; index += 1) {
       createArticle({ slug: `news-${index}`, title: `Launch ${index}`, summary: 'A release',
@@ -38,8 +38,8 @@ test('article discovery is published-only, filtered, bounded, and has independen
     assert.equal(searchPublishedArticles({ query: 'Launch', category: 'Guides', page: 1 }).articles.length, 0);
     assert.equal(searchPublishedArticles({ tag: 'Launch', page: 10_000 }).page, 2);
 
-    assert.throws(() => deleteTaxon('article-category', 'News'), /use|content|referenc/i);
-    renameTaxon('article-category', 'News', 'Updates');
+    assert.throws(() => deleteTaxon('article-category', 'News', 'editor'), /use|content|referenc/i);
+    renameTaxon('article-category', 'News', 'Updates', 'editor');
     assert.equal(searchPublishedArticles({ category: 'News', page: 1 }).articles.length, 0);
     assert.equal(searchPublishedArticles({ category: 'Updates', page: 1 }).articles.length, 20);
     assert.equal(listTaxa('category').some((item) => item.name === 'Updates'), false);

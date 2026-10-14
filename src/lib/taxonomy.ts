@@ -1,6 +1,7 @@
 import { database } from "@/lib/database";
 import { migrateCatalog } from "@/lib/catalog-migrations";
 import { HttpError, httpErrorResponse } from "@/lib/http-error";
+import { recordAudit } from "@/lib/audit";
 
 migrateCatalog();
 
@@ -55,16 +56,18 @@ export function listTaxa(kind: TaxonKind): Taxon[] {
     .all() as Taxon[];
 }
 
-export function createTaxon(kind: TaxonKind, input: unknown): string {
+export function createTaxon(kind: TaxonKind, input: unknown, actorUserId: string): string {
   const name = nameFrom(input);
   database.transaction(() => {
     if (storedName(kind, name)) throw new TaxonomyError(409, "Name already exists");
     database.prepare(`INSERT INTO ${table[kind]} (name) VALUES (?)`).run(name);
+    recordAudit(`taxonomy.${kind}.create`, actorUserId, name);
   }).immediate();
   return name;
 }
 
-export function renameTaxon(kind: TaxonKind, original: string, input: unknown): string {
+export function renameTaxon(kind: TaxonKind, original: string, input: unknown,
+  actorUserId: string): string {
   const next = nameFrom(input);
   database.transaction(() => {
     const prior = storedName(kind, original);
@@ -94,11 +97,12 @@ export function renameTaxon(kind: TaxonKind, original: string, input: unknown): 
       }
     }
     database.prepare(`DELETE FROM ${table[kind]} WHERE name = ?`).run(prior);
+    recordAudit(`taxonomy.${kind}.rename`, actorUserId, `${prior} -> ${next}`);
   }).immediate();
   return next;
 }
 
-export function deleteTaxon(kind: TaxonKind, original: string): void {
+export function deleteTaxon(kind: TaxonKind, original: string, actorUserId: string): void {
   database.transaction(() => {
     const name = storedName(kind, original);
     if (!name) throw new TaxonomyError(404, "Name not found");
@@ -122,5 +126,6 @@ export function deleteTaxon(kind: TaxonKind, original: string): void {
       throw new TaxonomyError(409, "Remove this name from content before deleting it");
     }
     database.prepare(`DELETE FROM ${table[kind]} WHERE name = ?`).run(name);
+    recordAudit(`taxonomy.${kind}.delete`, actorUserId, name);
   }).immediate();
 }

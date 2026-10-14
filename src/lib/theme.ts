@@ -1,4 +1,6 @@
 import themeData from "@/lib/theme-options.json";
+import { recordAudit } from "@/lib/audit";
+import { database } from "@/lib/database";
 import { readSiteSetting, writeSiteSetting } from "@/lib/site-settings";
 
 export const themeOptions = themeData.options;
@@ -25,8 +27,11 @@ export function getThemePreset(): ThemePreset {
   return preset;
 }
 
-export function saveThemePreset(preset: ThemePreset): void {
-  writeSiteSetting("theme", JSON.stringify(preset));
+export function saveThemePreset(preset: ThemePreset, actorUserId: string): void {
+  database.transaction(() => {
+    writeSiteSetting("theme", JSON.stringify(preset));
+    recordAudit("site.theme.save", actorUserId, "site");
+  }).immediate();
 }
 
 const baseColors: Record<string, [number, number]> = {
