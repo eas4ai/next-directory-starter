@@ -1646,6 +1646,31 @@ requirementTest("PRF-004 preserves profiles across packages, seeds, imports, and
         assert.throws(attempt(seed), /duplicate|slug/i);
         assert.deepEqual(seedSnapshot(api.database), before);
       });
+      await seedTest.test("rejects duplicate destinations without partial rows", () => {
+        reset();
+        const seed = seedRecords(profile);
+        seed.listings[2].url = seed.listings[0].url;
+        const before = seedSnapshot(api.database);
+        assert.throws(attempt(seed), /duplicate|destination/i);
+        assert.deepEqual(seedSnapshot(api.database), before);
+      });
+      await seedTest.test("rejects a conflicting existing slug without partial rows", () => {
+        reset();
+        insertListing(api.database, "seed-tool-3");
+        const before = seedSnapshot(api.database);
+        assert.throws(attempt(seedRecords(profile)), /slug|exists|conflict/i);
+        assert.deepEqual(seedSnapshot(api.database), before);
+      });
+      await seedTest.test("rejects a conflicting prior seed digest", () => {
+        reset();
+        api.database.prepare(`INSERT INTO directory_profile_seed_runs
+          (addon_id, addon_version, seed_digest, profile_id, profile_version, record_count, applied_at)
+          VALUES ('vendor', '1.0.0', ?, 'vendor.ai-tools', '1.0.0', 1, ?)`)
+          .run("d".repeat(64), "2026-10-14T00:00:00.000Z");
+        const before = seedSnapshot(api.database);
+        assert.throws(attempt(seedRecords(profile)), /different|digest|already/i);
+        assert.deepEqual(seedSnapshot(api.database), before);
+      });
       await seedTest.test("rejects an unowned media reference without partial rows", () => {
         reset();
         const seed = seedRecords(profile);
@@ -1663,6 +1688,19 @@ requirementTest("PRF-004 preserves profiles across packages, seeds, imports, and
         assert.equal(afterFirst.directory_profile_seed_runs.length, 1);
         assert.deepEqual(invoke(), { inserted: 0, existing: 3 });
         assert.deepEqual(seedSnapshot(api.database), afterFirst);
+      });
+      await seedTest.test("rolls the full batch back when a late database write fails", () => {
+        reset();
+        api.database.exec(`CREATE TEMP TRIGGER reject_last_profile_seed
+          BEFORE INSERT ON listings WHEN NEW.slug = 'seed-tool-3'
+          BEGIN SELECT RAISE(ABORT, 'injected late seed failure'); END;`);
+        const before = seedSnapshot(api.database);
+        try {
+          assert.throws(attempt(seedRecords(profile)), /injected late seed failure/i);
+          assert.deepEqual(seedSnapshot(api.database), before);
+        } finally {
+          api.database.exec("DROP TRIGGER reject_last_profile_seed");
+        }
       });
     } finally {
       rmSync(temporary, { recursive: true, force: true });

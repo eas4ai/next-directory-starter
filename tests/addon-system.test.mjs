@@ -375,11 +375,25 @@ requirementTest("ADD-003 reference add-on completes a clean build seed and remov
       `const imported = await import("./src/lib/directory-profiles.ts");
        const availableDirectoryProfiles = imported.availableDirectoryProfiles ??
          imported.default?.availableDirectoryProfiles;
+       const availableDirectoryProfileDefinition = imported.availableDirectoryProfileDefinition ??
+         imported.default?.availableDirectoryProfileDefinition;
+       const activateDirectoryProfile = imported.activateDirectoryProfile ??
+         imported.default?.activateDirectoryProfile;
        const available = availableDirectoryProfiles();
        if (!available.some((profile) => profile.profileId === "reference-addon.ai-tools" &&
            profile.version === "1.0.0" && profile.sourceId === "reference-addon")) {
          throw new Error("installed profile is not discoverable");
-       }`], {
+       }
+       const databaseModule = await import("./src/lib/database.ts");
+       const database = databaseModule.database ?? databaseModule.default?.database;
+       database.prepare('INSERT INTO "user" (id, name, email, emailVerified, createdAt, updatedAt, role, banned) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+         .run("addon-admin", "Add-on Admin", "addon-admin@example.invalid", 1,
+           new Date().toISOString(), new Date().toISOString(), "admin", 0);
+       activateDirectoryProfile({
+         definition: availableDirectoryProfileDefinition("reference-addon.ai-tools", "1.0.0"),
+         sourceKind: "addon", sourceId: "reference-addon", expectedRevision: 0,
+         actorUserId: "addon-admin",
+       });`], {
       cwd: source,
       encoding: "utf8",
       env: { ...process.env, CI: "1", NODE_ENV: "test", ...env },

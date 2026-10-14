@@ -56,8 +56,9 @@ async function main() {
   if (command === "seed") {
     exactArgs(args, 1, command);
     const { seedInstalledAddon } = await import("../src/lib/addon-seed.ts");
-    const count = seedInstalledAddon(process.cwd(), args[0]);
-    process.stdout.write(`Seeded ${count} listing${count === 1 ? "" : "s"} from ${args[0]}\n`);
+    const { inserted, existing } = seedInstalledAddon(process.cwd(), args[0]);
+    process.stdout.write(`Seeded ${inserted} new and ${existing} existing listing` +
+      `${inserted + existing === 1 ? "" : "s"} from ${args[0]}\n`);
     return;
   }
   throw new Error(command ? `Unknown add-on command: ${command}\n${usage()}` : usage());
