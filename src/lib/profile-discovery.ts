@@ -211,19 +211,33 @@ function facetKey(key: string, descriptorSet: DescriptorSet):
   return { operator: match[1] as "facet" | "min" | "max", fieldKey: match[2] };
 }
 
+function putRawValues(rawFacets: Map<string, RawFacet>, fieldKey: string,
+  raw: string | string[] | undefined): boolean {
+  const values = (Array.isArray(raw) ? raw : raw === undefined ? [] : [raw])
+    .filter((value) => value !== "");
+  if (!values.length) return true;
+  const state = rawFacets.get(fieldKey) ?? {};
+  if (state.values || values.some((value) => typeof value !== "string")) return false;
+  state.values = values;
+  rawFacets.set(fieldKey, state);
+  return rawFacets.size <= FACET_LIMIT;
+}
+
+function putRawRange(rawFacets: Map<string, RawFacet>, operator: "min" | "max", fieldKey: string,
+  raw: string | string[] | undefined): boolean {
+  if (raw === "") return true;
+  const state = rawFacets.get(fieldKey) ?? {};
+  if (Array.isArray(raw) || raw === undefined || state[operator] !== undefined) return false;
+  state[operator] = raw;
+  rawFacets.set(fieldKey, state);
+  return rawFacets.size <= FACET_LIMIT;
+}
+
 function putRawFacet(rawFacets: Map<string, RawFacet>, parsedKey: NonNullable<ReturnType<typeof facetKey>>,
   raw: string | string[] | undefined): boolean {
-  const state = rawFacets.get(parsedKey.fieldKey) ?? {};
-  if (parsedKey.operator === "facet") {
-    const values = Array.isArray(raw) ? raw : raw === undefined ? [] : [raw];
-    if (state.values || values.some((value) => typeof value !== "string")) return false;
-    state.values = values;
-  } else {
-    if (Array.isArray(raw) || raw === undefined || state[parsedKey.operator] !== undefined) return false;
-    state[parsedKey.operator] = raw;
-  }
-  rawFacets.set(parsedKey.fieldKey, state);
-  return rawFacets.size <= FACET_LIMIT;
+  return parsedKey.operator === "facet"
+    ? putRawValues(rawFacets, parsedKey.fieldKey, raw)
+    : putRawRange(rawFacets, parsedKey.operator, parsedKey.fieldKey, raw);
 }
 
 function collectRawFacets(input: Record<string, string | string[] | undefined>,

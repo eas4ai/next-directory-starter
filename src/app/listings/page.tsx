@@ -1,47 +1,81 @@
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { activeFeaturedListings, activeFeaturedSlugs, directoryCategories, searchPublishedListings } from "@/lib/listings";
-import { getThemePreset } from "@/lib/theme";
-import { PresetExternalLinkIcon } from "@/components/preset-icon";
 import { connection } from "next/server";
-import { pageMetadata, publicUrl } from "@/lib/page-metadata";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { getSiteConfig } from "@/lib/site-config";
 import { JsonLd } from "@/components/json-ld";
+import { PresetExternalLinkIcon } from "@/components/preset-icon";
+import { ProfileFacets } from "@/components/profile-facets";
+import { ProfileValuesView } from "@/components/profile-values-view";
+import { activeDirectoryProfiles } from "@/lib/directory-profiles";
+import type { DirectoryProfileField } from "@/lib/directory-profile-types";
+import {
+  parseProfileDirectoryQuery, profileDiscoveryDescriptors, searchProfileDirectory,
+  serializeProfileDirectoryQuery,
+} from "@/lib/profile-discovery";
+import {
+  activeFeaturedSlugs, directoryCategories, LISTINGS_PER_PAGE, type Listing,
+} from "@/lib/listings";
+import { pageMetadata, publicUrl } from "@/lib/page-metadata";
+import { getSiteConfig } from "@/lib/site-config";
+import { getThemePreset } from "@/lib/theme";
+import {
+  profileMediaIds, publicProfileMediaAssets, type MediaAsset,
+} from "@/lib/media";
+
+function ListingResultCard({ listing, fields, mediaAssets, iconLibrary, featured,
+  highlighted = false }: {
+    listing: Listing;
+    fields: DirectoryProfileField[];
+    mediaAssets: ReadonlyMap<string, MediaAsset>;
+    iconLibrary: ReturnType<typeof getThemePreset>["iconLibrary"];
+    featured: boolean;
+    highlighted?: boolean;
+  }) {
+  return <Card className={`min-w-0 ${highlighted ? "border-primary/50" : ""}`}>
+    <CardHeader>
+      {highlighted && <span className="w-fit rounded-full bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground">
+        Featured
+      </span>}
+      <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+        {listing.category}{featured && !highlighted ? " · Featured" : ""}
+      </p>
+      <CardTitle><Link href={`/listings/${listing.slug}`}
+        className="inline-flex max-w-full items-center gap-1 wrap-anywhere hover:underline">
+        {listing.name}<PresetExternalLinkIcon library={iconLibrary} />
+      </Link></CardTitle>
+    </CardHeader>
+    <CardContent className="min-w-0">
+      <p className="text-muted-foreground">{listing.summary}</p>
+      <ProfileValuesView fields={fields} values={listing.profileValues}
+        placements={["badge", "card"]} mediaAssets={mediaAssets} />
+    </CardContent>
+  </Card>;
+}
 
 export async function generateMetadata({ searchParams }: PageProps<"/listings">) {
   await connection();
   const hasQuery = Object.keys(await searchParams).length > 0;
   return {
-    ...pageMetadata("/listings", `Listings | ${getSiteConfig().name}`, "Explore the published links in this directory."),
+    ...pageMetadata("/listings", `Listings | ${getSiteConfig().name}`,
+      "Explore the published links in this directory."),
     ...(hasQuery ? { robots: { index: false, follow: true } } : {}),
   };
 }
 
-function one(value: string | string[] | undefined): string {
-  return typeof value === "string" ? value : Array.isArray(value) ? value[0] ?? "" : "";
-}
-
 export default async function ListingsPage({ searchParams }: PageProps<"/listings">) {
-  const params = await searchParams;
-  const q = one(params.q).trim().slice(0, 120);
-  const category = one(params.category).trim().slice(0, 80);
-  const page = one(params.page);
-  const result = searchPublishedListings({ q, category, page });
-  const featured = activeFeaturedListings({ q, category });
+  const input = await searchParams;
+  const profiles = activeDirectoryProfiles();
+  const fields = profiles.definitions.flatMap((definition) => definition.fields);
+  const descriptors = profileDiscoveryDescriptors(profiles);
+  const query = parseProfileDirectoryQuery(input, profiles);
+  const result = searchProfileDirectory(query);
+  const mediaIds = result.listings.flatMap((listing) =>
+    [...profileMediaIds(listing.profileValues, profiles)]);
+  const mediaAssets = publicProfileMediaAssets(mediaIds);
   const featuredSlugs = activeFeaturedSlugs(result.listings.map((listing) => listing.slug));
-  const categories = directoryCategories();
-  const selectedCategory = categories.find((item) => item.toLowerCase() === category.toLowerCase()) ?? category;
-  const unknownCategory = Boolean(category) && !categories.includes(selectedCategory);
+  const featured = result.listings.filter((listing) => featuredSlugs.has(listing.slug));
   const preset = getThemePreset();
-  const pageHref = (number: number) => {
-    const query = new URLSearchParams();
-    if (q) query.set("q", q);
-    if (category) query.set("category", category);
-    query.set("page", String(number));
-    return `/listings?${query}`;
-  };
+  const pageHref = (page: number) => `/listings?${serializeProfileDirectoryQuery(query, page)}`;
 
   return (
     <main className="site-container wrap-anywhere">
@@ -50,65 +84,53 @@ export default async function ListingsPage({ searchParams }: PageProps<"/listing
         name: "Listings", description: "Explore the published links in this directory.",
         url: publicUrl("/listings"),
         mainEntity: { "@type": "ItemList", itemListElement: result.listings.map((listing, index) => ({
-          "@type": "ListItem", position: index + 1,
+          "@type": "ListItem", position: (result.page - 1) * LISTINGS_PER_PAGE + index + 1,
           name: listing.name, url: publicUrl(`/listings/${listing.slug}`),
         })) },
       }} />
       <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">← Home</Link>
       <div className="mt-8">
         <h1 className="text-4xl font-semibold tracking-tight">Listings</h1>
-        <p className="mt-3 max-w-2xl text-muted-foreground">Explore the published links in this directory.</p>
+        <p className="mt-3 max-w-2xl text-muted-foreground">
+          Explore the published links in this directory.
+        </p>
       </div>
-      <form action="/listings" method="get" className="mt-8 grid gap-3 rounded-lg border p-4 sm:grid-cols-[1fr_12rem_auto] sm:items-end">
-        <label className="grid gap-2 text-sm font-medium" htmlFor="directory-query">
-          Search
-          <Input id="directory-query" name="q" defaultValue={q} placeholder="Search listings" />
-        </label>
-        <label className="grid gap-2 text-sm font-medium" htmlFor="directory-category">
-          Category
-          <select id="directory-category" name="category" defaultValue={selectedCategory} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
-            <option value="">All categories</option>
-            {unknownCategory && <option value={selectedCategory}>Unknown category: {selectedCategory}</option>}
-            {categories.map((item) => <option key={item} value={item}>{item}</option>)}
-          </select>
-        </label>
-        <Button type="submit">Find links</Button>
-      </form>
-      <p className="mt-6 text-sm text-muted-foreground" role="status">{result.total} {result.total === 1 ? "listing" : "listings"} found</p>
+      <ProfileFacets descriptors={descriptors} query={query} facetCounts={result.facetCounts}
+        categories={directoryCategories()} />
+      <p className="mt-6 text-sm text-muted-foreground" role="status">
+        {result.total} {result.total === 1 ? "listing" : "listings"} found
+      </p>
       {featured.length > 0 && (
         <section aria-label="Featured listings" className="mt-8">
           <h2 className="text-xl font-semibold">Featured listings</h2>
           <p className="mt-1 text-sm text-muted-foreground">Paid placements matching these filters.</p>
           <div className="template-listing-grid mt-4">
             {featured.map((listing) => (
-              <Card key={listing.slug} className="border-primary/50">
-                <CardHeader>
-                  <span className="w-fit rounded-full bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground">Featured</span>
-                  <CardTitle><Link href={`/listings/${listing.slug}`} className="inline-flex items-center gap-1 hover:underline">{listing.name}<PresetExternalLinkIcon library={preset.iconLibrary} /></Link></CardTitle>
-                </CardHeader>
-                <CardContent><p className="text-muted-foreground">{listing.summary}</p></CardContent>
-              </Card>
+              <ListingResultCard key={listing.slug} listing={listing} fields={fields}
+                mediaAssets={mediaAssets} iconLibrary={preset.iconLibrary} featured highlighted />
             ))}
           </div>
         </section>
       )}
-      <section aria-label="Directory results" data-testid="ordinary-results" className="template-listing-grid mt-8">
+      <section aria-label="Directory results" data-testid="ordinary-results"
+        className="template-listing-grid mt-8">
         {result.listings.map((listing) => (
-          <Card key={listing.slug}>
-            <CardHeader>
-              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">{listing.category}{featuredSlugs.has(listing.slug) ? " · Featured" : ""}</p>
-              <CardTitle><Link href={`/listings/${listing.slug}`} className="inline-flex items-center gap-1 hover:underline">{listing.name}<PresetExternalLinkIcon library={preset.iconLibrary} /></Link></CardTitle>
-            </CardHeader>
-            <CardContent><p className="text-muted-foreground">{listing.summary}</p></CardContent>
-          </Card>
+          <ListingResultCard key={listing.slug} listing={listing} fields={fields}
+            mediaAssets={mediaAssets} iconLibrary={preset.iconLibrary}
+            featured={featuredSlugs.has(listing.slug)} />
         ))}
       </section>
-      {result.listings.length === 0 && <p className="mt-6 text-muted-foreground">No listings match these filters.</p>}
+      {result.listings.length === 0 &&
+        <p className="mt-6 text-muted-foreground">No listings match these filters.</p>}
       {result.pages > 1 && (
         <nav className="mt-8 flex items-center justify-between gap-4" aria-label="Listing pages">
-          {result.page > 1 ? <Button variant="outline" asChild><Link href={pageHref(result.page - 1)}>Previous</Link></Button> : <span />}
+          {result.page > 1 ? <Button variant="outline" asChild>
+            <Link href={pageHref(result.page - 1)}>Previous</Link>
+          </Button> : <span />}
           <span className="text-sm text-muted-foreground">Page {result.page} of {result.pages}</span>
-          {result.page < result.pages ? <Button variant="outline" asChild><Link href={pageHref(result.page + 1)}>Next</Link></Button> : <span />}
+          {result.page < result.pages ? <Button variant="outline" asChild>
+            <Link href={pageHref(result.page + 1)}>Next</Link>
+          </Button> : <span />}
         </nav>
       )}
     </main>

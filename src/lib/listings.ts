@@ -116,18 +116,6 @@ export function searchPublishedListings({ q = "", category = "", page = "1" }: L
   return { listings, total, page: pageNumber, pages };
 }
 
-export function activeFeaturedListings(search: Pick<ListingSearch, "q" | "category"> = {}): Listing[] {
-  const { where, args } = publicFilter(search.q ?? "", search.category ?? "");
-  const now = new Date().toISOString();
-  const rows = database.prepare(`SELECT l.* FROM listings l WHERE ${where}
-    AND EXISTS (SELECT 1 FROM entitlements e
-      JOIN purchases p ON p.id = e.purchase_id AND p.plan_mode = ?
-      WHERE e.listing_slug = l.slug
-      AND e.featured = 1 AND e.revoked_at IS NULL AND e.starts_at <= ? AND e.ends_at > ?)
-    ORDER BY l.name COLLATE NOCASE, l.slug LIMIT 6`).all(...args, checkoutMode(), now, now) as StoredListing[];
-  return hydrateMany(rows, false);
-}
-
 export function activeFeaturedSlugs(slugs: string[]): Set<string> {
   if (slugs.length === 0) return new Set();
   const placeholders = slugs.map(() => "?").join(", ");

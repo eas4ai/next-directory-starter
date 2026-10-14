@@ -10,11 +10,27 @@ import { getSiteConfig } from "@/lib/site-config";
 import { JsonLd } from "@/components/json-ld";
 import { MarkdownContent } from "@/components/markdown-content";
 import { ContentImage } from "@/components/content-image";
-import { assignedMedia } from "@/lib/media";
+import { assignedMedia, profileMediaIds, publicProfileMediaAssets } from "@/lib/media";
 import { publicSeoOverrides } from "@/lib/seo-settings";
 import { database } from "@/lib/database";
+import { activeDirectoryProfiles } from "@/lib/directory-profiles";
+import type { DirectoryProfileField, ProfileValueSet } from "@/lib/directory-profile-types";
+import { ProfileValuesView } from "@/components/profile-values-view";
 
 export const instant = false;
+
+function publicProfileProperties(fields: DirectoryProfileField[], values: ProfileValueSet) {
+  const scalarTypes = new Set(["short-text", "boolean", "integer", "decimal", "money",
+    "single-choice", "date", "datetime", "duration"]);
+  return fields.filter((field) => field.visibility === "public" && field.placement !== "hidden" &&
+    scalarTypes.has(field.type) && Object.hasOwn(values, field.key)).map((field) => {
+      const raw = values[field.key];
+      const value = field.type === "money" && raw && typeof raw === "object"
+        ? `${(raw as { currency: string }).currency}:${(raw as { amountMinor: number }).amountMinor}`
+        : raw;
+      return { "@type": "PropertyValue", name: field.label, value };
+    });
+}
 
 export async function generateMetadata({ params }: PageProps<"/listings/[slug]">) {
   await connection();
@@ -41,6 +57,10 @@ export default async function ListingPage({ params }: PageProps<"/listings/[slug
   const preset = getThemePreset();
   const featured = activeFeaturedSlugs([listing.slug]).has(listing.slug);
   const image = assignedMedia("listing", listing.slug, "public");
+  const profiles = activeDirectoryProfiles();
+  const fields = profiles.definitions.flatMap((definition) => definition.fields);
+  const properties = publicProfileProperties(fields, listing.profileValues);
+  const profileMedia = publicProfileMediaAssets([...profileMediaIds(listing.profileValues, profiles)]);
 
   return (
     <main className="site-container wrap-anywhere">
@@ -48,6 +68,7 @@ export default async function ListingPage({ params }: PageProps<"/listings/[slug
         "@context": "https://schema.org", "@type": "Thing",
         name: listing.name, description: listing.description, url: listing.url,
         mainEntityOfPage: publicUrl(`/listings/${listing.slug}`),
+        ...(properties.length ? { additionalProperty: properties } : {}),
       }} />
       <Link href="/listings" className="text-sm text-muted-foreground hover:text-foreground">← Listings</Link>
       <a href={`/markdown/listings/${listing.slug}`} type="text/markdown" rel="alternate"
@@ -58,6 +79,9 @@ export default async function ListingPage({ params }: PageProps<"/listings/[slug
       <p className="mt-5 text-lg text-muted-foreground">{listing.summary}</p>
       {image && <div className="mt-8"><ContentImage asset={image} /></div>}
       <div className="mt-8"><MarkdownContent source={listing.description} /></div>
+      <section className="mt-8 min-w-0" aria-label="Listing details">
+        <ProfileValuesView fields={fields} values={listing.profileValues} mediaAssets={profileMedia} />
+      </section>
       <div className="mt-8"><Button asChild className="h-auto min-h-8 max-w-full whitespace-normal wrap-anywhere text-center"><a href={listing.url} target="_blank" rel="noopener noreferrer">Visit {listing.name} <PresetExternalLinkIcon library={preset.iconLibrary} /></a></Button></div>
     </main>
   );

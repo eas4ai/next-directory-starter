@@ -228,3 +228,104 @@
 .markdown-content :not(pre) > code { padding: 0.125rem 0.25rem; }
 .markdown-content table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
 .markdown-content :is(th, td) { border: 1px solid var(--border); padding: 0.25rem 0.5rem; }
+
+.profile-facets {
+  display: grid;
+  min-width: 0;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.profile-core-filters,
+.profile-facet-grid,
+.profile-range {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  min-width: 0;
+  gap: 0.75rem;
+}
+
+.profile-core-filters label,
+.profile-range label,
+.profile-facet > label {
+  display: grid;
+  min-width: 0;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.profile-core-filters select {
+  width: 100%;
+  min-width: 0;
+  height: 2rem;
+  border: 1px solid var(--input);
+  border-radius: var(--radius);
+  background: var(--background);
+  padding-inline: 0.625rem;
+}
+
+.profile-facet {
+  min-width: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.profile-facet legend { padding-inline: 0.25rem; font-size: 0.875rem; font-weight: 600; }
+.profile-facet > p { margin-bottom: 0.5rem; color: var(--muted-foreground); font-size: 0.75rem; }
+.profile-facet-options { display: grid; gap: 0.375rem; }
+.profile-facet-options label { display: flex; min-width: 0; align-items: center; gap: 0.5rem; font-size: 0.875rem; }
+.profile-facet-options input { accent-color: var(--primary); }
+.profile-facet-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.profile-query-error { color: var(--destructive); font-size: 0.875rem; }
+
+.profile-values {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  min-width: 0;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.profile-value {
+  min-width: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.profile-value[data-profile-placement="badge"] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.375rem;
+  width: fit-content;
+  max-width: 100%;
+  border: 0;
+  background: var(--secondary);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.profile-value > dt { color: var(--muted-foreground); font-size: 0.75rem; font-weight: 500; }
+.profile-value > dd { min-width: 0; margin-top: 0.25rem; overflow-wrap: anywhere; font-size: 0.875rem; }
+.profile-value[data-profile-placement="badge"] > dd { margin-top: 0; color: var(--secondary-foreground); font-weight: 600; }
+.profile-repeat-list,
+.profile-group-list { display: grid; min-width: 0; gap: 0.5rem; }
+.profile-group-item { min-width: 0; padding: 0.625rem; border: 1px solid var(--border); border-radius: var(--radius); }
+.profile-group-item dl { display: grid; min-width: 0; gap: 0.5rem; }
+.profile-group-pair { display: grid; grid-template-columns: minmax(0, 7rem) minmax(0, 1fr); gap: 0.5rem; }
+.profile-group-pair dt { color: var(--muted-foreground); font-size: 0.75rem; }
+.profile-group-pair dd { min-width: 0; overflow-wrap: anywhere; }
+
+@media (max-width: 639px) {
+  .profile-core-filters,
+  .profile-facet-grid,
+  .profile-range,
+  .profile-values { grid-template-columns: minmax(0, 1fr); }
+  .profile-group-pair { grid-template-columns: minmax(0, 1fr); }
+}

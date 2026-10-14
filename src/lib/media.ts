@@ -346,9 +346,10 @@ export function assignedProfileMedia(listingSlug: string, fieldKey: string,
   return row ? fromMediaRow(row) : undefined;
 }
 
-function profileMediaIds(values: ProfileValueSet): Set<string> {
+export function profileMediaIds(values: ProfileValueSet,
+  profiles = activeDirectoryProfiles()): Set<string> {
   const result = new Set<string>();
-  for (const definition of activeDirectoryProfiles().definitions) for (const field of definition.fields) {
+  for (const definition of profiles.definitions) for (const field of definition.fields) {
     const value = values[field.key];
     if (field.type === "media") {
       if (typeof value === "string") result.add(value);
@@ -370,6 +371,27 @@ function profileMediaIds(values: ProfileValueSet): Set<string> {
     }
   }
   return result;
+}
+
+export function publicProfileMediaAssets(ids: readonly string[]): Map<string, MediaAsset> {
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (!unique.length) return new Map();
+  const placeholders = unique.map(() => "?").join(", ");
+  const rows = database.prepare(`SELECT DISTINCT a.id, a.target_kind, a.target_slug,
+      a.alt, a.width, a.height
+    FROM directory_profile_media p
+    JOIN media_assets a ON a.id = p.asset_id AND a.target_kind = 'listing'
+      AND a.target_slug = p.listing_slug
+    JOIN listings l ON l.slug = p.listing_slug AND l.status = 'published'
+    JOIN directory_profile_values v ON v.listing_slug = p.listing_slug
+      AND v.field_key = p.field_key AND v.media_id = p.asset_id AND v.archived_at IS NULL
+    JOIN directory_profile_state s ON s.id = 1
+    WHERE p.asset_id IN (${placeholders}) AND p.state = 'public'
+      AND ((v.profile_id = s.base_profile_id AND v.definition_version = s.base_profile_version)
+        OR (v.profile_id = s.site_profile_id AND v.definition_version = s.site_profile_version))
+      AND NOT EXISTS (SELECT 1 FROM "user" u WHERE u.id = l.owner_user_id AND u.banned = 1)`)
+    .all(...unique) as MediaRow[];
+  return new Map(rows.map((row) => [row.id, fromMediaRow(row)]));
 }
 
 export function promoteProfileMedia(listingSlug: string, values: ProfileValueSet): void {
