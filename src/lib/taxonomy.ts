@@ -2,6 +2,7 @@ import { database } from "@/lib/database";
 import { migrateCatalog } from "@/lib/catalog-migrations";
 import { HttpError, httpErrorResponse } from "@/lib/http-error";
 import { recordAudit } from "@/lib/audit";
+import { canManageTaxonomy, requireCurrentActor } from "@/lib/admin";
 
 migrateCatalog();
 
@@ -59,6 +60,7 @@ export function listTaxa(kind: TaxonKind): Taxon[] {
 export function createTaxon(kind: TaxonKind, input: unknown, actorUserId: string): string {
   const name = nameFrom(input);
   database.transaction(() => {
+    requireCurrentActor(actorUserId, canManageTaxonomy);
     if (storedName(kind, name)) throw new TaxonomyError(409, "Name already exists");
     database.prepare(`INSERT INTO ${table[kind]} (name) VALUES (?)`).run(name);
     recordAudit(`taxonomy.${kind}.create`, actorUserId, name);
@@ -70,6 +72,7 @@ export function renameTaxon(kind: TaxonKind, original: string, input: unknown,
   actorUserId: string): string {
   const next = nameFrom(input);
   database.transaction(() => {
+    requireCurrentActor(actorUserId, canManageTaxonomy);
     const prior = storedName(kind, original);
     if (!prior) throw new TaxonomyError(404, "Name not found");
     if (prior === next) return;
@@ -104,6 +107,7 @@ export function renameTaxon(kind: TaxonKind, original: string, input: unknown,
 
 export function deleteTaxon(kind: TaxonKind, original: string, actorUserId: string): void {
   database.transaction(() => {
+    requireCurrentActor(actorUserId, canManageTaxonomy);
     const name = storedName(kind, original);
     if (!name) throw new TaxonomyError(404, "Name not found");
     const used = kind === "category"

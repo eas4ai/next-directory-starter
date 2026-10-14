@@ -15,6 +15,12 @@ test('article discovery is published-only, filtered, bounded, and has independen
     const { createArticle, searchPublishedArticles } = await import('../src/lib/articles.ts');
     const { createTaxon, renameTaxon, deleteTaxon, listTaxa } = await import('../src/lib/taxonomy.ts');
     migrateCatalog();
+    database.exec(`CREATE TABLE IF NOT EXISTS "user" (
+      id TEXT PRIMARY KEY, role TEXT, banned INTEGER NOT NULL DEFAULT 0,
+      emailVerified INTEGER NOT NULL DEFAULT 0
+    )`);
+    database.prepare(`INSERT INTO "user" (id, role, banned, emailVerified)
+      VALUES ('editor', 'taxonomy', 0, 1)`).run();
     createTaxon('article-category', 'News', 'editor');
     createTaxon('article-category', 'Guides', 'editor');
     createTaxon('tag', 'Launch', 'editor');

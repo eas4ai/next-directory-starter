@@ -1,4 +1,5 @@
 import themeData from "@/lib/theme-options.json";
+import { canAdmin, requireCurrentActor } from "@/lib/admin";
 import { recordAudit } from "@/lib/audit";
 import { database } from "@/lib/database";
 import { readSiteSetting, writeSiteSetting } from "@/lib/site-settings";
@@ -29,6 +30,7 @@ export function getThemePreset(): ThemePreset {
 
 export function saveThemePreset(preset: ThemePreset, actorUserId: string): void {
   database.transaction(() => {
+    requireCurrentActor(actorUserId, canAdmin);
     writeSiteSetting("theme", JSON.stringify(preset));
     recordAudit("site.theme.save", actorUserId, "site");
   }).immediate();
