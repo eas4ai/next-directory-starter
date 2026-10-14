@@ -33,7 +33,7 @@ try {
   const headings = [...manual.matchAll(/^## \d+\. (.+)$/gm)].map((match) => match[1]);
   expect(JSON.stringify(headings) === JSON.stringify(chapters),
     'Manual chapters do not cover the operator workflows');
-  const sourceLinks = [...manual.matchAll(/\]\(\.\.\/((?:src|scripts)\/[^)]+)\)/g)]
+  const sourceLinks = [...manual.matchAll(/\]\(\.\.\/((?:(?:src|scripts)\/[^)]+|Dockerfile|compose\.yaml))\)/g)]
     .map((match) => match[1]);
   expect(new Set(sourceLinks).size >= 60, 'Manual needs broad implementation evidence');
   for (const path of sourceLinks) expect(existsSync(path), `Broken implementation link: ${path}`);
@@ -59,6 +59,13 @@ try {
   source('src/lib/notification-delivery.ts', 'MAX_ATTEMPTS');
   source('scripts/backup.mjs', 'inspectDatabase');
   source('scripts/restore.mjs', 'Backup checksum failed');
+  source('compose.yaml', 'image: ${DIRECTORY_IMAGE:-next-directory-starter:local}');
+  source('compose.yaml', '127.0.0.1:${DIRECTORY_PORT:-3000}:3000');
+  source('compose.yaml', 'directory-data:/app/data');
+  source('Dockerfile', 'USER node');
+  source('Dockerfile', 'HEALTHCHECK');
+  expect(manual.includes('](../compose.yaml)') && manual.includes('](../Dockerfile)'),
+    'Manual does not link its container claims to executable configuration');
   expect(manual.includes('export DATABASE_URL') && manual.includes('.env.local') &&
     manual.includes('tsx'), 'Manual omits custom database CLI environment workaround');
   expect(manual.includes('WebMCP') && manual.includes('/api/mcp'),
