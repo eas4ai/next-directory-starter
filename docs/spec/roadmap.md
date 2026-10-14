@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: markdown-head-requests
+Current: mcp-preview-bearer
 
 ## public-starter-and-theme
 
@@ -657,3 +657,9 @@ Delivers backlog item recovery-form-error: Audit 2026-10-11 (L6, reported). src/
 Requirements: SEO-010
 
 Delivers backlog item markdown-head-requests: Audit 2026-10-11 (L7, reported). src/proxy.ts:58 serves Markdown only for GET. HEAD /listings/<slug>.md falls through to the HTML page, which looks up the slug including '.md' and returns 404 while GET returns Markdown; articles behave the same. Handle HEAD in the Markdown branch with matching status and headers.
+
+## mcp-preview-bearer
+
+Requirements: ING-003
+
+Delivers backlog item mcp-preview-bearer: Audit 2026-10-11 (L8, reported). MCP preview_card returns /api/agent/imports/<slug>/card, but that route authenticates only a staff session (sessionUser), not the agent key that requested it, so a bearer-only client gets 403. Accept account-checked agent keys on the route or return the image through MCP.
