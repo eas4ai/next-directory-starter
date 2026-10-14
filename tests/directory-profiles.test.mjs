@@ -737,6 +737,68 @@ requirementTest("PRF-002 validates profile values with the complete listing revi
     assert.doesNotMatch(ownerHtml, /Tagline help|Updated help/);
   });
 
+  await t.test("retains removed private values for staff until an explicit purge", async () => {
+    const api = await profileTestContext();
+    resetProfileTables(api.database);
+    activate(api, authoringProfile(), 0);
+    const values = completeProfileValues({ includeSystem: false });
+    delete values["vendor.ai-tools.screenshot"];
+    const listingApi = await import("../src/lib/listings.ts");
+    const valuesApi = await import("../src/lib/profile-values.ts");
+    listingApi.createListing(parseListing(listingInput("archived-profile", values, 1)),
+      "profile-admin");
+    const next = authoringProfile({ version: "2.0.0" });
+    next.fields = next.fields.filter(({ key }) => key !== "vendor.ai-tools.notes");
+    activate(api, next, 1, { fields: {
+      "vendor.ai-tools.notes": { action: "archive" },
+    }, defaults: {} });
+    assert.equal(valuesApi.profileValuesForListings(["archived-profile"])
+      .get("archived-profile")["vendor.ai-tools.notes"], undefined);
+    assert.equal(valuesApi.profileValuesForListings(["archived-profile"], {
+      includePrivate: true, includeArchived: true,
+    }).get("archived-profile")["vendor.ai-tools.notes"], "**Private** owner notes");
+    assert.equal(api.database.prepare(`SELECT COUNT(*) AS count FROM directory_profile_values
+      WHERE listing_slug = 'archived-profile' AND field_key = 'vendor.ai-tools.notes'
+        AND archived_at IS NOT NULL`).get().count, 1);
+  });
+
+  await t.test("keeps profile media private and promotes only the approved snapshot", async () => {
+    const api = await profileTestContext();
+    resetProfileTables(api.database);
+    activate(api, authoringProfile(), 0);
+    api.database.prepare("INSERT INTO categories (name) VALUES ('Tools')").run();
+    const moderation = await import("../src/lib/moderation.ts");
+    const media = await import("../src/lib/media.ts");
+    assert.equal(typeof media.uploadProfileMedia, "function", "profile media upload is missing");
+    const ownerValues = completeProfileValues({ includeOperator: false, includeSystem: false });
+    delete ownerValues["vendor.ai-tools.screenshot"];
+    moderation.createOwnerListing("profile-owner",
+      listingInput("profile-media", ownerValues, 1));
+    const sharp = (await import("sharp")).default;
+    const bytes = await sharp({ create: { width: 8, height: 8, channels: 3,
+      background: "#3557ff" } }).png().toBuffer();
+    const upload = (itemId) => media.uploadProfileMedia({ listingSlug: "profile-media",
+      fieldKey: "vendor.ai-tools.screenshot", itemId, actorUserId: "profile-owner",
+      actorRole: null, bytes, mimeType: "image/png", alt: `Profile ${itemId}` });
+    assert.rejects(() => media.uploadProfileMedia({ listingSlug: "profile-media",
+      fieldKey: "vendor.ai-tools.screenshot", itemId: "unowned", actorUserId: "profile-catalog",
+      actorRole: "catalog", bytes, mimeType: "image/png", alt: "Unowned" }),
+    /permission|owner|not found|forbidden/i);
+    const selected = await upload("selected");
+    const abandoned = await upload("abandoned");
+    assert.equal(media.publicMediaAsset(selected.id), undefined);
+    moderation.updateOwnerListing("profile-owner", "profile-media", {
+      profileValues: { ...ownerValues, "vendor.ai-tools.screenshot": selected.id },
+      profileStateRevision: 1,
+    });
+    const submission = moderation.submitOwnerListing("profile-owner", "profile-media");
+    moderation.decideSubmission(submission.id, "profile-moderator", "approve", "Good");
+    assert.equal(media.publicMediaAsset(selected.id)?.id, selected.id);
+    assert.equal(media.publicMediaAsset(abandoned.id), undefined);
+    assert.equal(api.database.prepare(`SELECT state FROM directory_profile_media
+      WHERE asset_id = ?`).get(selected.id).state, "public");
+  });
+
   await t.test("publishes one exact owner snapshot and rejects stale or unauthorized moderation", async () => {
     const api = await profileTestContext();
     resetProfileTables(api.database);
@@ -747,6 +809,11 @@ requirementTest("PRF-002 validates profile values with the complete listing revi
     const ownerValues = completeProfileValues({ includeOperator: false, includeSystem: false });
     delete ownerValues["vendor.ai-tools.screenshot"];
     moderation.createOwnerListing("profile-owner", listingInput("owner-profile", ownerValues, 1));
+    api.database.prepare("UPDATE \"user\" SET banned = 1 WHERE id = 'profile-owner'").run();
+    assert.throws(() => moderation.updateOwnerListing("profile-owner", "owner-profile", {
+      profileValues: ownerValues, profileStateRevision: 1,
+    }), /Forbidden|banned|suspended|verified/i);
+    api.database.prepare("UPDATE \"user\" SET banned = 0 WHERE id = 'profile-owner'").run();
     assert.throws(() => moderation.updateOwnerListing("profile-owner", "owner-profile", {
       profileValues: { ...ownerValues, "vendor.ai-tools.tagline": "Forbidden owner edit" },
       profileStateRevision: 1,
