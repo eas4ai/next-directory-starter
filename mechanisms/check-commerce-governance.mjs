@@ -355,7 +355,12 @@ try {
       "SELECT COUNT(*) AS count FROM listings WHERE category = 'Audited Tools'").get().count);
     const currentTheme = await request('/api/admin/theme', { headers: { Cookie: adminCookie } });
     const currentPreset = currentTheme.ok ? (await currentTheme.json()).preset : null;
-    const themeSave = await request('/api/admin/theme', json(currentPreset, adminCookie));
+    const changedPreset = currentPreset
+      ? { ...currentPreset, theme: currentPreset.theme === 'blue' ? 'red' : 'blue' }
+      : null;
+    const themeSave = await request('/api/admin/theme', json(changedPreset, adminCookie));
+    const savedTheme = await request('/api/admin/theme', { headers: { Cookie: adminCookie } });
+    const savedPreset = savedTheme.ok ? (await savedTheme.json()).preset : null;
 
     const history = await request('/api/admin/audit', { headers: { Cookie: adminCookie } });
     const events = history.ok ? (await history.json()).events : null;
@@ -371,7 +376,8 @@ try {
       event.target === target && event.actorUserId === adminId &&
       Number.isFinite(Date.parse(event.occurredAt));
     if (taxonomyCreate.status !== 201 || !taxonomyRename.ok || !taxonomyDelete.ok ||
-        renamedListings < 1 || !currentTheme.ok || !themeSave.ok || !Array.isArray(events) ||
+        renamedListings < 1 || !currentTheme.ok || !themeSave.ok || !savedTheme.ok ||
+        JSON.stringify(savedPreset) !== JSON.stringify(changedPreset) || !Array.isArray(events) ||
         addedEvents.some(([action, target]) =>
           !events.some((event) => validEvent(event, action, target)))) {
       throw new Error('Taxonomy or theme changes lack actor and time in audit history.');
