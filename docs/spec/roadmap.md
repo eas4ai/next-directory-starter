@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: addon-installer-foundation
+Current: directory-profile-standard
 
 ## public-starter-and-theme
 
@@ -415,6 +415,33 @@ and selection flow, explicitly seeds its sample catalog, and passes the
 production build; removal refuses changed owned files, otherwise removes only
 owned files and returns tracked source to its pre-install state; and equal
 package inputs produce byte-identical archives.
+
+## directory-profile-standard
+
+Requirements: PRF-001, PRF-002, PRF-003, PRF-004
+
+Delivery: add a versioned directory-profile standard that remains independent
+from themes and public templates. Store immutable profile definitions and
+typed listing values with transactional activation, customization, switching,
+mapping, archival, and migration. Generate protected administrator and owner
+editing controls from the active profile and include profile values in the
+existing revision, submission, moderation, publication, and audit paths.
+Provide indexed server-rendered search, facets, stable sorts, generic public
+field rendering, and bounded shareable query URLs without exposing private or
+ineligible values. Extend add-on manifests and explicit seed data with profile
+definitions and typed values while preserving operator data across package
+removal, migration, backup, restore, and upgrade.
+
+Done-when: invalid, unsafe, duplicate, contradictory, stale, or incompatible
+profile changes leave definitions and listing values unchanged; an operator
+can activate and customize a profile and safely map a breaking version; owners
+can edit only allowed fields and moderation publishes core and profile values
+as one revision; every supported field family renders through accessible
+forms and the generic public view; indexed filters, ranges, any-or-all facets,
+sorting, pagination, canonical and noindex behavior, privacy, and 320-pixel
+layouts pass the bound mechanism; typed seed and agent-import paths enforce the
+active schema; and add-on removal, migration, backup, isolated restore, and
+upgrade preserve current and archived profile data.
 
 ## cli-env-local-mismatch
 

@@ -37,6 +37,7 @@ adapted to a subject other than developer resources.
 | Visitor light and dark appearance | appearance.md | UI |
 | Custom themes, templates, branding, and the creation skill | theming.md | THM |
 | Installable theme and template add-ons | addons.md | ADD |
+| Versioned directory profiles, structured fields, and public facets | profiles.md | PRF |
 | Container deployment, backup, restore, and upgrades | operations.md | OPS |
 | Account verification, recovery, magic links, and suspension | accounts.md | ACC |
 | Public discovery, search, categories, and listing pages | directory.md | DIR |

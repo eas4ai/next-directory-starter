@@ -1,0 +1,24 @@
+{
+  "command": "node mechanisms/check-directory-profiles.mjs",
+  "requirements": ["PRF-001", "PRF-002", "PRF-003", "PRF-004"],
+  "results": "per-requirement",
+  "inputs": [
+    "docs/operator-manual.md",
+    "fixtures/addons",
+    "mechanisms/check-directory-profiles.mjs",
+    "mechanisms/directory-profiles.def.json",
+    "mechanisms/tap-results.mjs",
+    "package.json",
+    "package-lock.json",
+    "scripts",
+    "src",
+    "tests/directory-profiles.test.mjs"
+  ],
+  "identity": {
+    "env": [],
+    "tools": {
+      "node": "node --version",
+      "npm": "npm --version"
+    }
+  }
+}

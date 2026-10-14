@@ -30,6 +30,12 @@
   site's custom theme without editing application page components.
 - **Public template:** a registered layout choice for public pages, separate
   from theme colors, typography, and the visitor's appearance mode.
+- **Directory profile:** a versioned definition of the structured fields,
+  validation, discovery facets, sorts, and display hints used by a directory,
+  independent from its public template and theme.
+- **Profile field:** one namespaced typed value defined by a directory profile
+  or by the operator's site-owned profile layer.
+- **Facet:** a public filter generated from an approved profile field.
 - **Brand kit:** the site's identity text and public logo, favicon, and
   default social card, supplied by code defaults or administrator settings.
 - **Agent import:** an operator-managed listing drafted from a URL inspected
