@@ -1,19 +1,97 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import {
+  cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync,
+  readlinkSync, rmSync, symlinkSync, writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { spawn, spawnSync } from "node:child_process";
+import Database from "better-sqlite3";
 import { chromium } from "playwright-core";
 import { parseListing } from "../src/lib/catalog-input.ts";
-import { parseManifest } from "../scripts/addons/manifest.mjs";
+import { canonicalJson, sha256 } from "../scripts/addons/manifest.mjs";
+import { canonicalProfileJson, profileDigest } from "../scripts/addons/profile-schema.mjs";
 
 const repository = resolve(import.meta.dirname, "..");
 const selectedRequirement = process.env.PROFILE_REQUIREMENT;
 
 function requirementTest(name, body) {
   if (!selectedRequirement || name.startsWith(selectedRequirement)) test(name, body);
+}
+
+function command(cwd, executable, args, env = {}, timeout = 180_000) {
+  return spawnSync(executable, args, {
+    cwd,
+    encoding: "utf8",
+    timeout,
+    env: { ...process.env, CI: "1", ...env },
+  });
+}
+
+function addonCommand(cwd, args, env = {}) {
+  return command(cwd, process.execPath, ["scripts/addons.mjs", ...args], env);
+}
+
+function expectCommandSuccess(result, label) {
+  assert.equal(result.status, 0, `${label}: ${result.stderr || result.stdout}`);
+}
+
+function expectCommandFailure(result, label, pattern) {
+  assert.notEqual(result.status, 0, `${label} unexpectedly succeeded`);
+  if (pattern) assert.match(`${result.stderr}\n${result.stdout}`, pattern, label);
+}
+
+function fileSnapshot(path) {
+  if (!existsSync(path)) return null;
+  const status = lstatSync(path);
+  assert.ok(status.isFile() && !status.isSymbolicLink(), `${path} must remain a regular file`);
+  return { bytes: status.size, digest: sha256(readFileSync(path)) };
+}
+
+function runWithoutDatabaseMutation(cwd, args, databaseFile, env = {}) {
+  const before = fileSnapshot(databaseFile);
+  const result = addonCommand(cwd, args, {
+    DATABASE_URL: `file:${databaseFile}`,
+    ...env,
+  });
+  assert.deepEqual(fileSnapshot(databaseFile), before,
+    `${args[0]} opened or changed the operator database`);
+  return result;
+}
+
+const ignoredCopyRoots = new Set([
+  ".git", ".next", ".runtime", ".claude", ".gstack", ".superpowers", "node_modules",
+]);
+
+function copyStarter(destination) {
+  cpSync(repository, destination, {
+    recursive: true,
+    filter(source) {
+      const path = relative(repository, source);
+      if (!path) return true;
+      return !ignoredCopyRoots.has(path.split(sep)[0]);
+    },
+  });
+  symlinkSync(join(repository, "node_modules"), join(destination, "node_modules"), "dir");
+}
+
+function treeSnapshot(root) {
+  const result = [];
+  function visit(directory) {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const absolute = join(directory, entry.name);
+      const path = relative(root, absolute).split(sep).join("/");
+      if (ignoredCopyRoots.has(path.split("/")[0])) continue;
+      if (entry.isDirectory()) visit(absolute);
+      else if (entry.isSymbolicLink()) result.push([path, `link:${readlinkSync(absolute)}`]);
+      else result.push([path, sha256(readFileSync(absolute))]);
+    }
+  }
+  visit(root);
+  return result.sort(([left], [right]) => left.localeCompare(right));
 }
 
 const profileDirectory = mkdtempSync(join(tmpdir(), "directory-profiles-"));
@@ -225,6 +303,8 @@ function resetProfileTables(database) {
     DELETE FROM directory_profile_definitions;
     DELETE FROM submissions;
     DELETE FROM owner_drafts;
+    DELETE FROM agent_imports;
+    DELETE FROM agent_staging_usage;
     DELETE FROM audit_events;
     DELETE FROM media_assignments;
     DELETE FROM media_cleanup_queue;
@@ -1229,16 +1309,521 @@ requirementTest("PRF-003 parses bounded public profile facets and stable sorts",
   });
 });
 
-requirementTest("PRF-004 validates profile-bearing add-on manifests", () => {
-  const fixture = join(repository, "fixtures/addons/reference-addon/directory-addon.json");
-  const manifest = JSON.parse(readFileSync(fixture, "utf8"));
-  manifest.profiles = [{
-    id: "ai-tools",
-    version: "1.0.0",
-    schema: "src/ai-tools.profile.json",
-  }];
-  manifest.files.push("src/ai-tools.profile.json");
-  const parsed = parseManifest(manifest);
-  assert.deepEqual(parsed.profiles, manifest.profiles,
-    "add-on validation does not preserve versioned profile declarations");
+function profileForAddon(addonId, overrides = {}) {
+  const definition = structuredClone(discoveryProfile());
+  const previousId = definition.id;
+  const id = overrides.id ?? `${addonId}.ai-tools`;
+  definition.id = id;
+  definition.version = overrides.version ?? "1.0.0";
+  definition.name = `${addonId} AI tools`;
+  definition.fields = definition.fields.map((field) => ({
+    ...field,
+    key: field.key.replace(previousId, id),
+  }));
+  return { ...definition, ...overrides, id, version: overrides.version ?? definition.version };
+}
+
+function copyProfileAddon(root, addonId, options = {}) {
+  const source = join(root, addonId);
+  cpSync(join(repository, "fixtures/addons/reference-addon"), source, { recursive: true });
+  const manifestPath = join(source, "directory-addon.json");
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  manifest.id = addonId;
+  manifest.name = `${addonId} profile package`;
+  manifest.themes = manifest.themes.map((theme) => ({
+    ...theme,
+    id: addonId,
+    name: `${addonId} theme`,
+  }));
+  manifest.templates = manifest.templates.map((template) => ({
+    ...template,
+    id: addonId,
+    name: `${addonId} template`,
+  }));
+  const profile = profileForAddon(addonId, options.profile ?? {});
+  manifest.profiles = [{ id: profile.id, version: profile.version, schema: "src/ai-tools.profile.json" }];
+  manifest.templates[0].supportedProfiles = [{ id: profile.id, range: "^1.0.0" }];
+  manifest.files = [...new Set([...manifest.files, "src/ai-tools.profile.json"])];
+  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  for (const file of [join(source, "src/theme.ts"), join(source, "src/template.css")]) {
+    let text = readFileSync(file, "utf8").replaceAll("reference-addon", addonId);
+    if (file.endsWith("theme.ts")) {
+      text = text.replace('name: "Reference Add-on"', `name: "${addonId} theme"`);
+    }
+    writeFileSync(file, text);
+  }
+  writeFileSync(join(source, "src/ai-tools.profile.json"), canonicalProfileJson(profile));
+  return { source, manifestPath, profilePath: join(source, "src/ai-tools.profile.json"),
+    manifest, profile };
+}
+
+function mutateJson(path, mutate) {
+  const value = JSON.parse(readFileSync(path, "utf8"));
+  mutate(value);
+  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function seedSnapshot(database) {
+  const tables = [
+    "categories", "listings", "directory_profile_values", "directory_profile_seed_runs",
+    "directory_profile_search",
+  ];
+  return Object.fromEntries(tables.map((table) =>
+    [table, database.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()]));
+}
+
+function writeInstalledSeed(root, profile, seed) {
+  const addonId = profile.id.split(".")[0];
+  const schemaSource = "src/ai-tools.profile.json";
+  const seedSource = "seed/catalog.json";
+  const schemaTarget = `src/addons/${addonId}/ai-tools.profile.json`;
+  const seedTarget = `src/addons/${addonId}/seed/catalog.json`;
+  mkdirSync(join(root, ".directory-starter"), { recursive: true });
+  mkdirSync(join(root, `src/addons/${addonId}/seed`), { recursive: true });
+  const schemaBytes = Buffer.from(canonicalProfileJson(profile));
+  const seedBytes = canonicalJson(seed);
+  writeFileSync(join(root, schemaTarget), schemaBytes);
+  writeFileSync(join(root, seedTarget), seedBytes);
+  const lock = {
+    schemaVersion: 1,
+    addons: [{
+      id: addonId,
+      name: `${addonId} profile package`,
+      version: "1.0.0",
+      archiveSha256: "a".repeat(64),
+      manifestSha256: "b".repeat(64),
+      themes: [],
+      templates: [],
+      profiles: [{
+        id: profile.id,
+        version: profile.version,
+        schema: schemaSource,
+        digest: profileDigest(profile),
+      }],
+      seed: seedSource,
+      files: [
+        { source: seedSource, target: seedTarget, bytes: seedBytes.length,
+          sha256: sha256(seedBytes) },
+        { source: schemaSource, target: schemaTarget, bytes: schemaBytes.length,
+          sha256: sha256(schemaBytes) },
+      ],
+    }],
+  };
+  writeFileSync(join(root, ".directory-starter/addons.lock.json"), canonicalJson(lock));
+}
+
+function seedRecords(profile, overrides = {}) {
+  const values = [0, 1, 2].map((index) => publicProfileValues(index));
+  return {
+    profile: { id: profile.id, version: profile.version },
+    listings: values.map((profileValues, index) => ({
+      slug: `seed-tool-${index + 1}`,
+      title: `Seed Tool ${index + 1}`,
+      summary: `Seed profile ${index + 1}`,
+      description: `Typed directory profile seed record ${index + 1}.`,
+      category: "Seeded tools",
+      url: `https://example.com/seed-tool-${index + 1}`,
+      status: "published",
+      profileValues,
+    })),
+    ...overrides,
+  };
+}
+
+function profileTableDump(database) {
+  const order = {
+    directory_profile_definitions: "profile_id, version",
+    directory_profile_state: "id",
+    directory_profile_values:
+      "listing_slug, profile_id, definition_version, field_key, item_id, child_key",
+    directory_profile_changes: "created_at, id",
+    directory_profile_media: "asset_id",
+    directory_profile_seed_runs: "addon_id, addon_version, seed_digest",
+    directory_profile_search: "listing_slug, profile_id, field_key, value",
+  };
+  return Object.fromEntries(Object.entries(order).map(([table, clause]) =>
+    [table, database.prepare(`SELECT * FROM ${table} ORDER BY ${clause}`).all()]));
+}
+
+function refreshBackupManifest(backup) {
+  const manifestPath = join(backup, "manifest.json");
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  for (const file of Object.keys(manifest.hashes)) {
+    const path = join(backup, file);
+    if (existsSync(path)) manifest.hashes[file] = sha256(readFileSync(path));
+    else delete manifest.hashes[file];
+  }
+  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
+requirementTest("PRF-004 preserves profiles across packages, seeds, imports, and recovery", async (t) => {
+  await t.test("validates profile package identity, content, bounds, and compatibility without database access",
+    async (packageTest) => {
+      const temporary = mkdtempSync(join(tmpdir(), "directory-profile-packages-"));
+      const databaseFile = join(temporary, "operator-database-must-not-open.db");
+      try {
+        await packageTest.test("packs and validates a deterministic profile package", () => {
+          const { source } = copyProfileAddon(temporary, "profile-package");
+          const first = join(temporary, "profile-first.zip");
+          const second = join(temporary, "profile-second.zip");
+          expectCommandSuccess(runWithoutDatabaseMutation(repository, ["pack", source, first], databaseFile),
+            "pack profile package");
+          expectCommandSuccess(runWithoutDatabaseMutation(repository, ["pack", source, second], databaseFile),
+            "repack profile package");
+          assert.deepEqual(readFileSync(first), readFileSync(second));
+          expectCommandSuccess(runWithoutDatabaseMutation(repository, ["validate", first], databaseFile),
+            "validate profile package");
+        });
+
+        const invalidSources = [
+          ["traversal", /unsafe|path/i, ({ manifestPath }) => mutateJson(manifestPath,
+            (manifest) => { manifest.profiles[0].schema = "../outside.profile.json"; })],
+          ["duplicate-id", /duplicate.*profile/i, ({ manifestPath }) => mutateJson(manifestPath,
+            (manifest) => { manifest.profiles.push({ ...manifest.profiles[0] }); })],
+          ["mismatched-id", /identity|profile.*id|match/i, ({ profilePath }) => mutateJson(profilePath,
+            (profile) => { profile.id = "different.ai-tools"; })],
+          ["mismatched-version", /version|match/i, ({ profilePath }) => mutateJson(profilePath,
+            (profile) => { profile.version = "1.1.0"; })],
+          ["unknown-type", /type|invalid/i, ({ profilePath }) => mutateJson(profilePath,
+            (profile) => { profile.fields[0].type = "executable"; })],
+          ["unsafe-default", /url|protocol|default/i, ({ profilePath }) => mutateJson(profilePath,
+            (profile) => {
+              profile.fields.find(({ type }) => type === "url").default = "javascript:alert(1)";
+            })],
+          ["invalid-constraint", /constraint|min|max|integer/i, ({ profilePath }) => mutateJson(profilePath,
+            (profile) => {
+              profile.fields.find(({ type }) => type === "integer").constraints = { min: 10, max: 1 };
+            })],
+          ["incompatible-template", /compatible|range|profile/i, ({ manifestPath }) =>
+            mutateJson(manifestPath, (manifest) => {
+              manifest.templates[0].supportedProfiles[0].range = "^9.0.0";
+            })],
+        ];
+        for (const [name, pattern, corrupt] of invalidSources) {
+          await packageTest.test(`rejects ${name}`, () => {
+            const value = copyProfileAddon(temporary, `profile-${name}`);
+            corrupt(value);
+            const output = join(temporary, `${name}.zip`);
+            expectCommandFailure(runWithoutDatabaseMutation(repository,
+              ["pack", value.source, output], databaseFile), name, pattern);
+          });
+        }
+
+        await packageTest.test("rejects a linked profile source", () => {
+          const value = copyProfileAddon(temporary, "profile-symlink");
+          rmSync(value.profilePath);
+          symlinkSync("theme.ts", value.profilePath);
+          expectCommandFailure(runWithoutDatabaseMutation(repository,
+            ["pack", value.source, join(temporary, "symlink.zip")], databaseFile),
+          "profile symlink", /link|regular|profile/i);
+        });
+
+        await packageTest.test("rejects an oversized profile source", () => {
+          const value = copyProfileAddon(temporary, "profile-oversized");
+          const bytes = readFileSync(value.profilePath);
+          writeFileSync(value.profilePath, Buffer.concat([bytes.subarray(0, -2),
+            Buffer.alloc(257 * 1024, 0x20), bytes.subarray(-2)]));
+          expectCommandFailure(runWithoutDatabaseMutation(repository,
+            ["pack", value.source, join(temporary, "oversized.zip")], databaseFile),
+          "oversized profile", /profile|256|large|size/i);
+        });
+
+        await packageTest.test("rejects corrupt profile bytes", () => {
+          const value = copyProfileAddon(temporary, "profile-corrupt");
+          writeFileSync(value.profilePath, Buffer.from([0xff, 0xfe, 0xfd]));
+          expectCommandFailure(runWithoutDatabaseMutation(repository,
+            ["pack", value.source, join(temporary, "corrupt-profile.zip")], databaseFile),
+          "corrupt profile", /profile|json|utf-8|utf8/i);
+        });
+
+        await packageTest.test("rejects a corrupt archive", () => {
+          const value = copyProfileAddon(temporary, "profile-archive");
+          const archive = join(temporary, "valid-profile.zip");
+          expectCommandSuccess(runWithoutDatabaseMutation(repository,
+            ["pack", value.source, archive], databaseFile), "pack corruption fixture");
+          const bytes = readFileSync(archive);
+          bytes[Math.floor(bytes.length / 2)] ^= 0xff;
+          writeFileSync(join(temporary, "corrupt-archive.zip"), bytes);
+          expectCommandFailure(runWithoutDatabaseMutation(repository,
+            ["validate", join(temporary, "corrupt-archive.zip")], databaseFile),
+          "corrupt archive", /archive|zip|integrity|invalid|compressed/i);
+        });
+
+        await packageTest.test("rejects an incompatible starter version", () => {
+          const value = copyProfileAddon(temporary, "profile-incompatible");
+          mutateJson(value.manifestPath, (manifest) => {
+            manifest.compatibility.starter = ">=99.0.0";
+          });
+          const archive = join(temporary, "incompatible-profile.zip");
+          expectCommandSuccess(runWithoutDatabaseMutation(repository,
+            ["pack", value.source, archive], databaseFile), "pack incompatible profile");
+          expectCommandFailure(runWithoutDatabaseMutation(repository,
+            ["validate", archive], databaseFile), "incompatible starter", /compatible|starter|version/i);
+        });
+      } finally {
+        rmSync(temporary, { recursive: true, force: true });
+      }
+    });
+
+  await t.test("rejects profile collisions and rolls install and removal failures back without database access",
+    () => {
+      const temporary = mkdtempSync(join(tmpdir(), "directory-profile-install-"));
+      try {
+        const starter = join(temporary, "starter");
+        copyStarter(starter);
+        const databaseFile = join(temporary, "operator-database-must-not-open.db");
+        const first = copyProfileAddon(temporary, "profile-first", {
+          profile: { id: "shared.ai-tools" },
+        });
+        const second = copyProfileAddon(temporary, "profile-second", {
+          profile: { id: "shared.ai-tools" },
+        });
+        const firstArchive = join(temporary, "first.zip");
+        const secondArchive = join(temporary, "second.zip");
+        expectCommandSuccess(runWithoutDatabaseMutation(repository,
+          ["pack", first.source, firstArchive], databaseFile), "pack first profile");
+        expectCommandSuccess(runWithoutDatabaseMutation(repository,
+          ["pack", second.source, secondArchive], databaseFile), "pack colliding profile");
+        const baseline = treeSnapshot(starter);
+        const failedInstall = runWithoutDatabaseMutation(starter, ["install", firstArchive], databaseFile,
+          { NODE_ENV: "test", DIRECTORY_ADDON_TEST_FAIL_AFTER: "2" });
+        expectCommandFailure(failedInstall, "injected profile installation failure", /injected/i);
+        assert.deepEqual(treeSnapshot(starter), baseline, "failed profile installation changed the workspace");
+        expectCommandSuccess(runWithoutDatabaseMutation(starter,
+          ["install", firstArchive], databaseFile), "install first profile");
+        const installed = treeSnapshot(starter);
+        expectCommandFailure(runWithoutDatabaseMutation(starter,
+          ["install", secondArchive], databaseFile), "colliding profile ID", /profile.*collision|duplicate.*profile/i);
+        assert.deepEqual(treeSnapshot(starter), installed, "profile collision changed the workspace");
+        const failedRemove = runWithoutDatabaseMutation(starter, ["remove", "profile-first"], databaseFile,
+          { NODE_ENV: "test", DIRECTORY_ADDON_TEST_FAIL_AFTER: "2" });
+        expectCommandFailure(failedRemove, "injected profile removal failure", /injected/i);
+        assert.deepEqual(treeSnapshot(starter), installed, "failed profile removal changed the workspace");
+        expectCommandSuccess(runWithoutDatabaseMutation(starter,
+          ["remove", "profile-first"], databaseFile), "remove profile package");
+        assert.deepEqual(treeSnapshot(starter), baseline,
+          "profile package removal did not restore the clean starter");
+      } finally {
+        rmSync(temporary, { recursive: true, force: true });
+      }
+    });
+
+  await t.test("validates a complete typed seed before one idempotent transaction", async (seedTest) => {
+    const temporary = mkdtempSync(join(tmpdir(), "directory-profile-seed-"));
+    const api = await profileTestContext();
+    const seedApi = await import("../src/lib/addon-seed.ts");
+    const profile = discoveryProfile();
+    const attempt = (seed) => {
+      writeInstalledSeed(temporary, profile, seed);
+      return () => seedApi.seedInstalledAddon(temporary, "vendor");
+    };
+    const reset = () => {
+      resetProfileTables(api.database);
+      activate(api, profile, 0);
+    };
+    try {
+      await seedTest.test("rejects one late invalid typed value without partial rows", () => {
+        reset();
+        const seed = seedRecords(profile);
+        seed.listings[2].profileValues["vendor.ai-tools.starting-price"].currency = "CAD";
+        const before = seedSnapshot(api.database);
+        assert.throws(attempt(seed), /currency|CAD|profile/i);
+        assert.deepEqual(seedSnapshot(api.database), before);
+      });
+      await seedTest.test("rejects a profile version mismatch without partial rows", () => {
+        reset();
+        const seed = seedRecords(profile);
+        seed.profile.version = "9.9.9";
+        const before = seedSnapshot(api.database);
+        assert.throws(attempt(seed), /profile|version|active/i);
+        assert.deepEqual(seedSnapshot(api.database), before);
+      });
+      await seedTest.test("rejects duplicate slugs without partial rows", () => {
+        reset();
+        const seed = seedRecords(profile);
+        seed.listings[2].slug = seed.listings[0].slug;
+        const before = seedSnapshot(api.database);
+        assert.throws(attempt(seed), /duplicate|slug/i);
+        assert.deepEqual(seedSnapshot(api.database), before);
+      });
+      await seedTest.test("rejects an unowned media reference without partial rows", () => {
+        reset();
+        const seed = seedRecords(profile);
+        seed.listings[2].profileValues["vendor.ai-tools.screenshot"] =
+          "123e4567-e89b-12d3-a456-426614174999";
+        const before = seedSnapshot(api.database);
+        assert.throws(attempt(seed), /media|owned|listing/i);
+        assert.deepEqual(seedSnapshot(api.database), before);
+      });
+      await seedTest.test("applies an equal seed digest once and reports every retry as existing", () => {
+        reset();
+        const invoke = attempt(seedRecords(profile));
+        assert.deepEqual(invoke(), { inserted: 3, existing: 0 });
+        const afterFirst = seedSnapshot(api.database);
+        assert.equal(afterFirst.directory_profile_seed_runs.length, 1);
+        assert.deepEqual(invoke(), { inserted: 0, existing: 3 });
+        assert.deepEqual(seedSnapshot(api.database), afterFirst);
+      });
+    } finally {
+      rmSync(temporary, { recursive: true, force: true });
+    }
+  });
+
+  await t.test("keeps incomplete agent imports private through direct and browser-approved publication", async () => {
+    const api = await profileTestContext();
+    resetProfileTables(api.database);
+    activate(api, authoringProfile(), 0);
+    api.database.prepare("INSERT INTO categories (name) VALUES ('Tools')").run();
+    const imports = await import("../src/lib/agent-imports.ts");
+    const [staged] = imports.stageAgentImports("profile-catalog", { kind: "key", id: "profile-key" }, [{
+      idempotencyKey: "incomplete-profile",
+      url: "https://example.com/incomplete-profile",
+      sourceUrl: "https://source.example.com/incomplete-profile",
+      sourceExcerpt: "Observed directory candidate",
+      name: "Incomplete profile",
+      summary: "The required typed field is deliberately absent.",
+      description: "Incomplete staged records remain available for review without becoming public.",
+      category: "Tools",
+      profileValues: {},
+      profileStateRevision: 1,
+    }]);
+    assert.equal(staged.status, "created");
+    const before = {
+      listing: api.database.prepare("SELECT * FROM listings WHERE slug = ?").get(staged.slug),
+      imported: api.database.prepare("SELECT * FROM agent_imports WHERE slug = ?").get(staged.slug),
+      values: profileSnapshot(api.database),
+    };
+    assert.throws(() => imports.publishAgentImport("profile-catalog", staged.slug),
+      /required|pricing|profile/i);
+    assert.equal(api.database.prepare("SELECT status FROM listings WHERE slug = ?")
+      .pluck().get(staged.slug), "draft");
+    imports.approveAgentImportForBrowser("profile-catalog", staged.slug);
+    assert.throws(() => imports.publishBrowserApprovedAgentImport("profile-catalog", staged.slug),
+      /required|pricing|profile/i);
+    imports.markAgentImportChanged(staged.slug);
+    assert.throws(() => imports.publishBrowserApprovedAgentImport("profile-catalog", staged.slug),
+      /approval|revision|profile/i);
+    const after = {
+      listing: api.database.prepare("SELECT * FROM listings WHERE slug = ?").get(staged.slug),
+      imported: api.database.prepare("SELECT * FROM agent_imports WHERE slug = ?").get(staged.slug),
+      values: profileSnapshot(api.database),
+    };
+    assert.equal(after.listing.status, before.listing.status);
+    assert.equal(after.listing.revision, before.listing.revision);
+    assert.equal(after.imported.published_at, null);
+    assert.deepEqual(after.values, before.values);
+  });
+
+  await t.test("preserves every profile table and rejects corrupted restored profile state",
+    async (operationTest) => {
+      const temporary = mkdtempSync(join(tmpdir(), "directory-profile-recovery-"));
+      const api = await profileTestContext();
+      resetProfileTables(api.database);
+      const mediaDirectory = join(temporary, "media");
+      mkdirSync(mediaDirectory);
+      const mediaId = "123e4567-e89b-12d3-a456-426614174321";
+      const key = randomBytes(32).toString("base64url");
+      const keyFile = join(temporary, "billing.key");
+      writeFileSync(keyFile, `${key}\n`, { mode: 0o600 });
+      try {
+        activate(api, discoveryProfile(), 0);
+        const listingApi = await import("../src/lib/listings.ts");
+        listingApi.createListing(parseListing(listingInput("recovery-profile",
+          publicProfileValues(0), 1, { status: "published" })), "profile-admin");
+        activate(api, { ...discoveryProfile(), version: "1.1.0" }, 1);
+        api.saveSiteField({
+          field: commonField("site.certification", "Certification", "short-text",
+            { minLength: 1, maxLength: 80 }),
+          expectedRevision: 2,
+          actorUserId: "profile-admin",
+        });
+        insertProfileMedia(api.database, {
+          id: mediaId,
+          slug: "recovery-profile",
+          fieldKey: "vendor.ai-tools.screenshot",
+          uploadedBy: "profile-admin",
+          state: "public",
+        });
+        writeFileSync(join(mediaDirectory, `${mediaId}.webp`), Buffer.from("profile-media"));
+        const valuesApi = await import("../src/lib/profile-values.ts");
+        valuesApi.replaceListingProfileValues({
+          listingSlug: "recovery-profile",
+          values: {
+            ...publicProfileValues(0),
+            "vendor.ai-tools.screenshot": mediaId,
+            "site.certification": "Verified",
+          },
+          profiles: api.activeDirectoryProfiles(),
+        });
+        api.database.prepare(`INSERT INTO directory_profile_seed_runs
+          (addon_id, addon_version, seed_digest, profile_id, profile_version, record_count, applied_at)
+          VALUES ('vendor', '1.0.0', ?, 'vendor.ai-tools', '1.1.0', 1, ?)`)
+          .run("c".repeat(64), "2026-10-14T00:00:00.000Z");
+        api.database.pragma("wal_checkpoint(TRUNCATE)");
+
+        const before = profileTableDump(api.database);
+        assert.ok(before.directory_profile_definitions.length >= 3, "fixture needs inactive and site definitions");
+        assert.ok(before.directory_profile_values.some(({ archived_at }) => archived_at),
+          "fixture needs archived values");
+        assert.ok(before.directory_profile_values.some(({ archived_at }) => !archived_at),
+          "fixture needs current values");
+        const backup = join(temporary, "backup");
+        const operationsEnv = {
+          DATABASE_URL: process.env.DATABASE_URL,
+          MEDIA_DIR: mediaDirectory,
+          BILLING_ENCRYPTION_KEY: key,
+        };
+        expectCommandSuccess(command(repository, process.execPath,
+          ["scripts/backup.mjs", "--output", backup, "--key-file", keyFile], operationsEnv),
+        "profile backup");
+        const restored = join(temporary, "restored");
+        expectCommandSuccess(command(repository, process.execPath,
+          ["scripts/restore.mjs", "--backup", backup, "--target", restored], operationsEnv),
+        "profile restore");
+        const restoredDatabase = new Database(join(restored, "database.db"), { readonly: true });
+        try {
+          assert.deepEqual(profileTableDump(restoredDatabase), before);
+        } finally {
+          restoredDatabase.close();
+        }
+        assert.equal(sha256(readFileSync(join(restored, "media", `${mediaId}.webp`))),
+          sha256(readFileSync(join(mediaDirectory, `${mediaId}.webp`))));
+
+        const corruptions = [
+          ["definition digest", (database) => database.prepare(`UPDATE directory_profile_definitions
+            SET digest = ? WHERE profile_id = 'vendor.ai-tools' AND version = '1.1.0'`)
+            .run("0".repeat(64))],
+          ["active state reference", (database) => database.prepare(`UPDATE directory_profile_state
+            SET base_profile_version = '9.9.9' WHERE id = 1`).run()],
+          ["typed value columns", (database) => database.prepare(`UPDATE directory_profile_values
+            SET text_value = 'impossible' WHERE value_type = 'money' AND archived_at IS NULL`).run()],
+          ["archived definition reference", (database) => database.prepare(`UPDATE directory_profile_values
+            SET definition_version = '9.9.9' WHERE archived_at IS NOT NULL`).run()],
+          ["migration mapping", (database) => database.prepare(`UPDATE directory_profile_changes
+            SET plan_json = '{"fields":{"missing.field":{"action":"archive"}},"defaults":{}}'
+            WHERE kind = 'activate' AND from_version IS NOT NULL`).run()],
+          ["profile media file", null],
+        ];
+        for (const [name, corrupt] of corruptions) {
+          await operationTest.test(`rejects corrupt ${name}`, () => {
+            const damaged = join(temporary, `damaged-${name.replaceAll(" ", "-")}`);
+            cpSync(backup, damaged, { recursive: true });
+            if (corrupt) {
+              const database = new Database(join(damaged, "database.db"));
+              try { corrupt(database); } finally { database.close(); }
+            } else {
+              rmSync(join(damaged, "media", `${mediaId}.webp`));
+            }
+            refreshBackupManifest(damaged);
+            const target = join(temporary, `rejected-${name.replaceAll(" ", "-")}`);
+            expectCommandFailure(command(repository, process.execPath,
+              ["scripts/restore.mjs", "--backup", damaged, "--target", target], operationsEnv),
+            `corrupt ${name}`, /profile|definition|value|media|migration|integrity|reference/i);
+            assert.equal(existsSync(target), false, `corrupt ${name} produced a restore target`);
+          });
+        }
+      } finally {
+        rmSync(temporary, { recursive: true, force: true });
+      }
+    });
 });
