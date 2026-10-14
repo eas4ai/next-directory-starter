@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { parseListing } from "../src/lib/catalog-input.ts";
 import { parseManifest } from "../scripts/addons/manifest.mjs";
 
@@ -12,15 +14,387 @@ function requirementTest(name, body) {
   if (!selectedRequirement || name.startsWith(selectedRequirement)) test(name, body);
 }
 
-requirementTest("PRF-001 activates immutable versioned directory-profile definitions", async () => {
+const profileDirectory = mkdtempSync(join(tmpdir(), "directory-profiles-"));
+const previousDatabaseUrl = process.env.DATABASE_URL;
+process.env.DATABASE_URL = `file:${join(profileDirectory, "catalog.db")}`;
+let profileDatabase;
+
+test.after(() => {
+  profileDatabase?.close();
+  if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+  else process.env.DATABASE_URL = previousDatabaseUrl;
+  rmSync(profileDirectory, { recursive: true, force: true });
+});
+
+function commonField(key, label, type, constraints = {}) {
+  return {
+    key,
+    label,
+    help: `${label} help`,
+    type,
+    cardinality: type === "multiple-choice" || type === "group" ? "many" : "one",
+    required: false,
+    writeAuthority: "owner",
+    visibility: "public",
+    placement: "detail",
+    group: "Details",
+    order: 10,
+    searchable: ["short-text", "markdown"].includes(type),
+    facet: null,
+    sort: null,
+    constraints,
+  };
+}
+
+function completeProfile(overrides = {}) {
+  const fields = [
+    commonField("vendor.ai-tools.tagline", "Tagline", "short-text",
+      { minLength: 1, maxLength: 120 }),
+    commonField("vendor.ai-tools.notes", "Notes", "markdown",
+      { minLength: 0, maxLength: 5000 }),
+    { ...commonField("vendor.ai-tools.open-source", "Open source", "boolean"),
+      facet: { label: "Open source", mode: "any" } },
+    { ...commonField("vendor.ai-tools.team-size", "Team size", "integer",
+      { min: 0, max: 1000000 }), sort: { label: "Team size", directions: ["asc", "desc"] } },
+    { ...commonField("vendor.ai-tools.rating", "Rating", "decimal",
+      { min: "0.00", max: "5.00", scale: 2 }),
+      sort: { label: "Rating", directions: ["asc", "desc"] } },
+    { ...commonField("vendor.ai-tools.starting-price", "Starting price", "money",
+      { minMinor: 0, maxMinor: 100000000, currencies: ["EUR", "USD"] }),
+      facet: { label: "Starting price", mode: "any" },
+      sort: { label: "Starting price", directions: ["asc", "desc"] } },
+    { ...commonField("vendor.ai-tools.pricing-model", "Pricing model", "single-choice",
+      { choices: [{ value: "free", label: "Free" }, { value: "paid", label: "Paid" }] }),
+      facet: { label: "Pricing model", mode: "any" } },
+    { ...commonField("vendor.ai-tools.platforms", "Platforms", "multiple-choice",
+      { choices: [{ value: "web", label: "Web" }, { value: "mac", label: "macOS" }] }),
+      facet: { label: "Platforms", mode: "all" } },
+    commonField("vendor.ai-tools.docs", "Documentation", "url"),
+    { ...commonField("vendor.ai-tools.launched", "Launched", "date",
+      { min: "2000-01-01", max: "2100-12-31" }),
+      facet: { label: "Launched", mode: "any" } },
+    commonField("vendor.ai-tools.updated", "Updated", "datetime",
+      { min: "2000-01-01T00:00:00.000Z", max: "2100-12-31T23:59:59.999Z" }),
+    { ...commonField("vendor.ai-tools.availability", "Availability", "date-range",
+      { min: "2000-01-01", max: "2100-12-31" }),
+      facet: { label: "Availability", mode: "any" } },
+    { ...commonField("vendor.ai-tools.setup-time", "Setup time", "duration",
+      { minSeconds: 0, maxSeconds: 31536000 }),
+      facet: { label: "Setup time", mode: "any" } },
+    { ...commonField("vendor.ai-tools.headquarters", "Headquarters", "location",
+      { countries: ["CA", "US"] }), facet: { label: "Location", mode: "any" } },
+    commonField("vendor.ai-tools.screenshot", "Screenshot", "media", { maxItems: 4 }),
+    commonField("vendor.ai-tools.integrations", "Integrations", "group", {
+      minItems: 0,
+      maxItems: 25,
+      children: [
+        { key: "name", label: "Name", help: "Integration name", type: "short-text",
+          required: true, constraints: { minLength: 1, maxLength: 80 } },
+        { key: "url", label: "URL", help: "Integration URL", type: "url",
+          required: false, constraints: {} },
+        { key: "native", label: "Native", help: "Native integration", type: "boolean",
+          required: false, constraints: {} },
+      ],
+    }),
+  ];
+  return {
+    schemaVersion: 1,
+    id: "vendor.ai-tools",
+    version: "1.0.0",
+    name: "AI tools",
+    description: "Structured fields for an AI tools directory.",
+    fields,
+    ...overrides,
+  };
+}
+
+function reorderedObject(value) {
+  if (Array.isArray(value)) return value.map(reorderedObject);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value).reverse()
+    .map(([key, child]) => [key, reorderedObject(child)]));
+}
+
+async function profileTestContext() {
+  const { database } = await import("../src/lib/database.ts");
+  profileDatabase = database;
+  const { migrateCatalog } = await import("../src/lib/catalog-migrations.ts");
+  migrateCatalog();
+  database.exec(`CREATE TABLE IF NOT EXISTS "user" (
+    id TEXT PRIMARY KEY, email TEXT, role TEXT, banned INTEGER NOT NULL DEFAULT 0,
+    emailVerified INTEGER NOT NULL DEFAULT 0
+  )`);
+  database.prepare(`INSERT OR REPLACE INTO "user" (id, email, role, banned, emailVerified)
+    VALUES (?, ?, ?, ?, ?)`).run("profile-admin", "admin@example.invalid", "admin", 0, 1);
+  database.prepare(`INSERT OR REPLACE INTO "user" (id, email, role, banned, emailVerified)
+    VALUES (?, ?, ?, ?, ?)`).run("profile-catalog", "catalog@example.invalid", "catalog", 0, 1);
   const modulePath = join(repository, "src/lib/directory-profiles.ts");
   assert.ok(existsSync(modulePath),
     "directory-profile definition and lifecycle module is missing");
-  const profiles = await import(modulePath);
-  assert.equal(typeof profiles.parseDirectoryProfileDefinition, "function",
-    "directory profiles do not expose schema validation");
-  assert.equal(typeof profiles.activateDirectoryProfile, "function",
-    "directory profiles do not expose transactional activation");
+  const api = await import(pathToFileURL(modulePath).href);
+  return { database, ...api };
+}
+
+function resetProfileTables(database) {
+  database.exec(`DELETE FROM directory_profile_search;
+    DELETE FROM directory_profile_media;
+    DELETE FROM directory_profile_values;
+    DELETE FROM directory_profile_changes;
+    DELETE FROM directory_profile_seed_runs;
+    DELETE FROM directory_profile_state;
+    DELETE FROM directory_profile_definitions;
+    DELETE FROM submissions;
+    DELETE FROM owner_drafts;
+    DELETE FROM audit_events;
+    DELETE FROM listings;
+    DELETE FROM categories;`);
+  database.prepare(`INSERT INTO directory_profile_state
+    (id, revision, updated_at, updated_by) VALUES (1, 0, ?, ?)`)
+    .run("2026-10-14T00:00:00.000Z", "system");
+}
+
+function profileSnapshot(database) {
+  const tables = [
+    "directory_profile_definitions", "directory_profile_state", "directory_profile_values",
+    "directory_profile_changes", "directory_profile_media", "directory_profile_seed_runs",
+  ];
+  return Object.fromEntries(tables.map((table) =>
+    [table, database.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()]));
+}
+
+function activate(api, definition, expectedRevision, migration) {
+  return api.activateDirectoryProfile({
+    definition,
+    sourceKind: "addon",
+    sourceId: definition.id.split(".")[0],
+    expectedRevision,
+    migration,
+    actorUserId: "profile-admin",
+  });
+}
+
+function insertListing(database, slug = "profile-listing", status = "published") {
+  database.prepare("INSERT OR IGNORE INTO categories (name) VALUES ('Tools')").run();
+  database.prepare(`INSERT INTO listings
+    (slug, name, summary, description, category, url, destination_key, status, revision)
+    VALUES (?, ?, 'Profile summary', 'Profile description', 'Tools', ?, ?, ?, 1)`)
+    .run(slug, `Profile ${slug}`, `https://example.com/${slug}`,
+      `https://example.com/${slug}`, status);
+}
+
+function insertValue(database, {
+  slug = "profile-listing", profileId = "vendor.ai-tools", version = "1.0.0",
+  fieldKey = "vendor.ai-tools.starting-price", itemId = "value", valueType = "money",
+  textValue = null, integerValue = 1299, currency = "USD", archivedAt = null,
+} = {}) {
+  database.prepare(`INSERT INTO directory_profile_values
+    (listing_slug, profile_id, definition_version, field_key, item_id, child_key,
+      position, value_type, text_value, integer_value, currency, archived_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, '', 0, ?, ?, ?, ?, ?, ?)`)
+    .run(slug, profileId, version, fieldKey, itemId, valueType, textValue,
+      integerValue, currency, archivedAt, "2026-10-14T00:00:00.000Z");
+}
+
+requirementTest("PRF-001 activates immutable versioned directory-profile definitions", async (t) => {
+  await t.test("validates all field families and rejects invalid definitions", async () => {
+    const api = await profileTestContext();
+    resetProfileTables(api.database);
+    const parsed = api.parseDirectoryProfileDefinition(completeProfile());
+    assert.deepEqual(parsed.fields.map(({ type }) => type), [
+      "short-text", "markdown", "boolean", "integer", "decimal", "money",
+      "single-choice", "multiple-choice", "url", "date", "datetime", "date-range",
+      "duration", "location", "media", "group",
+    ]);
+    assert.throws(() => api.parseDirectoryProfileDefinition({
+      ...completeProfile(),
+      fields: [...completeProfile().fields, completeProfile().fields[0]],
+    }), /duplicate field/i);
+    const unbounded = structuredClone(completeProfile());
+    unbounded.fields.at(-1).constraints.maxItems = 26;
+    assert.throws(() => api.parseDirectoryProfileDefinition(unbounded), /25|bounded|maxItems/i);
+    const unsafe = structuredClone(completeProfile());
+    unsafe.fields.find(({ type }) => type === "url").default = "javascript:alert(1)";
+    assert.throws(() => api.parseDirectoryProfileDefinition(unsafe), /URL|protocol|default/i);
+    const privateFacet = structuredClone(completeProfile());
+    const faceted = privateFacet.fields.find(({ facet }) => facet);
+    faceted.visibility = "private";
+    assert.throws(() => api.parseDirectoryProfileDefinition(privateFacet), /visibility|public|facet/i);
+  });
+
+  await t.test("canonicalizes definitions and produces stable digests", async () => {
+    const api = await profileTestContext();
+    resetProfileTables(api.database);
+    const definition = completeProfile();
+    assert.equal(api.profileDigest(definition), api.profileDigest(reorderedObject(definition)));
+    assert.equal(api.canonicalProfileJson(definition), api.canonicalProfileJson(reorderedObject(definition)));
+    assert.match(api.profileDigest(definition), /^[a-f0-9]{64}$/);
+  });
+
+  await t.test("stores immutable definitions and protects activation", async () => {
+    const api = await profileTestContext();
+    resetProfileTables(api.database);
+    assert.throws(() => api.activateDirectoryProfile({
+      definition: completeProfile(), sourceKind: "addon", sourceId: "vendor",
+      expectedRevision: 0, actorUserId: "profile-catalog",
+    }), /Forbidden|admin/i);
+    const first = activate(api, completeProfile(), 0);
+    assert.equal(first.revision, 1);
+    assert.equal(first.base.profileId, "vendor.ai-tools");
+    assert.equal(first.base.version, "1.0.0");
+    assert.equal(first.base.digest, api.profileDigest(completeProfile()));
+    const before = profileSnapshot(api.database);
+    assert.throws(() => activate(api, completeProfile({ name: "Changed bytes" }), 1),
+      /immutable|same version|digest/i);
+    assert.deepEqual(profileSnapshot(api.database), before);
+    assert.equal(api.database.prepare(`SELECT COUNT(*) AS count FROM audit_events
+      WHERE action = 'profile.activate'`).get().count, 1);
+  });
+
+  await t.test("reports and applies explicit breaking mappings atomically", async () => {
+    const api = await profileTestContext();
+    resetProfileTables(api.database);
+    activate(api, completeProfile(), 0);
+    insertListing(api.database);
+    insertValue(api.database);
+    const compatible = completeProfile({ version: "1.1.0", fields: [
+      ...completeProfile().fields,
+      commonField("vendor.ai-tools.support-email", "Support email", "short-text",
+        { minLength: 0, maxLength: 200 }),
+    ] });
+    const compatibleImpact = api.profileImpact({ definition: compatible, expectedRevision: 1 });
+    assert.equal(compatibleImpact.compatible, true);
+    activate(api, compatible, 1);
+    const renamedFields = compatible.fields
+      .filter(({ key }) => key !== "vendor.ai-tools.starting-price")
+      .concat({ ...compatible.fields.find(({ key }) => key === "vendor.ai-tools.starting-price"),
+        key: "vendor.ai-tools.price", label: "Price" });
+    const breaking = completeProfile({ version: "2.0.0", fields: renamedFields });
+    const impact = api.profileImpact({ definition: breaking, expectedRevision: 2 });
+    assert.equal(impact.compatible, false);
+    assert.deepEqual(impact.breakingFields, ["vendor.ai-tools.starting-price"]);
+    const before = profileSnapshot(api.database);
+    assert.throws(() => activate(api, breaking, 2), /mapping|breaking/i);
+    assert.deepEqual(profileSnapshot(api.database), before);
+    assert.throws(() => activate(api, breaking, 2, { fields: {
+      "vendor.ai-tools.starting-price": {
+        action: "map", to: "vendor.ai-tools.missing", onInvalid: "reject",
+      },
+    }, defaults: {} }), /target|missing|field/i);
+    assert.deepEqual(profileSnapshot(api.database), before);
+    const migrated = activate(api, breaking, 2, { fields: {
+      "vendor.ai-tools.starting-price": {
+        action: "map", to: "vendor.ai-tools.price", onInvalid: "reject",
+      },
+    }, defaults: {} });
+    assert.equal(migrated.revision, 3);
+    const current = api.database.prepare(`SELECT field_key, integer_value, currency, archived_at
+      FROM directory_profile_values WHERE listing_slug = ? ORDER BY field_key, archived_at`)
+      .all("profile-listing");
+    assert.equal(current.some((row) => row.field_key === "vendor.ai-tools.price" &&
+      row.integer_value === 1299 && row.currency === "USD" && row.archived_at === null), true);
+    assert.equal(current.some((row) => row.field_key === "vendor.ai-tools.starting-price" &&
+      row.archived_at !== null), true);
+  });
+
+  await t.test("rejects stale and unsatisfied required-field activation without partial writes", async () => {
+    const api = await profileTestContext();
+    resetProfileTables(api.database);
+    activate(api, completeProfile(), 0);
+    insertListing(api.database);
+    const required = structuredClone(completeProfile({ version: "2.0.0" }));
+    const tagline = required.fields.find(({ key }) => key === "vendor.ai-tools.tagline");
+    tagline.required = true;
+    const impact = api.profileImpact({ definition: required, expectedRevision: 1 });
+    assert.equal(impact.publishedMissingRequired, 1);
+    const before = profileSnapshot(api.database);
+    assert.throws(() => activate(api, required, 0), /stale|revision|changed/i);
+    assert.deepEqual(profileSnapshot(api.database), before);
+    assert.throws(() => activate(api, required, 1), /required|default|mapping/i);
+    assert.deepEqual(profileSnapshot(api.database), before);
+    const state = activate(api, required, 1, { fields: {}, defaults: {
+      "vendor.ai-tools.tagline": "Migrated tagline",
+    } });
+    assert.equal(state.revision, 2);
+    assert.equal(api.database.prepare(`SELECT text_value FROM directory_profile_values
+      WHERE listing_slug = 'profile-listing' AND field_key = 'vendor.ai-tools.tagline'
+        AND archived_at IS NULL`).get().text_value, "Migrated tagline");
+  });
+
+  await t.test("versions site fields, archives values, confirms purges, and audits actions", async () => {
+    const api = await profileTestContext();
+    resetProfileTables(api.database);
+    activate(api, completeProfile(), 0);
+    const siteField = commonField("site.certified", "Certified", "boolean");
+    const siteState = api.saveSiteField({ field: siteField, expectedRevision: 1,
+      actorUserId: "profile-admin" });
+    assert.equal(siteState.site.profileId, "site.local");
+    assert.equal(siteState.site.version, "0.0.2");
+    insertListing(api.database);
+    insertValue(api.database, { profileId: "site.local", version: "0.0.2",
+      fieldKey: "site.certified", valueType: "boolean", integerValue: 1, currency: null });
+    assert.throws(() => api.saveSiteField({
+      field: { ...siteField, key: "vendor.not-site" }, expectedRevision: 2,
+      actorUserId: "profile-admin",
+    }), /site\.|namespace/i);
+    const archivedState = api.archiveSiteField({ fieldKey: "site.certified",
+      expectedRevision: 2, actorUserId: "profile-admin" });
+    assert.equal(archivedState.revision, 3);
+    assert.ok(api.database.prepare(`SELECT archived_at FROM directory_profile_values
+      WHERE field_key = 'site.certified'`).get().archived_at);
+    assert.throws(() => api.purgeArchivedProfileValues({ profileId: "site.local",
+      fieldKey: "site.certified", expectedCount: 2, expectedRevision: 3,
+      actorUserId: "profile-admin" }), /count|changed/i);
+    assert.equal(api.purgeArchivedProfileValues({ profileId: "site.local",
+      fieldKey: "site.certified", expectedCount: 1, expectedRevision: 3,
+      actorUserId: "profile-admin" }), 1);
+    const actions = api.database.prepare(`SELECT action FROM audit_events
+      WHERE action LIKE 'profile.%' ORDER BY occurred_at, id`).all().map(({ action }) => action);
+    assert.deepEqual(actions, ["profile.activate", "profile.site-field.save",
+      "profile.site-field.archive", "profile.values.purge"]);
+  });
+
+  await t.test("switches active profiles without deleting inactive definitions or values", async () => {
+    const api = await profileTestContext();
+    resetProfileTables(api.database);
+    activate(api, completeProfile(), 0);
+    insertListing(api.database);
+    insertValue(api.database);
+    const places = {
+      ...completeProfile(), id: "vendor.places", version: "1.0.0", name: "Places",
+      fields: [commonField("vendor.places.neighborhood", "Neighborhood", "short-text",
+        { minLength: 0, maxLength: 100 })],
+    };
+    const switched = activate(api, places, 1, { fields: {
+      "vendor.ai-tools.starting-price": { action: "archive" },
+    }, defaults: {} });
+    assert.equal(switched.base.profileId, "vendor.places");
+    assert.equal(api.database.prepare(`SELECT COUNT(*) AS count FROM directory_profile_definitions
+      WHERE profile_id = 'vendor.ai-tools'`).get().count, 1);
+    assert.equal(api.database.prepare(`SELECT COUNT(*) AS count FROM directory_profile_values
+      WHERE profile_id = 'vendor.ai-tools'`).get().count, 1);
+  });
+
+  await t.test("bounds online migrations before changing state", async () => {
+    const api = await profileTestContext();
+    resetProfileTables(api.database);
+    activate(api, completeProfile(), 0);
+    insertListing(api.database);
+    api.database.exec(`WITH RECURSIVE sequence(value) AS (
+      VALUES(1) UNION ALL SELECT value + 1 FROM sequence WHERE value < 100001
+    ) INSERT INTO directory_profile_values
+      (listing_slug, profile_id, definition_version, field_key, item_id, child_key,
+        position, value_type, text_value, updated_at)
+      SELECT 'profile-listing', 'vendor.ai-tools', '1.0.0', 'vendor.ai-tools.tagline',
+        printf('item-%06d', value), '', value % 25, 'short-text', 'bounded',
+        '2026-10-14T00:00:00.000Z' FROM sequence;`);
+    const narrowed = structuredClone(completeProfile({ version: "2.0.0" }));
+    narrowed.fields.find(({ key }) => key === "vendor.ai-tools.tagline")
+      .constraints.maxLength = 20;
+    const before = api.directoryProfileState();
+    assert.throws(() => api.profileImpact({ definition: narrowed, expectedRevision: 1 }),
+      /100,000|migration|limit/i);
+    assert.deepEqual(api.directoryProfileState(), before);
+  });
 });
 
 requirementTest("PRF-002 validates profile values with the complete listing revision", () => {
