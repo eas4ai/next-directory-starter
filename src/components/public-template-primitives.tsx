@@ -17,6 +17,14 @@ export function TemplateLink(props: ComponentProps<typeof Link>) {
   return <Link {...props} />;
 }
 
+export function TemplateMarkdown({ source }: { source: string }) {
+  return <MarkdownContent source={source} />;
+}
+
+export function TemplateContentImage({ asset }: { asset: MediaAsset }) {
+  return <ContentImage asset={asset} />;
+}
+
 export function TemplateProfileValues({ fields, listing, mediaAssets, placements }: {
   fields: readonly DirectoryProfileField[];
   listing: PublicTemplateListing;
