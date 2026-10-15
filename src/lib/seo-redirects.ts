@@ -29,7 +29,7 @@ function path(value: unknown, allowRoot: boolean): string {
 }
 
 export const REDIRECT_RESERVED_PREFIXES = [
-  "/", "/listings", "/articles", "/feed", "/robots", "/sitemap", "/favicon", "/admin",
+  "/", "/compare", "/listings", "/articles", "/feed", "/robots", "/sitemap", "/favicon", "/admin",
   "/owner", "/api", "/markdown", "/media", "/_next", "/social-card", "/og",
   "/brand-assets", "/theme.css",
 ] as const;
@@ -55,6 +55,8 @@ function unavailableSource(source: string): boolean {
 }
 
 export function redirectForPath(source: string): string | null {
+  // An older redirect must not shadow a route added by a later starter release.
+  if (unavailableSource(source)) return null;
   const row = database.prepare("SELECT destination_path FROM seo_redirects WHERE source_path = ?")
     .get(source) as { destination_path: string } | undefined;
   return row?.destination_path ?? null;
