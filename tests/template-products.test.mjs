@@ -1230,6 +1230,8 @@ requirementTest("TPL-004 packages the complete NOW/NEXT events directory product
       ["form-function-forum", new Date(runtimeNow - 129_600_000).toISOString()],
       ["signal-rooftop", new Date(runtimeNow + 86_400_000).toISOString()],
     ]);
+      const runtimeEnds = new Map();
+      const runtimeStart = (entry) => runtimeDates.get(entry.slug) ?? entry.profileValues[key("starts-at")];
     try {
       assert.equal(seededDb.prepare("SELECT COUNT(*) FROM listings").pluck().get(),
         seed.listings.length);
@@ -1253,6 +1255,7 @@ requirementTest("TPL-004 packages the complete NOW/NEXT events directory product
           ? new Date(runtimeNow + 129_600_000).toISOString()
           : slug === "signal-rooftop" ? new Date(runtimeNow + 93_600_000).toISOString()
             : new Date(runtimeNow - 86_400_000).toISOString();
+        runtimeEnds.set(slug, endsAt);
         const updatedAt = new Date().toISOString();
         assert.equal(updateDate.run(startsAt, updatedAt, slug, key("starts-at")).changes, 1);
         assert.equal(updateDate.run(endsAt, updatedAt, slug, key("ends-at")).changes, 1);
@@ -1334,6 +1337,14 @@ requirementTest("TPL-004 packages the complete NOW/NEXT events directory product
     assert.doesNotMatch(home, /city-systems-closing/);
     assert.ok([...home.matchAll(/data-now-next-event=/g)].length <= 7,
       "NOW/NEXT home discovery is not bounded");
+      const runtimeEnd = (entry) => runtimeEnds.get(entry.slug) ?? entry.profileValues[key("ends-at")];
+      const expectedHome = publishedSeed.filter((entry) => Date.parse(runtimeEnd(entry)) >= runtimeNow)
+        .sort((left, right) => Date.parse(runtimeStart(left)) - Date.parse(runtimeStart(right)) ||
+          left.slug.localeCompare(right.slug)).slice(0, 6).map(({ slug }) => slug);
+      const homeSlugs = [...new Set([...home.matchAll(/data-now-next-event="([a-z0-9-]+)"/g)]
+        .map((match) => match[1]))];
+      assert.deepEqual(homeSlugs, expectedHome,
+        "NOW/NEXT home does not show the catalogue's actual next events in chronological order");
       const todayHref = [...home.matchAll(/href="([^"]+)"[^>]*>Today</g)]
         .map((match) => match[1].replaceAll("&amp;", "&"))[0];
       assert.ok(todayHref, "NOW/NEXT Today link is missing");
@@ -1384,7 +1395,6 @@ requirementTest("TPL-004 packages the complete NOW/NEXT events directory product
       [`min.${key("starts-at")}`, signalStart], [`max.${key("starts-at")}`, signalStart],
     ]), ["signal-rooftop"]);
 
-    const runtimeStart = (entry) => runtimeDates.get(entry.slug) ?? entry.profileValues[key("starts-at")];
     const expectedChronological = [...publishedSeed].sort((left, right) =>
       Date.parse(runtimeStart(left)) - Date.parse(runtimeStart(right)) || left.slug.localeCompare(right.slug))
       .slice(0, 12).map(({ slug }) => slug);
