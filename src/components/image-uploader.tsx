@@ -66,7 +66,9 @@ export function ImageUploader({ kind, slug, endpoint: endpointOverride, label = 
       <p className="text-sm font-medium">{label}</p>
       {asset && <Image unoptimized src={`/api/media/${asset.id}`} alt={asset.alt}
         width={asset.width} height={asset.height} className="max-h-48 w-auto max-w-full rounded-md object-contain" />}
-      <Input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+      <Input type="file" accept="image/jpeg,image/png,image/webp"
+        aria-label={`${label} image file`}
+        onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
       <Input value={alt} onChange={(event) => setAlt(event.target.value)} maxLength={160} placeholder="Describe the image for visitors" aria-label="Image alt text" />
       <Button type="button" variant="outline" disabled={pending} onClick={upload}>Upload image privately</Button>
       {message && <p role="status" className="text-sm text-muted-foreground">{message}</p>}
