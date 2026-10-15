@@ -7,7 +7,7 @@ import {
 } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
-import { join, relative, resolve, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import Database from "better-sqlite3";
 import { chromium } from "playwright-core";
@@ -521,6 +521,393 @@ requirementTest("TPL-002 packages the complete VECTOR directory product", async 
     expectSuccess(fallback, "fallback after VECTOR removal");
     assert.deepEqual(treeSnapshot(starter), baseline,
       "VECTOR remove did not restore the unchanged starter source");
+  } finally {
+    if (application?.pid) {
+      try { process.kill(-application.pid, "SIGTERM"); } catch { /* already stopped */ }
+    }
+    rmSync(temporary, { recursive: true, force: true });
+  }
+});
+
+requirementTest("TPL-003 packages the complete BOROUGH local-city directory product", async () => {
+  const fixture = join(repository, "fixtures/addons/borough-city-guide");
+  assert.ok(existsSync(join(fixture, "directory-addon.json")),
+    "the BOROUGH add-on package is missing");
+  for (const path of [
+    "src/theme.ts", "src/template.tsx", "src/template.css", "src/places.profile.json",
+    "seed/catalog.json", "docs/readme.md", "docs/changelog.md", "docs/license.md",
+  ]) {
+    assert.ok(existsSync(join(fixture, path)), `BOROUGH is missing ${path}`);
+  }
+
+  const combinedDesignSource = ["src/theme.ts", "src/template.css"]
+    .map((path) => readFileSync(join(fixture, path), "utf8")).join("\n").toUpperCase();
+  for (const token of ["#F5EDE0", "#FFF8EC", "#302C25", "#A54A30", "#839179"]) {
+    assert.match(combinedDesignSource, new RegExp(token), `BOROUGH is missing ${token}`);
+  }
+  assert.match(combinedDesignSource, /2PX|0\.125REM/,
+    "BOROUGH does not preserve the approved two-pixel corner geometry");
+
+  const profile = JSON.parse(readFileSync(join(fixture, "src/places.profile.json"), "utf8"));
+  assert.equal(profile.id, "borough-city-guide.places");
+  assert.equal(profile.version, "1.0.0");
+  const fieldBySuffix = new Map(profile.fields.map((field) =>
+    [field.key.replace("borough-city-guide.places.", ""), field]));
+  const expectedFields = new Map([
+    ["neighborhood", "single-choice"], ["place-type", "single-choice"],
+    ["address", "short-text"], ["location", "location"],
+    ["price-level", "single-choice"], ["accessibility", "multiple-choice"],
+    ["best-for", "multiple-choice"], ["visit-duration", "duration"],
+    ["curator-note", "markdown"], ["editorial-pick", "boolean"],
+    ["trails", "multiple-choice"], ["photography", "media"],
+  ]);
+  for (const [name, type] of expectedFields) {
+    assert.equal(fieldBySuffix.get(name)?.type, type, `BOROUGH profile is missing ${name}`);
+  }
+  for (const name of ["curator-note", "editorial-pick", "trails"]) {
+    assert.equal(fieldBySuffix.get(name).writeAuthority, "operator",
+      `${name} is not operator controlled`);
+  }
+
+  const seed = JSON.parse(readFileSync(join(fixture, "seed/catalog.json"), "utf8"));
+  assert.ok(seed.listings.length >= 9, "BOROUGH needs representative public and private states");
+  assert.ok(seed.listings.some(({ status }) => status === "draft"),
+    "BOROUGH seed does not exercise an ineligible draft");
+  const publishedSeed = seed.listings.filter(({ status }) => status === "published");
+  const imageSources = seed.listings.flatMap(({ media = [] }) => media.map(({ source }) => source));
+  assert.ok(imageSources.length >= publishedSeed.length,
+    "BOROUGH needs representative photography for its published places");
+  assert.equal(new Set(imageSources).size, imageSources.length,
+    "BOROUGH seed reuses a packaged photograph identity");
+  const manifest = JSON.parse(readFileSync(join(fixture, "directory-addon.json"), "utf8"));
+  for (const source of imageSources) {
+    assert.match(source, /^seed\/media\/[a-z0-9][a-z0-9._-]*$/,
+      `unsafe BOROUGH seed media path: ${source}`);
+    assert.ok(manifest.files.includes(source), `BOROUGH media is undeclared: ${source}`);
+    assert.ok(readFileSync(join(fixture, source)).length > 1_024,
+      `BOROUGH photograph is empty or implausibly small: ${source}`);
+  }
+  const photoDigests = imageSources.map((source) =>
+    createHash("sha256").update(readFileSync(join(fixture, source))).digest("hex"));
+  assert.equal(new Set(photoDigests).size, photoDigests.length,
+    "BOROUGH seed repeats the same photograph under different names");
+
+  const temporary = mkdtempSync(join(tmpdir(), "borough-template-product-"));
+  let application;
+  const addon = (cwd, args) => spawnSync(process.execPath, ["scripts/addons.mjs", ...args], {
+    cwd, encoding: "utf8", timeout: 300_000, env: { ...process.env, CI: "1" },
+  });
+  const npm = (cwd, args, env, timeout = 600_000) => spawnSync("npm", args, {
+    cwd, encoding: "utf8", timeout, env: { ...process.env, CI: "1", ...env },
+  });
+  const expectSuccess = (result, label) => assert.equal(result.status, 0,
+    `${label}: ${result.stderr || result.stdout}`);
+  try {
+    const firstArchive = join(temporary, "borough-first.zip");
+    const secondArchive = join(temporary, "borough-second.zip");
+    expectSuccess(addon(repository, ["pack", fixture, firstArchive]), "pack BOROUGH archive");
+    expectSuccess(addon(repository, ["pack", fixture, secondArchive]), "repack BOROUGH archive");
+    assert.deepEqual(readFileSync(firstArchive), readFileSync(secondArchive),
+      "equal BOROUGH sources did not produce a byte-identical archive");
+    expectSuccess(addon(repository, ["validate", firstArchive]), "validate BOROUGH archive");
+
+    const corrupt = join(temporary, "corrupt-source");
+    cpSync(fixture, corrupt, { recursive: true });
+    writeFileSync(join(corrupt, imageSources[0]), "not an image");
+    const corruptResult = addon(repository, ["pack", corrupt, join(temporary, "corrupt.zip")]);
+    assert.notEqual(corruptResult.status, 0, "corrupt seed photography unexpectedly packed");
+    assert.match(corruptResult.stderr, /image|media|photograph/i);
+
+    const escaping = join(temporary, "escaping-source");
+    cpSync(fixture, escaping, { recursive: true });
+    const escapingSeedPath = join(escaping, "seed/catalog.json");
+    const escapingSeed = JSON.parse(readFileSync(escapingSeedPath, "utf8"));
+    escapingSeed.listings[0].media[0].source = "seed/media/../outside.webp";
+    writeFileSync(escapingSeedPath, `${JSON.stringify(escapingSeed, null, 2)}\n`);
+    const escapingResult = addon(repository,
+      ["pack", escaping, join(temporary, "escaping.zip")]);
+    assert.notEqual(escapingResult.status, 0, "path-escaping seed photography unexpectedly packed");
+    assert.match(escapingResult.stderr, /path|media|unsafe/i);
+
+    const starter = join(temporary, "starter");
+    copyStarter(starter);
+    const baseline = treeSnapshot(starter);
+    const databasePath = join(temporary, `borough-${randomBytes(6).toString("hex")}.db`);
+    const mediaDirectory = join(dirname(databasePath), "media");
+    const port = await freePort();
+    const origin = `http://127.0.0.1:${port}`;
+    const billingKey = randomBytes(32).toString("base64url");
+    const env = {
+      DATABASE_URL: `file:${databasePath}`,
+      DIRECTORY_EXPLICIT_MIGRATIONS: "1",
+      BETTER_AUTH_SECRET: randomBytes(32).toString("hex"),
+      BILLING_ENCRYPTION_KEY: billingKey,
+      SITE_URL: origin,
+      BETTER_AUTH_URL: origin,
+    };
+    assert.equal(existsSync(databasePath), false);
+    expectSuccess(addon(starter, ["install", firstArchive]), "install BOROUGH archive");
+    assert.equal(existsSync(databasePath), false, "BOROUGH installation opened the operator database");
+    assert.equal(existsSync(mediaDirectory), false, "BOROUGH installation wrote runtime media");
+    expectSuccess(npm(starter, ["run", "db:migrate"], env), "migrate BOROUGH database");
+    expectSuccess(npm(starter, ["run", "build"], env), "build installed BOROUGH product");
+
+    const activate = spawnSync(process.execPath,
+      ["--import", "tsx", "--input-type=module", "--eval", `
+        const profilesModule = await import("./src/lib/directory-profiles.ts");
+        const databaseModule = await import("./src/lib/database.ts");
+        const themeModule = await import("./src/lib/theme-selection.ts");
+        const profiles = profilesModule.default ?? profilesModule;
+        const database = databaseModule.database ?? databaseModule.default?.database;
+        const themes = themeModule.default ?? themeModule;
+        const now = new Date().toISOString();
+        database.prepare('INSERT INTO "user" (id, name, email, emailVerified, createdAt, updatedAt, role, banned) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+          .run("borough-admin", "BOROUGH Admin", "borough-admin@example.invalid", 1,
+            now, now, "admin", 0);
+        const definition = profiles.availableDirectoryProfileDefinition(
+          "borough-city-guide.places", "1.0.0");
+        profiles.activateDirectoryProfile({ definition, sourceKind: "addon",
+          sourceId: "borough-city-guide", expectedRevision: 0,
+          actorUserId: "borough-admin" });
+        const selected = themes.saveThemeSelection({ themeId: "borough-city-guide",
+          templateId: "borough-city-guide" }, "borough-admin");
+        if (selected.templateId !== "borough-city-guide") process.exit(2);`],
+      { cwd: starter, encoding: "utf8",
+        env: { ...process.env, CI: "1", NODE_ENV: "test", ...env } });
+    expectSuccess(activate, "activate and select BOROUGH");
+
+    const failureDb = new Database(databasePath);
+    try {
+      failureDb.exec(`CREATE TRIGGER reject_borough_media BEFORE INSERT ON media_assets
+        BEGIN SELECT RAISE(ABORT, 'deliberate BOROUGH media failure'); END`);
+    } finally {
+      failureDb.close();
+    }
+    const mediaBeforeFailure = existsSync(mediaDirectory) ? readdirSync(mediaDirectory).sort() : [];
+    const failedSeed = npm(starter, ["run", "addon:seed", "--", "borough-city-guide"], env);
+    assert.notEqual(failedSeed.status, 0, "BOROUGH seed ignored a media transaction failure");
+    const afterFailureDb = new Database(databasePath);
+    try {
+      assert.equal(afterFailureDb.prepare("SELECT COUNT(*) FROM listings").pluck().get(), 0,
+        "failed BOROUGH seed left listings behind");
+      assert.equal(afterFailureDb.prepare("SELECT COUNT(*) FROM media_assets").pluck().get(), 0,
+        "failed BOROUGH seed left media records behind");
+      assert.equal(afterFailureDb.prepare("SELECT COUNT(*) FROM directory_profile_seed_runs")
+        .pluck().get(), 0, "failed BOROUGH seed was recorded as complete");
+      afterFailureDb.exec("DROP TRIGGER reject_borough_media");
+    } finally {
+      afterFailureDb.close();
+    }
+    assert.deepEqual(existsSync(mediaDirectory) ? readdirSync(mediaDirectory).sort() : [],
+      mediaBeforeFailure, "failed BOROUGH seed left runtime media behind");
+
+    expectSuccess(npm(starter, ["run", "addon:seed", "--", "borough-city-guide"], env),
+      "seed BOROUGH catalog and photography");
+    const seededDb = new Database(databasePath);
+    let mediaRows;
+    try {
+      assert.equal(seededDb.prepare("SELECT COUNT(*) FROM listings").pluck().get(),
+        seed.listings.length);
+      mediaRows = seededDb.prepare(`SELECT id, target_slug, alt, state FROM media_assets
+        ORDER BY target_slug, id`).all();
+      assert.equal(mediaRows.length, imageSources.length,
+        "BOROUGH did not create one media record per packaged photograph");
+      assert.equal(seededDb.prepare("SELECT COUNT(*) FROM directory_profile_media").pluck().get(),
+        imageSources.length, "BOROUGH photography is not assigned to profile values");
+      assert.equal(seededDb.prepare("SELECT COUNT(*) FROM directory_profile_seed_runs")
+        .pluck().get(), 1);
+    } finally {
+      seededDb.close();
+    }
+    for (const { id } of mediaRows) {
+      assert.ok(existsSync(join(mediaDirectory, `${id}.webp`)),
+        `seeded BOROUGH media file is missing: ${id}`);
+    }
+    expectSuccess(npm(starter, ["run", "addon:seed", "--", "borough-city-guide"], env),
+      "repeat BOROUGH seed");
+    const repeatedDb = new Database(databasePath, { readonly: true });
+    try {
+      assert.equal(repeatedDb.prepare("SELECT COUNT(*) FROM listings").pluck().get(),
+        seed.listings.length, "repeated BOROUGH seed duplicated listings");
+      assert.equal(repeatedDb.prepare("SELECT COUNT(*) FROM media_assets").pluck().get(),
+        imageSources.length, "repeated BOROUGH seed duplicated media");
+    } finally {
+      repeatedDb.close();
+    }
+
+    application = spawn("npm", ["run", "start", "--", "-p", String(port)], {
+      cwd: starter, env: { ...process.env, CI: "1", ...env }, detached: true, stdio: "ignore",
+    });
+    let ready = false;
+    for (let attempt = 0; attempt < 80; attempt += 1) {
+      try {
+        if ((await fetch(origin, { signal: AbortSignal.timeout(1000) })).status < 500) {
+          ready = true;
+          break;
+        }
+      } catch { /* wait for the production server */ }
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, 250));
+    }
+    assert.ok(ready, "installed BOROUGH production server did not start");
+    const html = async (path) => {
+      const response = await fetch(`${origin}${path}`);
+      const body = await response.text();
+      assert.equal(response.status, 200, `${path}: ${body}`);
+      return body;
+    };
+    const results = (body) => [...body.matchAll(/data-borough-result="([a-z0-9-]+)"/g)]
+      .map((match) => match[1]);
+    const publicSlugs = publishedSeed.map(({ slug }) => slug).sort();
+
+    const home = await html("/");
+    assert.match(home, /The city, known by locals\./);
+    assert.match(home, /data-borough-neighborhood=/);
+    assert.match(home, /data-borough-trail=/);
+    assert.doesNotMatch(home, /hidden-draft/);
+    assert.ok([...home.matchAll(/data-borough-place=/g)].length <= 24,
+      "BOROUGH home discovery is not bounded");
+    const directory = await html("/listings");
+    assert.deepEqual(results(directory).sort(), publicSlugs);
+    assert.doesNotMatch(directory, /hidden-draft/);
+    assert.match(directory, /src="\/media\/[0-9a-f-]{36}"/,
+      "BOROUGH directory does not use eligible runtime photography");
+
+    const filtered = async (entries) => results(await html(`/listings?${new URLSearchParams(entries)}`));
+    const fieldKey = (suffix) => `borough-city-guide.places.${suffix}`;
+    const firstNeighborhood = publishedSeed[0].profileValues[fieldKey("neighborhood")];
+    const expectedNeighborhood = publishedSeed.filter(({ profileValues }) =>
+      profileValues[fieldKey("neighborhood")] === firstNeighborhood).map(({ slug }) => slug).sort();
+    assert.deepEqual((await filtered([[`facet.${fieldKey("neighborhood")}`, firstNeighborhood]])).sort(),
+      expectedNeighborhood);
+    const firstTrail = publishedSeed[0].profileValues[fieldKey("trails")][0];
+    const expectedTrail = publishedSeed.filter(({ profileValues }) =>
+      profileValues[fieldKey("trails")].includes(firstTrail)).map(({ slug }) => slug).sort();
+    assert.deepEqual((await filtered([[`facet.${fieldKey("trails")}`, firstTrail]])).sort(),
+      expectedTrail);
+    assert.deepEqual(await filtered([["q", publishedSeed[0].title]]), [publishedSeed[0].slug]);
+    const expectedDuration = [...publishedSeed].sort((left, right) =>
+      left.profileValues[fieldKey("visit-duration")] -
+      right.profileValues[fieldKey("visit-duration")]).map(({ slug }) => slug);
+    assert.deepEqual(await filtered([["sort", `${fieldKey("visit-duration")}:asc`]]),
+      expectedDuration);
+
+    const editorial = publishedSeed.find(({ profileValues }) =>
+      profileValues[fieldKey("editorial-pick")] === true);
+    assert.ok(editorial, "BOROUGH seed needs an editorial pick");
+    assert.match(home, new RegExp(`data-borough-place="${editorial.slug}"`));
+    const detail = await html(`/listings/${editorial.slug}`);
+    assert.match(detail, /Curator note/);
+    assert.doesNotMatch(detail, /visitor review/i);
+    assert.match(detail, /application\/ld\+json/);
+    assert.match(detail, new RegExp(`<link rel="canonical" href="${origin}/listings/${editorial.slug}"`));
+    const markdown = await fetch(`${origin}/markdown/listings/${editorial.slug}`);
+    assert.equal(markdown.status, 200);
+    assert.match(await markdown.text(), new RegExp(editorial.title));
+
+    const liveEditDb = new Database(databasePath);
+    const originalName = editorial.title;
+    try {
+      liveEditDb.prepare("UPDATE listings SET name = ? WHERE slug = ?")
+        .run("Operator-edited local favorite", editorial.slug);
+      assert.match(await html("/"), /Operator-edited local favorite/,
+        "BOROUGH home remained stale after an operator edit");
+      const now = new Date().toISOString();
+      liveEditDb.prepare('INSERT INTO "user" (id, name, email, emailVerified, createdAt, updatedAt, role, banned) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .run("borough-banned-owner", "Banned owner", "borough-banned@example.invalid", 1,
+          now, now, "user", 1);
+      liveEditDb.prepare("UPDATE listings SET owner_user_id = ? WHERE slug = ?")
+        .run("borough-banned-owner", editorial.slug);
+      const bannedHome = await html("/");
+      assert.doesNotMatch(bannedHome, /Operator-edited local favorite/,
+        "a banned owner's listing leaked onto the BOROUGH home page");
+      liveEditDb.prepare("UPDATE listings SET owner_user_id = NULL, name = ? WHERE slug = ?")
+        .run(originalName, editorial.slug);
+      const mediaId = mediaRows.find(({ target_slug: slug }) => slug === editorial.slug).id;
+      liveEditDb.prepare("UPDATE media_assets SET state = 'private' WHERE id = ?").run(mediaId);
+      assert.doesNotMatch(await html(`/listings/${editorial.slug}`), new RegExp(`/media/${mediaId}`),
+        "private photography leaked through BOROUGH");
+      liveEditDb.prepare("UPDATE media_assets SET state = 'public' WHERE id = ?").run(mediaId);
+    } finally {
+      liveEditDb.close();
+    }
+
+    const browser = await chromium.launch({ headless: true,
+      ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: "chrome" }),
+      args: ["--no-sandbox"] });
+    try {
+      const narrow = await browser.newContext({ viewport: { width: 320, height: 900 },
+        colorScheme: "dark", javaScriptEnabled: false });
+      await narrow.addCookies([{ name: "site_appearance", value: "dark", url: origin }]);
+      const page = await narrow.newPage();
+      await page.goto(`${origin}/listings`);
+      assert.equal(await page.locator("html").getAttribute("data-template"), "borough-city-guide");
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth), "BOROUGH overflows at 320 pixels");
+      const background = await page.locator("body").evaluate((element) =>
+        getComputedStyle(element).backgroundColor);
+      const foreground = await page.locator("body").evaluate((element) =>
+        getComputedStyle(element).color);
+      assert.ok(contrastRatio(background, foreground) >= 4.5,
+        `BOROUGH dark text contrast is too low: ${background} / ${foreground}`);
+      const firstLink = page.locator("a").first();
+      await firstLink.focus();
+      assert.equal(await firstLink.evaluate((element) => element === document.activeElement), true,
+        "BOROUGH navigation cannot receive keyboard focus");
+      await narrow.close();
+
+      const light = await browser.newContext({ viewport: { width: 1280, height: 900 },
+        colorScheme: "light" });
+      await light.addCookies([{ name: "site_appearance", value: "light", url: origin }]);
+      const lightPage = await light.newPage();
+      await lightPage.goto(origin);
+      assert.equal(await lightPage.locator("body").evaluate((element) =>
+        getComputedStyle(element).backgroundColor), "rgb(245, 237, 224)");
+      await light.close();
+    } finally {
+      await browser.close();
+    }
+
+    process.kill(-application.pid, "SIGTERM");
+    application = null;
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 500));
+    const keyFile = join(temporary, "billing.key");
+    writeFileSync(keyFile, `${billingKey}\n`, { mode: 0o600 });
+    const backup = join(temporary, "backup");
+    const restored = join(temporary, "restored");
+    expectSuccess(npm(starter, ["run", "ops:backup", "--", "--output", backup,
+      "--key-file", keyFile], env), "back up BOROUGH data and media");
+    expectSuccess(npm(starter, ["run", "ops:restore", "--", "--backup", backup,
+      "--target", restored], env), "restore BOROUGH data and media");
+    for (const { id } of mediaRows) {
+      assert.ok(existsSync(join(restored, "media", `${id}.webp`)),
+        `BOROUGH restore lost seeded media: ${id}`);
+    }
+
+    expectSuccess(addon(starter, ["remove", "borough-city-guide"]), "remove BOROUGH archive");
+    const retained = new Database(databasePath, { readonly: true });
+    try {
+      assert.equal(retained.prepare("SELECT COUNT(*) FROM listings").pluck().get(),
+        seed.listings.length, "BOROUGH removal deleted seeded listings");
+      assert.equal(retained.prepare("SELECT COUNT(*) FROM media_assets").pluck().get(),
+        imageSources.length, "BOROUGH removal deleted seeded media records");
+    } finally {
+      retained.close();
+    }
+    for (const { id } of mediaRows) {
+      assert.ok(existsSync(join(mediaDirectory, `${id}.webp`)),
+        `BOROUGH removal deleted seeded media file: ${id}`);
+    }
+    const fallback = spawnSync(process.execPath,
+      ["--import", "tsx", "--input-type=module", "--eval", `
+        const imported = await import("./src/lib/theme-selection.ts");
+        const api = imported.default ?? imported;
+        const selected = api.getThemeSelection();
+        if (selected.themeId !== "preset" || selected.templateId !== "classic") process.exit(2);`],
+      { cwd: starter, encoding: "utf8",
+        env: { ...process.env, CI: "1", NODE_ENV: "test", ...env } });
+    expectSuccess(fallback, "fallback after BOROUGH removal");
+    assert.deepEqual(treeSnapshot(starter), baseline,
+      "BOROUGH remove did not restore the unchanged starter source");
   } finally {
     if (application?.pid) {
       try { process.kill(-application.pid, "SIGTERM"); } catch { /* already stopped */ }

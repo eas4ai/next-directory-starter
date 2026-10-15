@@ -1,6 +1,6 @@
 {
   "command": "node mechanisms/check-template-products.mjs",
-  "requirements": ["TPL-001", "TPL-002"],
+  "requirements": ["TPL-001", "TPL-002", "TPL-003"],
   "results": "per-requirement",
   "inputs": [
     "docs/operator-manual.md",
