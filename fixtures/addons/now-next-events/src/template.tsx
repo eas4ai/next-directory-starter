@@ -167,7 +167,7 @@ const nowNextTemplate = {
           <div className="now-next-nav-links">
             <TemplateLink href={`/listings?sort=${key("starts-at")}:asc`}>Events</TemplateLink>
             <TemplateLink href={facetHref("location", "US|NY|New York")}>Cities</TemplateLink>
-            <TemplateLink href="/listings">Speakers</TemplateLink>
+              <TemplateLink href={facetHref("attendance-mode", "online")}>Online</TemplateLink>
             {navigation.filter(({ href }) => href === "/owner/listings").map((item) =>
               <TemplateLink key={item.href} href={item.href} className="now-next-submit">
                 List an event
@@ -197,7 +197,7 @@ const nowNextTemplate = {
             <h1>WHAT&apos;S<br /><span>ON.</span></h1><p>{site.description}</p>
             <form action="/listings" method="get" className="now-next-search">
               <label htmlFor="now-next-query">Find an event</label>
-              <div><input id="now-next-query" name="q" placeholder="Topic, speaker, venue…" />
+                <div><input id="now-next-query" name="q" placeholder="Event, description, venue…" />
                 <button type="submit">Search</button></div>
             </form></div>
           {lead && <TemplateLink href={`/listings/${lead.slug}`} className="now-next-lead"
