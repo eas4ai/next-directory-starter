@@ -1319,6 +1319,8 @@ requirementTest("TPL-004 packages the complete NOW/NEXT events directory product
     assert.match(home, />Today</);
     assert.match(home, />This Week</);
     assert.match(home, /data-now-next-state=/);
+      assert.match(home, /data-now-next-attendance="hybrid">\s*Hybrid</,
+        "NOW/NEXT lead event does not visibly identify its attendance mode");
     assert.doesNotMatch(home, /city-systems-closing/);
     assert.ok([...home.matchAll(/data-now-next-event=/g)].length <= 7,
       "NOW/NEXT home discovery is not bounded");
@@ -1336,6 +1338,10 @@ requirementTest("TPL-004 packages the complete NOW/NEXT events directory product
     const secondPage = await html(`/listings?sort=${encodeURIComponent(`${key("starts-at")}:asc`)}&page=2`);
     assert.deepEqual([...results(directory), ...results(secondPage)].sort(), publicSlugs);
     assert.doesNotMatch(`${directory}${secondPage}`, /city-systems-closing/);
+      for (const mode of ["In Person", "Online", "Hybrid"]) {
+        assert.match(`${directory}${secondPage}`, new RegExp(`data-now-next-attendance="${mode.toLowerCase().replace(" ", "-")}">\\s*${mode}`),
+          `NOW/NEXT cards do not visibly identify ${mode} attendance`);
+      }
     assert.match(`${directory}${secondPage}`, /src="\/media\/[0-9a-f-]{36}"/,
       "NOW/NEXT directory does not use eligible runtime event media");
 

@@ -95,6 +95,9 @@
 .now-next-poster-copy > p,
 .now-next-card-copy > span { display: block; margin-top: 0.75rem; color: var(--muted-foreground); }
 .now-next-card-copy > small { display: block; margin-top: 0.35rem; color: var(--muted-foreground); font-size: 0.65rem; }
+.now-next-card-copy > [data-now-next-attendance],
+.now-next-lead [data-now-next-attendance] { display: inline-block; margin-top: 0.7rem; border: 1px solid currentColor;
+  padding: 0.22rem 0.4rem; color: var(--now-orange); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; }
 .now-next-poster-grid .profile-values,
 .now-next-card .profile-values { display: flex; min-width: 0; flex-wrap: wrap; gap: 0.35rem; border-top: 1px solid var(--now-rule); padding: 0.8rem; }
 .now-next-poster-grid .profile-value,

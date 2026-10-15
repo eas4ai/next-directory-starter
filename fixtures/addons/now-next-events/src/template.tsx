@@ -197,7 +197,10 @@ const nowNextTemplate = {
             <div className="now-next-lead-image">{leadImage && <TemplateContentImage asset={leadImage} />}
               <DateRail listing={lead} /></div>
             <div><span>{eventState(lead).replace("-", " ")}</span><h2>{lead.name}</h2>
-              <p>{lead.summary}</p><small>{dateParts(lead).time} · {text(facts(lead).venue)}</small></div>
+                <p>{lead.summary}</p><small>{dateParts(lead).time} · {text(facts(lead).venue)}</small>
+                <strong data-now-next-attendance={text(facts(lead).attendanceMode)}>
+                  {words(facts(lead).attendanceMode)}
+                </strong></div>
           </TemplateLink>}
         </section>
         <QuickDateNav />
@@ -242,7 +245,10 @@ const nowNextTemplate = {
             <DateRail listing={listing} /><span className="now-next-state">{state.replace("-", " ")}</span></div>
           <div className="now-next-card-copy"><p>{words(facts(listing).eventType)} / {date.time}</p>
             <h3>{listing.name}</h3><span>{text(facts(listing).venue)}</span>
-            <small data-now-next-time-zone={date.timeZone}>{date.timeZone}</small></div>
+            <small data-now-next-time-zone={date.timeZone}>{date.timeZone}</small>
+            <strong data-now-next-attendance={text(facts(listing).attendanceMode)}>
+              {words(facts(listing).attendanceMode)}
+            </strong></div>
         </TemplateLink>
         <TemplateProfileValues fields={fields.filter(({ key: fieldKey }) => fieldKey.endsWith(".topics"))}
           listing={listing} mediaAssets={mediaAssets} placements={["card"]} />
