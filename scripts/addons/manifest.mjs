@@ -40,6 +40,7 @@ const themeSchema = z.object({
 const templateSchema = z.object({
   id: identity,
   name: displayName,
+  renderer: payloadPath.optional(),
   stylesheet: payloadPath,
   supportedProfiles: z.array(z.object({
     id: z.string().min(3).max(160).regex(profileIdPattern),
@@ -99,8 +100,20 @@ function validateTemplateDeclaration(template, profiles, files) {
   }
   unique(template.supportedProfiles.map(({ id }) => id),
     `supported profile ID for template ${template.id}`);
+  if (template.renderer) {
+    if (!template.renderer.startsWith("src/") || !template.renderer.endsWith(".tsx") ||
+        !files.has(template.renderer)) {
+      throw new Error(`Template renderer is not a declared TSX payload: ${template.renderer}`);
+    }
+    if (template.supportedProfiles.length === 0) {
+      throw new Error(`Template renderer must declare a supported profile: ${template.id}`);
+    }
+  }
   for (const supported of template.supportedProfiles) {
     const packaged = profiles.find(({ id }) => id === supported.id);
+    if (template.renderer && !packaged) {
+      throw new Error(`Template renderer profile is not packaged: ${supported.id}`);
+    }
     if (packaged && !semver.satisfies(packaged.version, supported.range,
       { includePrerelease: true })) {
       throw new Error(`Template ${template.id} is incompatible with packaged profile ` +
@@ -239,6 +252,27 @@ function themeObject(sourceFile, path) {
   return expression;
 }
 
+function rendererObject(sourceFile, path) {
+  const assignments = sourceFile.statements.filter((statement) =>
+    ts.isExportAssignment(statement) && !statement.isExportEquals);
+  if (assignments.length !== 1) throw new Error(`Renderer must have one default export: ${path}`);
+  let expression = unwrapExpression(assignments[0].expression);
+  if (ts.isIdentifier(expression)) {
+    const declaration = sourceFile.statements.filter(ts.isVariableStatement)
+      .flatMap(({ declarationList }) => [...declarationList.declarations])
+      .find((candidate) => ts.isIdentifier(candidate.name) && candidate.name.text === expression.text);
+    if (!declaration?.initializer) throw new Error(`Renderer default export is not defined: ${path}`);
+    expression = unwrapExpression(declaration.initializer);
+  }
+  if (!ts.isObjectLiteralExpression(expression)) {
+    throw new Error(`Renderer default export must be an object literal: ${path}`);
+  }
+  if (expression.properties.some(ts.isSpreadAssignment)) {
+    throw new Error(`Renderer default export cannot contain spreads: ${path}`);
+  }
+  return expression;
+}
+
 function literalProperty(object, name, path) {
   const matches = object.properties.filter((property) => objectPropertyName(property) === name);
   if (matches.length !== 1 || !ts.isPropertyAssignment(matches[0])) {
@@ -276,6 +310,70 @@ export function validateThemeModules(manifest, files) {
     if (literalProperty(object, "id", theme.entry) !== theme.id ||
         literalProperty(object, "name", theme.entry) !== theme.name) {
       throw new Error(`Theme identity does not match the manifest: ${theme.entry}`);
+    }
+  }
+}
+
+const rendererImports = new Set([
+  "@/components/public-template-primitives",
+  "@/lib/public-template-sdk",
+]);
+const forbiddenRendererGlobals = new Set([
+  "eval", "fetch", "Function", "globalThis", "process", "require", "WebSocket", "Worker",
+  "XMLHttpRequest",
+]);
+
+export function validateRendererModules(manifest, files) {
+  for (const template of manifest.templates) {
+    if (!template.renderer) continue;
+    const bytes = files.get(template.renderer);
+    if (!bytes) throw new Error(`Template renderer is missing: ${template.renderer}`);
+    const source = bytes.toString("utf8");
+    if (!Buffer.from(source, "utf8").equals(bytes)) {
+      throw new Error(`Template renderer is not UTF-8: ${template.renderer}`);
+    }
+    const sourceFile = ts.createSourceFile(template.renderer, source, ts.ScriptTarget.Latest, true,
+      ts.ScriptKind.TSX);
+    if (sourceFile.parseDiagnostics.length > 0) {
+      throw new Error(`Template renderer is not valid TSX: ${template.renderer}`);
+    }
+    for (const statement of sourceFile.statements) {
+      if (ts.isExpressionStatement(statement) && ts.isStringLiteral(statement.expression) &&
+          ["use client", "use server"].includes(statement.expression.text)) {
+        throw new Error(`Template renderer cannot declare ${statement.expression.text}: ${template.renderer}`);
+      }
+      if (ts.isImportDeclaration(statement)) {
+        const specifier = ts.isStringLiteral(statement.moduleSpecifier)
+          ? statement.moduleSpecifier.text : "";
+        if (!rendererImports.has(specifier)) {
+          throw new Error(`Forbidden renderer import ${specifier || "<dynamic>"}: ${template.renderer}`);
+        }
+      }
+      if (ts.isImportEqualsDeclaration(statement) || ts.isExportDeclaration(statement)) {
+        throw new Error(`Forbidden renderer import or re-export: ${template.renderer}`);
+      }
+    }
+    function visit(node) {
+      if (ts.isCallExpression(node) && (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+          (ts.isIdentifier(node.expression) && ["eval", "require", "Function"].includes(
+            node.expression.text)))) {
+        throw new Error(`Forbidden renderer dynamic code: ${template.renderer}`);
+      }
+      if (ts.isIdentifier(node) && forbiddenRendererGlobals.has(node.text) &&
+          !ts.isPropertyAssignment(node.parent)) {
+        throw new Error(`Forbidden renderer global ${node.text}: ${template.renderer}`);
+      }
+      ts.forEachChild(node, visit);
+    }
+    visit(sourceFile);
+    const object = rendererObject(sourceFile, template.renderer);
+    const names = new Set(object.properties.map(objectPropertyName).filter(Boolean));
+    if (!names.has("id") || !names.has("name") || !names.has("renderers")) {
+      throw new Error(`Template renderer is missing required fields: ${template.renderer}`);
+    }
+    if (literalProperty(object, "id", template.renderer).replace(/^Theme /, "") !== template.id ||
+        literalProperty(object, "name", template.renderer).replace(/^Theme /, "") !== template.name) {
+      throw new Error(`Template renderer identity does not match the manifest: ${template.renderer}`);
     }
   }
 }
@@ -351,6 +449,7 @@ export function readSourcePackage(source) {
     files.set(path, readFileSync(absolute));
   }
   validateThemeModules(manifest, files);
+  validateRendererModules(manifest, files);
   const profiles = validateProfileDefinitions(manifest, files);
   return { manifest, files, profiles, manifestBytes: canonicalJson(manifest), root };
 }

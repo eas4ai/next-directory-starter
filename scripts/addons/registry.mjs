@@ -42,6 +42,7 @@ const lockThemeSchema = z.object({
 const lockTemplateSchema = z.object({
   id,
   name: z.string().trim().min(1).max(120),
+  renderer: sourcePath.optional(),
   stylesheet: sourcePath,
   supportedProfiles: z.array(z.object({
     id: profileId,
@@ -96,6 +97,7 @@ const addonLockSchema = z.object({
     if (new Set(expectedTargets).size !== expectedTargets.length ||
         addon.themes.some(({ entry }) => !sources.has(entry)) ||
         addon.templates.some(({ stylesheet }) => !sources.has(stylesheet)) ||
+        addon.templates.some(({ renderer }) => renderer && !sources.has(renderer)) ||
         (addon.profiles ?? []).some(({ schema }) => !sources.has(schema)) ||
         (addon.seed && !sources.has(addon.seed))) {
       context.addIssue({ code: "custom", message: `Invalid contributions for ${addon.id}` });
@@ -153,14 +155,19 @@ export function generateRegistries(lock) {
   const profileImports = profiles.map(({ addon, profile }, index) =>
     `import addonProfileSource${index} from ${JSON.stringify(relativeSourcePath(addon.id,
       profile.schema, ".json", "profile schema"))};`);
+  const rendererTemplates = templates.filter(({ template }) => template.renderer);
+  const rendererImports = rendererTemplates.map(({ addon, template }, index) =>
+    `import addonTemplateSource${index} from ${JSON.stringify(relativeSourcePath(addon.id,
+      template.renderer, ".tsx", "template renderer", true))};`);
   const authoritativeThemes = themes.map(({ theme }, index) =>
     `const addonTheme${index}: ThemeDefinition = { ...addonThemeSource${index}, id: ${JSON.stringify(
       theme.id)}, name: ${JSON.stringify(theme.name)} };`);
   const typescript = [
     'import type { ThemeDefinition } from "@/lib/theme-sdk";',
     'import type { DirectoryProfileDefinition } from "@/lib/directory-profile-types";',
-    ...((themeImports.length || profileImports.length)
-      ? ["", ...themeImports, ...profileImports] : []),
+    'import type { PublicTemplateDefinition } from "@/lib/public-template-sdk";',
+    ...((themeImports.length || profileImports.length || rendererImports.length)
+      ? ["", ...themeImports, ...profileImports, ...rendererImports] : []),
     ...(authoritativeThemes.length ? ["", ...authoritativeThemes] : []),
     "",
     `export const addonThemeDefinitions: ThemeDefinition[] = [${themes.map((_, index) =>
@@ -169,6 +176,12 @@ export function generateRegistries(lock) {
       ? `export const addonTemplateOptions = [${templates.map(({ template }) =>
         `{ id: ${JSON.stringify(template.id)}, name: ${JSON.stringify(template.name)} }`).join(", ")}] as const;`
       : "export const addonTemplateOptions: readonly { id: string; name: string }[] = [];",
+    rendererTemplates.length
+      ? `export const addonTemplateDefinitions: PublicTemplateDefinition[] = [${rendererTemplates.map(
+        ({ template }, index) => `{ ...addonTemplateSource${index}, id: ${JSON.stringify(template.id)}, ` +
+          `name: ${JSON.stringify(template.name)}, supportedProfiles: ${JSON.stringify(
+            template.supportedProfiles)} }`).join(", ")}];`
+      : "export const addonTemplateDefinitions: PublicTemplateDefinition[] = [];",
     profiles.length
       ? `export const addonProfileDefinitions = [${profiles.map((_, index) =>
         `addonProfileSource${index} as unknown as DirectoryProfileDefinition`).join(", ")}];`
