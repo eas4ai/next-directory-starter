@@ -996,3 +996,68 @@ requirementTest("TPL-003 packages the complete BOROUGH local-city directory prod
     rmSync(temporary, { recursive: true, force: true });
   }
 });
+
+requirementTest("TPL-004 packages the complete NOW/NEXT events directory product", () => {
+  const fixture = join(repository, "fixtures/addons/now-next-events");
+  assert.ok(existsSync(join(fixture, "directory-addon.json")),
+    "the NOW/NEXT add-on package is missing");
+  for (const path of [
+    "src/theme.ts", "src/template.tsx", "src/template.css", "src/events.profile.json",
+    "seed/catalog.json", "docs/readme.md", "docs/changelog.md", "docs/license.md",
+  ]) assert.ok(existsSync(join(fixture, path)), `NOW/NEXT is missing ${path}`);
+
+  const design = ["src/theme.ts", "src/template.css"]
+    .map((path) => readFileSync(join(fixture, path), "utf8")).join("\n").toUpperCase();
+  for (const token of ["#F5EEDF", "#FFF9EC", "#171A17", "#F05A2D", "#E9E8B9"]) {
+    assert.match(design, new RegExp(token), `NOW/NEXT is missing ${token}`);
+  }
+  assert.match(design, /0PX|SQUARE/, "NOW/NEXT does not preserve square geometry");
+
+  const profile = JSON.parse(readFileSync(join(fixture, "src/events.profile.json"), "utf8"));
+  assert.equal(profile.id, "now-next-events.events");
+  assert.equal(profile.version, "1.0.0");
+  const fieldBySuffix = new Map(profile.fields.map((field) =>
+    [field.key.replace("now-next-events.events.", ""), field]));
+  const expectedFields = new Map([
+    ["event-type", "single-choice"], ["topics", "multiple-choice"],
+    ["attendance-mode", "single-choice"], ["starts-at", "datetime"],
+    ["ends-at", "datetime"], ["time-zone", "short-text"],
+    ["venue", "short-text"], ["location", "location"],
+    ["price", "money"], ["ticket-url", "url"],
+    ["accessibility", "multiple-choice"], ["speakers", "group"],
+    ["schedule", "group"], ["event-media", "media"],
+  ]);
+  for (const [name, type] of expectedFields) {
+    assert.equal(fieldBySuffix.get(name)?.type, type, `NOW/NEXT profile is missing ${name}`);
+  }
+  assert.ok(fieldBySuffix.get("starts-at")?.facet,
+    "NOW/NEXT start time is not a public range facet");
+  assert.ok(fieldBySuffix.get("starts-at")?.sort,
+    "NOW/NEXT start time is not chronologically sortable");
+
+  const seed = JSON.parse(readFileSync(join(fixture, "seed/catalog.json"), "utf8"));
+  assert.ok(seed.listings.length >= 10,
+    "NOW/NEXT needs representative event and eligibility states");
+  assert.ok(seed.listings.some(({ status }) => status !== "published"),
+    "NOW/NEXT seed does not exercise an ineligible event");
+  const values = seed.listings.map(({ profileValues }) => profileValues);
+  const key = (suffix) => `now-next-events.events.${suffix}`;
+  for (const mode of ["in-person", "online", "hybrid"]) {
+    assert.ok(values.some((entry) => entry[key("attendance-mode")] === mode),
+      `NOW/NEXT seed does not exercise ${mode} attendance`);
+  }
+  assert.ok(values.some((entry) => entry[key("price")]?.amountMinor === 0),
+    "NOW/NEXT seed does not exercise a free event");
+  assert.ok(values.some((entry) => entry[key("price")]?.amountMinor > 0),
+    "NOW/NEXT seed does not exercise a paid event");
+  assert.ok(values.every((entry) => typeof entry[key("time-zone")] === "string"),
+    "NOW/NEXT seed omits event time zones");
+
+  const source = readFileSync(join(fixture, "src/template.tsx"), "utf8");
+  for (const behavior of [
+    /All Dates/i, /Today/i, /This Week/i, /attendance-mode/i,
+    /data-now-next-state/i, /Schedule/i, /Speakers/i,
+  ]) assert.match(source, behavior, `NOW/NEXT renderer omits ${behavior}`);
+  assert.doesNotMatch(source, /verified attendee|book(?:ing)? confirmed/i,
+    "NOW/NEXT implies booking or attendee verification");
+});

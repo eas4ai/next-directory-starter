@@ -1231,6 +1231,55 @@ requirementTest("PRF-003 parses bounded public profile facets and stable sorts",
     }
   });
 
+  await t.test("normalizes explicit-offset date-time facets and rejects ambiguous bounds", async () => {
+    const definition = discoveryProfile();
+    const startsAt = {
+      ...commonField("vendor.ai-tools.starts-at", "Starts at", "datetime", {
+        min: "2020-01-01T00:00:00.000Z",
+        max: "2040-12-31T23:59:59.999Z",
+      }),
+      placement: "card",
+      facet: { label: "Starts at", mode: "any" },
+      sort: { label: "Starts at", directions: ["asc", "desc"] },
+    };
+    definition.fields.push(startsAt);
+    const canonical = JSON.parse(canonicalProfileJson(definition));
+    const profiles = {
+      state: { revision: 1, base: {
+        profileId: canonical.id, version: canonical.version,
+        digest: profileDigest(canonical), name: canonical.name,
+      }, site: null },
+      definitions: [canonical],
+    };
+    const discovery = await discoveryModule();
+    const field = startsAt.key;
+    const parsed = discovery.parseProfileDirectoryQuery({
+      [`min.${field}`]: "2026-10-15T09:00:00-04:00",
+      [`max.${field}`]: "2026-10-15T10:00:00-04:00",
+      sort: `${field}:asc`,
+    }, profiles);
+    assert.equal(parsed.invalid, false);
+    assert.deepEqual(parsed.facets[field], {
+      min: "2026-10-15T13:00:00.000Z",
+      max: "2026-10-15T14:00:00.000Z",
+    });
+    assert.equal(discovery.serializeProfileDirectoryQuery(parsed).toString(),
+      `min.${field}=2026-10-15T13%3A00%3A00.000Z&max.${field}=2026-10-15T14%3A00%3A00.000Z&sort=${field}%3Aasc`);
+    const equivalent = discovery.parseProfileDirectoryQuery({
+      [`min.${field}`]: "2026-10-15T13:00:00Z",
+      [`max.${field}`]: "2026-10-15T14:00:00Z",
+      sort: `${field}:asc`,
+    }, profiles);
+    assert.equal(discovery.serializeProfileDirectoryQuery(equivalent).toString(),
+      discovery.serializeProfileDirectoryQuery(parsed).toString());
+    for (const input of [
+      { [`min.${field}`]: "2026-10-15T09:00:00" },
+      { [`min.${field}`]: "2026-10-15T14:00:00Z", [`max.${field}`]: "2026-10-15T13:00:00Z" },
+      { [`min.${field}`]: "2026-10-15T13:00:00Z".repeat(4) },
+    ]) assert.equal(discovery.parseProfileDirectoryQuery(input, profiles).invalid, true,
+      JSON.stringify(input));
+  });
+
   await t.test("filters every facet family with AND semantics, stable sorts, privacy, and indexed SQL", async () => {
     const api = await setupDiscoveryCatalog();
     const discovery = await discoveryModule();
