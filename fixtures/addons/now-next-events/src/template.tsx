@@ -315,9 +315,9 @@ const nowNextTemplate = {
           <article><p className="now-next-kicker">About the event</p>
             <TemplateMarkdown source={detail.listing.description} />
             <div className="now-next-actions">
-              {state === "past"
-                ? <a href={ticketUrl || detail.listing.url} target="_blank" rel="noopener noreferrer">Organizer archive ↗</a>
-                : <a href={ticketUrl || detail.listing.url} target="_blank" rel="noopener noreferrer">Check tickets with organizer ↗</a>}
+                <a href={ticketUrl || detail.listing.url} target="_blank" rel="noopener noreferrer">
+                  {ticketUrl ? "Ticket details with organizer ↗" : "Event details with organizer ↗"}
+                </a>
               <a href={detail.markdownHref} type="text/markdown" rel="alternate">Markdown</a>
             </div>
             <section className="now-next-schedule" aria-labelledby="now-next-schedule-heading">
