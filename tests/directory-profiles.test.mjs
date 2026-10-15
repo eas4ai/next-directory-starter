@@ -1094,6 +1094,8 @@ function discoveryProfile() {
   field("vendor.ai-tools.pricing-model").placement = "badge";
   field("vendor.ai-tools.team-size").facet = { label: "Team size", mode: "any" };
   field("vendor.ai-tools.rating").facet = { label: "Rating", mode: "any" };
+  field("vendor.ai-tools.updated").facet = { label: "Updated", mode: "any" };
+  field("vendor.ai-tools.updated").sort = { label: "Updated", directions: ["asc", "desc"] };
   field("vendor.ai-tools.setup-time").sort = { label: "Setup time", directions: ["asc", "desc"] };
   return profile;
 }
@@ -1114,6 +1116,10 @@ function publicProfileValues(index, overrides = {}) {
     "vendor.ai-tools.platforms": index === 0 ? ["web", "mac"] : index === 1 ? ["web"]
       : index === 2 ? ["mac"] : ["web", "mac"],
     "vendor.ai-tools.launched": index < 3 ? ["2025-01-10", "2024-01-10", "2025-06-10"][index] : "2023-01-01",
+      "vendor.ai-tools.updated": index < 3
+        ? ["2026-10-15T13:00:00.000Z", "2026-10-16T13:00:00.000Z",
+          "2026-10-14T13:00:00.000Z"][index]
+        : "2025-01-01T00:00:00.000Z",
     "vendor.ai-tools.availability": index === 0
       ? { start: "2026-01-01", end: "2026-01-31" }
       : { start: "2026-02-01", end: "2026-02-28" },
@@ -1233,16 +1239,6 @@ requirementTest("PRF-003 parses bounded public profile facets and stable sorts",
 
   await t.test("normalizes explicit-offset date-time facets and rejects ambiguous bounds", async () => {
     const definition = discoveryProfile();
-    const startsAt = {
-      ...commonField("vendor.ai-tools.starts-at", "Starts at", "datetime", {
-        min: "2020-01-01T00:00:00.000Z",
-        max: "2040-12-31T23:59:59.999Z",
-      }),
-      placement: "card",
-      facet: { label: "Starts at", mode: "any" },
-      sort: { label: "Starts at", directions: ["asc", "desc"] },
-    };
-    definition.fields.push(startsAt);
     const canonical = JSON.parse(canonicalProfileJson(definition));
     const profiles = {
       state: { revision: 1, base: {
@@ -1252,7 +1248,7 @@ requirementTest("PRF-003 parses bounded public profile facets and stable sorts",
       definitions: [canonical],
     };
     const discovery = await discoveryModule();
-    const field = startsAt.key;
+    const field = "vendor.ai-tools.updated";
     const parsed = discovery.parseProfileDirectoryQuery({
       [`min.${field}`]: "2026-10-15T09:00:00-04:00",
       [`max.${field}`]: "2026-10-15T10:00:00-04:00",
@@ -1297,6 +1293,8 @@ requirementTest("PRF-003 parses bounded public profile facets and stable sorts",
       "max.vendor.ai-tools.starting-price": "USD:1200" }), ["alpha"]);
     assert.deepEqual(slugs({ "min.vendor.ai-tools.launched": "2025-01-01",
       "max.vendor.ai-tools.launched": "2025-02-01" }), ["alpha"]);
+      assert.deepEqual(slugs({ "min.vendor.ai-tools.updated": "2026-10-15T09:00:00-04:00",
+        "max.vendor.ai-tools.updated": "2026-10-15T13:00:00Z" }), ["alpha"]);
     assert.deepEqual(slugs({ "min.vendor.ai-tools.availability": "2026-01-15",
       "max.vendor.ai-tools.availability": "2026-01-20" }), ["alpha"]);
     assert.deepEqual(slugs({ "min.vendor.ai-tools.setup-time": "3000",
@@ -1368,6 +1366,8 @@ requirementTest("PRF-003 parses bounded public profile facets and stable sorts",
       [{ "min.vendor.ai-tools.rating": "1.00" }, "directory_profile_values_integer"],
       [{ "min.vendor.ai-tools.starting-price": "USD:1" }, "directory_profile_values_money"],
       [{ "min.vendor.ai-tools.launched": "2025-01-01" }, "directory_profile_values_dates"],
+        [{ "min.vendor.ai-tools.updated": "2026-10-15T13:00:00Z" },
+          "directory_profile_values_dates"],
       [{ "min.vendor.ai-tools.availability": "2026-01-01" }, "directory_profile_values_dates"],
       [{ "min.vendor.ai-tools.setup-time": "1" }, "directory_profile_values_integer"],
       [{ "facet.vendor.ai-tools.headquarters": "US|NY|New York" },

@@ -16,6 +16,8 @@ const FACET_VALUE_LIMIT = 20;
 const FACET_VALUE_BYTES = 120;
 const integerPattern = /^-?(?:0|[1-9]\d*)$/;
 const moneyPattern = /^([A-Z]{3}):(-?(?:0|[1-9]\d*))$/;
+const explicitOffsetDateTimePattern =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/;
 
 type ParsedValuesFacet = { values: string[] };
 type ParsedRangeFacet = { min?: string; max?: string };
@@ -121,6 +123,10 @@ function normalizeRangeValue(field: DirectoryProfileField, value: string): strin
       return `${normalized.currency}:${normalized.amountMinor}`;
     }
     if (field.type === "date") {
+      return String(validateProfileFieldValue(field, value));
+    }
+    if (field.type === "datetime") {
+      if (!explicitOffsetDateTimePattern.test(value)) return null;
       return String(validateProfileFieldValue(field, value));
     }
     if (field.type === "date-range") {
@@ -431,7 +437,7 @@ function rangeFacetSql(descriptor: ProfileDiscoveryDescriptor, facet: ParsedRang
   const field = descriptor.field;
   if (field.type === "money") return moneyRangeSql(descriptor, facet);
   if (field.type === "date-range") return dateRangeSql(descriptor, facet);
-  const isDate = field.type === "date";
+  const isDate = field.type === "date" || field.type === "datetime";
   const column = isDate ? "date_start" : "integer_value";
   const scale = field.type === "decimal" ? Number(field.constraints.scale) : 0;
   const convert = (value: string) => field.type === "decimal"
