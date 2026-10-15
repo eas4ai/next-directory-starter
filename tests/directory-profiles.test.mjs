@@ -842,6 +842,41 @@ requirementTest("PRF-002 validates profile values with the complete listing revi
     assert.equal(created.profileValues["vendor.ai-tools.system-note"], "Trusted classification");
   });
 
+  await t.test("preserves protected values while authorizing only operator changes", async () => {
+    const api = await profileTestContext();
+    resetProfileTables(api.database);
+    activate(api, authoringProfile(), 0);
+    const operatorValues = completeProfileValues({ includeSystem: false });
+    delete operatorValues["vendor.ai-tools.screenshot"];
+    const listingApi = await import("../src/lib/listings.ts");
+    const valuesApi = await import("../src/lib/profile-values.ts");
+    listingApi.createListing(parseListing(listingInput("protected-lifecycle", operatorValues, 1)),
+      "profile-admin");
+    const trustedValues = valuesApi.validateProfileValues({ ...operatorValues,
+      "vendor.ai-tools.system-note": "Trusted workflow value" }, {
+      profiles: api.activeDirectoryProfiles(), authority: "system",
+      listingSlug: "protected-lifecycle", actorUserId: "profile-admin", requireComplete: true,
+    });
+    valuesApi.replaceListingProfileValues({ listingSlug: "protected-lifecycle",
+      values: trustedValues, profiles: api.activeDirectoryProfiles() });
+
+    const beforePublish = listingApi.listingBySlug("protected-lifecycle");
+    const published = listingApi.updateListing({ ...beforePublish, status: "published" },
+      "profile-catalog", beforePublish.revision);
+    assert.equal(published.profileValues["vendor.ai-tools.system-note"], "Trusted workflow value");
+    const updated = listingApi.updateListing({ ...published, profileValues: {
+      ...published.profileValues, "vendor.ai-tools.tagline": "Operator correction",
+    } }, "profile-catalog", published.revision);
+    assert.equal(updated.profileValues["vendor.ai-tools.tagline"], "Operator correction");
+    assert.equal(updated.profileValues["vendor.ai-tools.system-note"], "Trusted workflow value");
+
+    const beforeTamper = profileSnapshot(api.database);
+    assert.throws(() => listingApi.updateListing({ ...updated, profileValues: {
+      ...updated.profileValues, "vendor.ai-tools.system-note": "Operator tamper",
+    } }, "profile-catalog", updated.revision), /system-note|authority|permission/i);
+    assert.deepEqual(profileSnapshot(api.database), beforeTamper);
+  });
+
   await t.test("stores core and normalized values atomically and hydrates listings in a batch", async () => {
     const api = await profileTestContext();
     resetProfileTables(api.database);
