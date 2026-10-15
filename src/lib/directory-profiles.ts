@@ -593,6 +593,13 @@ function validateMigration(definition: DirectoryProfileDefinition, oldDefinition
   validateAggregateMigrationValues(definition, oldDefinition, rows, migration);
 }
 
+function validateDefinitionSource(definition: DirectoryProfileDefinition,
+  sourceKind: "addon" | "site"): void {
+  if ((definition.id === "site.local") !== (sourceKind === "site")) {
+    throw new Error("The site.local profile is reserved for operator-owned site fields");
+  }
+}
+
 function activateNow(input: {
   definition: unknown;
   sourceKind: "addon" | "site";
@@ -606,6 +613,7 @@ function activateNow(input: {
   if (!(["addon", "site"] as string[]).includes(input.sourceKind)) {
     throw new Error("Invalid directory profile source kind");
   }
+  validateDefinitionSource(definition, input.sourceKind);
   const digest = profileDigest(definition) as string;
   const json = canonicalProfileJson(definition) as string;
   const now = new Date().toISOString();
