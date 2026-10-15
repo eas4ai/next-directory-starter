@@ -338,6 +338,8 @@ const nowNextTemplate = {
                 <strong>{String(item.values.name ?? "Speaker")}</strong>
                 <p>{String(item.values.role ?? "Program contributor")}</p>
                 {Boolean(item.values.organization) && <small>{String(item.values.organization)}</small>}
+                  {Boolean(item.values["profile-url"]) && <a href={text(item.values["profile-url"])}
+                    target="_blank" rel="noopener noreferrer">Speaker profile ↗</a>}
               </article>)}</div>
             </section>
           </article>
