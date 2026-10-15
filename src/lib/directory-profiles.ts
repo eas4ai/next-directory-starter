@@ -359,6 +359,73 @@ function remapProfileMediaOwnership(listingSlug: string, sourceFieldKey: string,
     .run(targetField.key, listingSlug, sourceFieldKey);
 }
 
+function aggregateMigrationValue(field: DirectoryProfileField, values: unknown[]): unknown {
+  if (values.length === 1) return values[0];
+  const repeated = field.type === "multiple-choice" || field.type === "group" ||
+    field.cardinality === "many";
+  if (!repeated) throw new Error(`Migration target ${field.key} receives multiple values`);
+  return values.flatMap((value) => value as unknown[]);
+}
+
+type MigrationContribution = {
+  listingSlug: string;
+  field: DirectoryProfileField;
+  value: unknown;
+};
+
+function migrationContribution(groupKey: string, groupRows: ValueRow[],
+  oldFields: Map<string, DirectoryProfileField>, nextFields: Map<string, DirectoryProfileField>,
+  migration?: ProfileMigrationPlan): MigrationContribution | null {
+  const separator = groupKey.indexOf("\0");
+  const listingSlug = groupKey.slice(0, separator);
+  const sourceFieldKey = groupKey.slice(separator + 1);
+  const oldField = oldFields.get(sourceFieldKey);
+  if (!oldField) throw new Error(`Stored field definition is missing: ${sourceFieldKey}`);
+  const action = mappingFor(migration, sourceFieldKey);
+  const field = action?.action === "map" ? nextFields.get(action.to) : nextFields.get(sourceFieldKey);
+  if (!field || action?.action === "archive") return null;
+  try {
+    const sourceValue = decodeProfileValue(oldField, groupRows.map(normalizedRow));
+    const value = validateProfileFieldValue(field,
+      mappedValue(sourceValue, action ?? { action: "map", to: sourceFieldKey,
+        onInvalid: "reject" }));
+    return { listingSlug, field, value };
+  } catch (error) {
+    if (action?.action === "map" && action.onInvalid === "archive") return null;
+    throw error;
+  }
+}
+
+function validateAggregateMigrationTarget(target: { listingSlug: string;
+  field: DirectoryProfileField; values: unknown[] }): void {
+  try {
+    validateProfileFieldValue(target.field, aggregateMigrationValue(target.field, target.values));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "invalid aggregate value";
+    throw new Error(`Aggregate migration for ${target.listingSlug}:${target.field.key} is invalid: ${message}`,
+      { cause: error });
+  }
+}
+
+function validateAggregateMigrationValues(definition: DirectoryProfileDefinition,
+  oldDefinition: DirectoryProfileDefinition | null, rows: ValueRow[],
+  migration?: ProfileMigrationPlan): void {
+  const nextFields = new Map(definition.fields.map((field) => [field.key, field]));
+  const oldFields = new Map(oldDefinition?.fields.map((field) => [field.key, field]) ?? []);
+  const targets = new Map<string, { listingSlug: string; field: DirectoryProfileField;
+    values: unknown[] }>();
+  for (const [groupKey, groupRows] of rowGroups(rows)) {
+    const contribution = migrationContribution(groupKey, groupRows, oldFields, nextFields, migration);
+    if (!contribution) continue;
+    const key = `${contribution.listingSlug}\0${contribution.field.key}`;
+    const target = targets.get(key) ?? { listingSlug: contribution.listingSlug,
+      field: contribution.field, values: [] };
+    target.values.push(contribution.value);
+    targets.set(key, target);
+  }
+  for (const target of targets.values()) validateAggregateMigrationTarget(target);
+}
+
 function impactFor(definition: DirectoryProfileDefinition, expectedRevision: number,
   migration?: ProfileMigrationPlan): ProfileImpact {
   const row = stateRow();
@@ -523,6 +590,7 @@ function validateMigration(definition: DirectoryProfileDefinition, oldDefinition
   if (impact.publishedMissingRequired > 0) {
     throw new Error("Required profile fields need a valid migration default for every published listing");
   }
+  validateAggregateMigrationValues(definition, oldDefinition, rows, migration);
 }
 
 function activateNow(input: {
