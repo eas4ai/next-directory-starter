@@ -1115,6 +1115,7 @@ function discoveryProfile() {
   const profile = authoringProfile();
   const field = (key) => profile.fields.find((candidate) => candidate.key === key);
   field("vendor.ai-tools.tagline").placement = "card";
+    field("vendor.ai-tools.tagline").sort = { label: "Tagline", directions: ["asc", "desc"] };
   field("vendor.ai-tools.pricing-model").placement = "badge";
   field("vendor.ai-tools.team-size").facet = { label: "Team size", mode: "any" };
   field("vendor.ai-tools.rating").facet = { label: "Rating", mode: "any" };
@@ -1330,6 +1331,8 @@ requirementTest("PRF-003 parses bounded public profile facets and stable sorts",
     assert.deepEqual(slugs({ q: "PRIVATE_PROFILE_SENTINEL_0" }), []);
     for (const sentinel of ["DRAFT_PROFILE_SENTINEL", "SUSPENDED_PROFILE_SENTINEL",
       "BANNED_PROFILE_SENTINEL"]) assert.deepEqual(slugs({ q: sentinel }), []);
+      assert.deepEqual(slugs({ sort: "vendor.ai-tools.tagline:asc" }).slice(0, 3),
+        ["alpha", "beta", "page-10"]);
     assert.deepEqual(slugs({ sort: "vendor.ai-tools.team-size:asc" }).slice(0, 3),
       ["alpha", "beta", "gamma"]);
     assert.deepEqual(slugs({ sort: "vendor.ai-tools.team-size:desc", page: "2" }),
