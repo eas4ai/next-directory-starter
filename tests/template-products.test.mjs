@@ -281,8 +281,10 @@ requirementTest("TPL-002 packages the complete VECTOR directory product", async 
       ["--import", "tsx", "--input-type=module", "--eval", `
         const profilesModule = await import("./src/lib/directory-profiles.ts");
         const databaseModule = await import("./src/lib/database.ts");
+        const themeModule = await import("./src/lib/theme-selection.ts");
         const profiles = profilesModule.default ?? profilesModule;
         const database = databaseModule.database ?? databaseModule.default?.database;
+        const themes = themeModule.default ?? themeModule;
         const now = new Date().toISOString();
         database.prepare('INSERT INTO "user" (id, name, email, emailVerified, createdAt, updatedAt, role, banned) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
           .run("vector-admin", "VECTOR Admin", "vector-admin@example.invalid", 1,
@@ -290,6 +292,14 @@ requirementTest("TPL-002 packages the complete VECTOR directory product", async 
         const available = profiles.availableDirectoryProfiles();
         if (!available.some((item) => item.profileId === "vector-ai-tools.ai-tools" &&
             item.version === "1.0.0" && item.sourceId === "vector-ai-tools")) process.exit(2);
+        let rejected = false;
+        try {
+          themes.saveThemeSelection({ themeId: "vector-ai-tools",
+            templateId: "vector-ai-tools" }, "vector-admin");
+        } catch (error) {
+          rejected = /compatible|profile/i.test(String(error));
+        }
+        if (!rejected) process.exit(3);
         profiles.activateDirectoryProfile({
           definition: profiles.availableDirectoryProfileDefinition(
             "vector-ai-tools.ai-tools", "1.0.0"),
@@ -298,20 +308,36 @@ requirementTest("TPL-002 packages the complete VECTOR directory product", async 
         });`],
       { cwd: starter, encoding: "utf8", env: { ...process.env, CI: "1", NODE_ENV: "test", ...env } });
     expectSuccess(activate, "activate VECTOR profile");
-    expectSuccess(npm(starter, ["run", "addon:seed", "--", "vector-ai-tools"], env),
-      "seed VECTOR catalog");
 
     const select = spawnSync(process.execPath,
       ["--import", "tsx", "--input-type=module", "--eval", `
         const imported = await import("./src/lib/theme-selection.ts");
+        const profilesModule = await import("./src/lib/directory-profiles.ts");
+        const settingsModule = await import("./src/lib/site-settings.ts");
         const api = imported.default ?? imported;
+        const profiles = profilesModule.default ?? profilesModule;
+        const settings = settingsModule.default ?? settingsModule;
         if (!api.templateOptions.some((item) => item.id === "vector-ai-tools")) process.exit(2);
         if (!api.themeChoices.some((item) => item.id === "vector-ai-tools")) process.exit(3);
         const selection = api.saveThemeSelection({ themeId: "vector-ai-tools",
           templateId: "vector-ai-tools" }, "vector-admin");
-        if (selection.templateId !== "vector-ai-tools") process.exit(4);`],
+        if (selection.templateId !== "vector-ai-tools") process.exit(4);
+        const original = profiles.availableDirectoryProfileDefinition(
+          "vector-ai-tools.ai-tools", "1.0.0");
+        profiles.activateDirectoryProfile({ definition: { ...original, version: "9.0.0" },
+          sourceKind: "addon", sourceId: "vector-ai-tools", expectedRevision: 1,
+          actorUserId: "vector-admin" });
+        if (api.getThemeSelection().templateId !== "classic") process.exit(5);
+        if (JSON.parse(settings.readSiteSetting("theme_selection")).templateId !== "classic") process.exit(6);
+        profiles.activateDirectoryProfile({ definition: original, sourceKind: "addon",
+          sourceId: "vector-ai-tools", expectedRevision: 2, actorUserId: "vector-admin" });
+        const restored = api.saveThemeSelection({ themeId: "vector-ai-tools",
+          templateId: "vector-ai-tools" }, "vector-admin");
+        if (restored.templateId !== "vector-ai-tools") process.exit(7);`],
       { cwd: starter, encoding: "utf8", env: { ...process.env, CI: "1", NODE_ENV: "test", ...env } });
     expectSuccess(select, "select VECTOR theme and template");
+    expectSuccess(npm(starter, ["run", "addon:seed", "--", "vector-ai-tools"], env),
+      "seed VECTOR catalog");
 
     application = spawn("npm", ["run", "start", "--", "-p", String(port)], {
       cwd: starter, env: { ...process.env, CI: "1", ...env }, detached: true, stdio: "ignore",
