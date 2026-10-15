@@ -150,6 +150,7 @@ const boroughTemplate = {
     },
     directory(value) {
       const Card = value.slots?.card ?? TemplateListingCard;
+      const Featured = value.slots?.featured;
       return <main className="borough-directory">
         <header className="borough-directory-heading"><p className="borough-eyebrow">The local index</p>
           <h1>Places with a point of view.</h1><p>{value.description}</p></header>
@@ -158,6 +159,18 @@ const boroughTemplate = {
           <section aria-label="Directory results" className="borough-results">
             <div className="borough-results-heading"><h2>{value.total} local {value.total === 1 ? "place" : "places"}</h2>
               <span>Current, public recommendations</span></div>
+            {Featured
+              ? <Featured listings={value.featured} fields={value.fields}
+                mediaAssets={value.mediaAssets} iconLibrary={value.iconLibrary} Card={Card} />
+              : value.featured.length > 0 && <section className="borough-paid-picks"
+                aria-label="Featured listings">
+                <div><p>Featured places</p><span>Paid placements matching these filters.</span></div>
+                <div className="borough-card-grid">{value.featured.map((listing) =>
+                  <div key={listing.slug} data-borough-featured={listing.slug}>
+                    <Card listing={listing} fields={value.fields} mediaAssets={value.mediaAssets}
+                      iconLibrary={value.iconLibrary} highlighted />
+                  </div>)}</div>
+              </section>}
             {value.listings.length === 0
               ? <section className="borough-empty" aria-live="polite">
                 <strong>This route is quiet today.</strong>

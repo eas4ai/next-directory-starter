@@ -642,6 +642,7 @@ requirementTest("TPL-003 packages the complete BOROUGH local-city directory prod
       DIRECTORY_EXPLICIT_MIGRATIONS: "1",
       BETTER_AUTH_SECRET: randomBytes(32).toString("hex"),
       BILLING_ENCRYPTION_KEY: billingKey,
+      BILLING_CHECKOUT_MODE: "test",
       SITE_URL: origin,
       BETTER_AUTH_URL: origin,
     };
@@ -705,6 +706,7 @@ requirementTest("TPL-003 packages the complete BOROUGH local-city directory prod
       "seed BOROUGH catalog and photography");
     const seededDb = new Database(databasePath);
     let mediaRows;
+    const featuredSlug = publishedSeed[0].slug;
     try {
       assert.equal(seededDb.prepare("SELECT COUNT(*) FROM listings").pluck().get(),
         seed.listings.length);
@@ -717,6 +719,26 @@ requirementTest("TPL-003 packages the complete BOROUGH local-city directory prod
         imageSources.length, "BOROUGH photography is not assigned to profile values");
       assert.equal(seededDb.prepare("SELECT COUNT(*) FROM directory_profile_seed_runs")
         .pluck().get(), 1);
+      const featuredStartsAt = new Date(Date.now() - 60_000).toISOString();
+      const featuredEndsAt = new Date(Date.now() + 86_400_000).toISOString();
+      seededDb.prepare(`INSERT INTO publishing_plans
+        (key, name, description, mode, billing_mode, amount_minor, currency, duration_days,
+          featured, enabled, updated_at)
+        VALUES ('borough-featured', 'Featured place', '', 'test', 'one-time',
+          2500, 'usd', 1, 1, 1, ?)`)
+        .run(featuredStartsAt);
+      seededDb.prepare(`INSERT INTO purchases
+        (id, listing_slug, owner_user_id, plan_key, plan_mode, billing_mode, plan_name,
+          plan_description, amount_minor, currency, duration_days, accepted_duration_days,
+          featured, stripe_session_id, status, created_at, provider)
+        VALUES ('borough-featured-purchase', ?, 'borough-admin', 'borough-featured', 'test',
+          'one-time', 'Featured place', '', 2500, 'usd', 1, 1, 1,
+          'pending:borough-featured-purchase', 'paid', ?, 'stripe')`)
+        .run(featuredSlug, featuredStartsAt);
+      seededDb.prepare(`INSERT INTO entitlements
+        (purchase_id, listing_slug, starts_at, ends_at, featured, revoked_at)
+        VALUES ('borough-featured-purchase', ?, ?, ?, 1, NULL)`)
+        .run(featuredSlug, featuredStartsAt, featuredEndsAt);
     } finally {
       seededDb.close();
     }
@@ -769,6 +791,10 @@ requirementTest("TPL-003 packages the complete BOROUGH local-city directory prod
       "BOROUGH home discovery is not bounded");
     const directory = await html("/listings");
     assert.deepEqual(results(directory).sort(), publicSlugs);
+    assert.match(directory, new RegExp(`data-borough-featured="${featuredSlug}"`),
+      "BOROUGH dropped the separate paid featured placement");
+    assert.match(directory, /Featured placement/,
+      "BOROUGH did not label its paid featured placement");
     assert.doesNotMatch(directory, /hidden-draft/);
     assert.match(directory, /src="\/media\/[0-9a-f-]{36}"/,
       "BOROUGH directory does not use eligible runtime photography");

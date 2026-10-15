@@ -107,6 +107,10 @@
 .borough-results-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
 .borough-results-heading h2 { font-size: 2rem; }
 .borough-results-heading span { color: var(--muted-foreground); font-size: 0.72rem; }
+.borough-paid-picks { margin-bottom: 2.5rem; border-block: 1px solid var(--borough-rule); padding-block: 1.25rem 2rem; }
+.borough-paid-picks > div:first-child { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.borough-paid-picks > div:first-child p { color: var(--borough-brick); font-family: var(--preset-heading-font); font-size: 1.65rem; }
+.borough-paid-picks > div:first-child span { color: var(--muted-foreground); font-size: 0.72rem; }
 .borough-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .borough-card-image { position: relative; }
 .borough-card-image > span { position: absolute; left: 0; bottom: 0; background: var(--borough-brick); padding: 0.35rem 0.5rem; color: var(--primary-foreground); font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
@@ -158,6 +162,7 @@
   .borough-detail-grid { grid-template-columns: minmax(0, 1fr); }
   .borough-section-heading,
   .borough-results-heading,
+  .borough-paid-picks > div:first-child,
   .borough-footer { align-items: flex-start; flex-direction: column; }
   .borough-directory-layout .profile-facet-actions { position: static; }
 }
