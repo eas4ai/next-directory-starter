@@ -224,10 +224,14 @@ function scalarConstraintsWiden(oldField: DirectoryProfileField | ProfileChildFi
   nextField: DirectoryProfileField | ProfileChildField): boolean {
   if (oldField.type !== nextField.type) return false;
   switch (oldField.type) {
-    case "short-text":
-    case "markdown":
-      return numericConstraint(nextField, "minLength") <= numericConstraint(oldField, "minLength") &&
-        numericConstraint(nextField, "maxLength") >= numericConstraint(oldField, "maxLength");
+      case "short-text":
+      case "markdown": {
+        const oldFormat = oldField.constraints.format;
+        const nextFormat = nextField.constraints.format;
+        return numericConstraint(nextField, "minLength") <= numericConstraint(oldField, "minLength") &&
+          numericConstraint(nextField, "maxLength") >= numericConstraint(oldField, "maxLength") &&
+          (nextFormat === undefined || nextFormat === oldFormat);
+      }
     case "integer":
       return numericConstraint(nextField, "min") <= numericConstraint(oldField, "min") &&
         numericConstraint(nextField, "max") >= numericConstraint(oldField, "max");

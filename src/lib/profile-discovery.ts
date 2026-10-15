@@ -8,7 +8,7 @@ import {
   type Listing, type StoredListing,
 } from "@/lib/listings";
 import { validateProfileFieldValue } from "@/lib/profile-values";
-import { validProfileDate } from "../../scripts/addons/profile-schema.mjs";
+import { validProfileDate, validProfileDateTime } from "../../scripts/addons/profile-schema.mjs";
 
 const QUERY_BYTES = 4_096;
 const FACET_LIMIT = 12;
@@ -16,8 +16,6 @@ const FACET_VALUE_LIMIT = 20;
 const FACET_VALUE_BYTES = 120;
 const integerPattern = /^-?(?:0|[1-9]\d*)$/;
 const moneyPattern = /^([A-Z]{3}):(-?(?:0|[1-9]\d*))$/;
-const explicitOffsetDateTimePattern =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/;
 
 type ParsedValuesFacet = { values: string[] };
 type ParsedRangeFacet = { min?: string; max?: string };
@@ -114,7 +112,7 @@ function normalizeMoneyRangeValue(field: DirectoryProfileField, value: string): 
 }
 
 function normalizeDateTimeRangeValue(field: DirectoryProfileField, value: string): string | null {
-  if (!explicitOffsetDateTimePattern.test(value)) return null;
+  if (!validProfileDateTime(value)) return null;
   return String(validateProfileFieldValue(field, value));
 }
 

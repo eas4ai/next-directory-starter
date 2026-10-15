@@ -124,7 +124,7 @@
       "searchable": false,
       "facet": null,
       "sort": null,
-      "constraints": { "minLength": 3, "maxLength": 80 }
+        "constraints": { "minLength": 3, "maxLength": 80, "format": "iana-time-zone" }
     },
     {
       "key": "now-next-events.events.venue",

@@ -122,9 +122,21 @@ export function validProfileDate(value) {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
-function validDateTime(value) {
+/** @param {unknown} value @returns {value is string} */
+export function validProfileDateTime(value) {
   return typeof value === "string" && value.length <= 40 &&
-    /^\d{4}-\d{2}-\d{2}T/.test(value) && !Number.isNaN(Date.parse(value));
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/.test(value) &&
+    !Number.isNaN(Date.parse(value));
+}
+
+/** @param {unknown} value @returns {value is string} */
+export function validIanaTimeZone(value) {
+  if (typeof value !== "string" || value.length > 120) return false;
+  try {
+    return new Intl.DateTimeFormat("en-US", { timeZone: value }).resolvedOptions().timeZone === value;
+  } catch {
+    return false;
+  }
 }
 
 function validateRangeStrings(object, validator, label) {
@@ -135,13 +147,19 @@ function validateRangeStrings(object, validator, label) {
 
 function normalizeConstraints(type, input, child = false) {
   if (type === "short-text" || type === "markdown") {
-    const value = strictKeys(input, ["minLength", "maxLength"], type);
+    const allowed = type === "short-text" ? ["minLength", "maxLength", "format"]
+      : ["minLength", "maxLength"];
+    const value = strictKeys(input, allowed, type);
     boundedPair(value, "minLength", "maxLength", type);
     const ceiling = type === "short-text" ? 1_000 : 20_000;
     if (value.minLength < 0 || value.maxLength > ceiling) {
       throw new Error(`${type} length is unbounded`);
     }
-    return { minLength: value.minLength, maxLength: value.maxLength };
+    if (type === "short-text" && value.format !== undefined && value.format !== "iana-time-zone") {
+      throw new Error("Invalid short-text format");
+    }
+    return { minLength: value.minLength, maxLength: value.maxLength,
+      ...(value.format ? { format: value.format } : {}) };
   }
   if (["boolean", "url"].includes(type)) {
     strictKeys(input, [], type);
@@ -186,7 +204,7 @@ function normalizeConstraints(type, input, child = false) {
   }
   if (type === "datetime") {
     const value = strictKeys(input, ["min", "max"], type);
-    validateRangeStrings(value, validDateTime, type);
+    validateRangeStrings(value, validProfileDateTime, type);
     return { min: new Date(value.min).toISOString(), max: new Date(value.max).toISOString() };
   }
   if (type === "duration") {
@@ -281,6 +299,8 @@ function normalizeScalarDefault(field, value) {
     if (typeof value !== "string") throw new Error(`Invalid ${type} default`);
     const normalized = type === "short-text" ? value.trim().normalize("NFC") : value.normalize("NFC");
     if (normalized.length < constraints.minLength || normalized.length > constraints.maxLength ||
+        (type === "short-text" && constraints.format === "iana-time-zone" &&
+          !validIanaTimeZone(normalized)) ||
         (type === "markdown" && !safeMarkdown(normalized))) {
       throw new Error(`Invalid ${type} default`);
     }
@@ -339,7 +359,7 @@ function normalizeScalarDefault(field, value) {
     return value;
   }
   if (type === "datetime") {
-    if (!validDateTime(value)) throw new Error("Invalid datetime default");
+      if (!validProfileDateTime(value)) throw new Error("Invalid datetime default");
     const normalized = new Date(value).toISOString();
     if (normalized < constraints.min || normalized > constraints.max) {
       throw new Error("Invalid datetime default");
