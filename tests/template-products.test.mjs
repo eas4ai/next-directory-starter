@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import {
   cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, rmSync,
   symlinkSync, writeFileSync,
@@ -676,6 +676,48 @@ requirementTest("TPL-003 packages the complete BOROUGH local-city directory prod
       { cwd: starter, encoding: "utf8",
         env: { ...process.env, CI: "1", NODE_ENV: "test", ...env } });
     expectSuccess(activate, "activate and select BOROUGH");
+
+    const reservationId = randomUUID();
+    const reserveMedia = spawnSync(process.execPath,
+      ["--import", "tsx", "--input-type=module", "--eval", `
+        const fs = await import("node:fs");
+        const path = await import("node:path");
+        const imported = await import("./src/lib/media.ts");
+        const media = imported.default ?? imported;
+        const id = ${JSON.stringify(reservationId)};
+        media.reserveMediaFileCleanup(id);
+        const file = media.mediaFilePath(id);
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, "in-flight seed media");`],
+      { cwd: starter, encoding: "utf8", env: { ...process.env, CI: "1", NODE_ENV: "test", ...env } });
+    expectSuccess(reserveMedia, "reserve an in-flight BOROUGH media write");
+    const reservationFile = join(mediaDirectory, `${reservationId}.webp`);
+    assert.ok(existsSync(reservationFile));
+    const concurrentDrain = spawnSync(process.execPath,
+      ["--import", "tsx", "--input-type=module", "--eval", `
+        const imported = await import("./src/lib/media.ts");
+        const media = imported.default ?? imported;
+        media.drainMediaCleanupQueue();`],
+      { cwd: starter, encoding: "utf8", env: { ...process.env, CI: "1", NODE_ENV: "test", ...env } });
+    expectSuccess(concurrentDrain, "run a concurrent media cleanup process");
+    assert.ok(existsSync(reservationFile),
+      "a concurrent drainer deleted an in-flight BOROUGH media write");
+    const reservationDb = new Database(databasePath);
+    try {
+      reservationDb.prepare("UPDATE media_cleanup_queue SET queued_at = ? WHERE asset_id = ?")
+        .run(new Date(Date.now() - 1_000).toISOString(), reservationId);
+    } finally {
+      reservationDb.close();
+    }
+    const expiredDrain = spawnSync(process.execPath,
+      ["--import", "tsx", "--input-type=module", "--eval", `
+        const imported = await import("./src/lib/media.ts");
+        const media = imported.default ?? imported;
+        media.drainMediaCleanupQueue();`],
+      { cwd: starter, encoding: "utf8", env: { ...process.env, CI: "1", NODE_ENV: "test", ...env } });
+    expectSuccess(expiredDrain, "drain an expired media write reservation");
+    assert.equal(existsSync(reservationFile), false,
+      "an expired BOROUGH media reservation did not clean its runtime file");
 
     const failureDb = new Database(databasePath);
     try {
