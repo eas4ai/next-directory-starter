@@ -6,6 +6,7 @@ import { activeFeaturedSlugs, publishedListingBySlug } from "@/lib/listings";
 import { profileMediaIds, publicProfileMediaAssets } from "@/lib/media";
 import { pageMetadata, publicUrl } from "@/lib/page-metadata";
 import { publicTemplateDefinition } from "@/lib/public-template-registry";
+import { publicTemplateFields } from "@/lib/public-template-sdk";
 import { getSiteConfig } from "@/lib/site-config";
 import { getThemeSelection } from "@/lib/theme-selection";
 
@@ -41,7 +42,7 @@ export default async function ComparePage({ searchParams }: PageProps<"/compare"
   const featured = activeFeaturedSlugs(rawListings.map(({ slug }) => slug));
   const listings = rawListings.map((listing) => ({ ...listing, featured: featured.has(listing.slug) }));
   const profiles = activeDirectoryProfiles();
-  const fields = profiles.definitions.flatMap((definition) => definition.fields);
+  const fields = publicTemplateFields(profiles);
   const mediaIds = listings.flatMap((listing) =>
     [...profileMediaIds(listing.profileValues, profiles)]);
   const mediaAssets = publicProfileMediaAssets(mediaIds);

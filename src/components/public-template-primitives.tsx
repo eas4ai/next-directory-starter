@@ -8,7 +8,7 @@ import { PresetExternalLinkIcon } from "@/components/preset-icon";
 import { ProfileValuesView } from "@/components/profile-values-view";
 import type {
   PublicTemplateListing, PublicTemplateListingCardProps, PublicTemplateListingDetailProps,
-  PublicTemplatePaginationProps,
+  PublicTemplateField, PublicTemplatePaginationProps,
 } from "@/lib/public-template-sdk";
 import type { DirectoryProfileField } from "@/lib/directory-profile-types";
 import type { MediaAsset } from "@/lib/media";
@@ -26,12 +26,12 @@ export function TemplateContentImage({ asset }: { asset: MediaAsset }) {
 }
 
 export function TemplateProfileValues({ fields, listing, mediaAssets, placements }: {
-  fields: readonly DirectoryProfileField[];
+  fields: readonly PublicTemplateField[];
   listing: PublicTemplateListing;
   mediaAssets: ReadonlyMap<string, MediaAsset>;
   placements?: readonly DirectoryProfileField["placement"][];
 }) {
-  return <ProfileValuesView fields={[...fields]} values={listing.profileValues}
+  return <ProfileValuesView fields={[...fields] as DirectoryProfileField[]} values={listing.profileValues}
     mediaAssets={mediaAssets} placements={placements ? [...placements] : undefined} />;
 }
 

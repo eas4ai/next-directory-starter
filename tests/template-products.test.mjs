@@ -11,6 +11,7 @@ import { join, relative, resolve, sep } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import Database from "better-sqlite3";
 import { chromium } from "playwright-core";
+import { publicTemplateFields } from "../src/lib/public-template-sdk.tsx";
 
 const repository = resolve(import.meta.dirname, "..");
 const selectedRequirement = process.env.TEMPLATE_REQUIREMENT;
@@ -73,6 +74,30 @@ requirementTest("TPL-001 installs constrained public-template renderer modules",
   const expectSuccess = (result, label) => assert.equal(result.status, 0,
     `${label}: ${result.stderr || result.stdout}`);
   try {
+    const publicField = {
+      key: "example.profile.public", label: "Public label", help: "Visible help",
+      type: "single-choice", cardinality: "one", required: false, writeAuthority: "owner",
+      visibility: "public", placement: "detail", group: null, order: 1, searchable: false,
+      facet: null, sort: null,
+      constraints: { choices: [{ value: "one", label: "One" }] },
+    };
+    const fields = publicTemplateFields({
+      state: { revision: 1, base: null, site: null },
+      definitions: [{ schemaVersion: 1, id: "example.profile", version: "1.0.0",
+        name: "Example", description: "Example fields", fields: [publicField, {
+          ...publicField, key: "example.profile.private", label: "Private label",
+          visibility: "private",
+        }, { ...publicField, key: "example.profile.hidden", label: "Hidden label",
+          placement: "hidden" }] }],
+    });
+    assert.deepEqual(fields.map(({ key }) => key), ["example.profile.public"]);
+    assert.notEqual(fields[0], publicField, "public template received the stored field object");
+    assert.ok(Object.isFrozen(fields) && Object.isFrozen(fields[0]) &&
+      Object.isFrozen(fields[0].constraints) && Object.isFrozen(fields[0].constraints.choices),
+    "public template fields are not deeply frozen");
+    assert.throws(() => { fields[0].label = "Changed"; }, TypeError);
+    assert.equal(publicField.label, "Public label");
+
     const rendererFixture = join(repository, "fixtures/addons/renderer-addon");
     const referenceFixture = join(repository, "fixtures/addons/reference-addon");
     const rendererArchive = join(temporary, "renderer.zip");
