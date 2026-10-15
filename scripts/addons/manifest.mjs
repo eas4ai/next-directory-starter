@@ -10,6 +10,7 @@ import {
 
 export const ADDON_SCHEMA_VERSION = 1;
 export const ADDON_API_VERSION = 1;
+export const PUBLIC_TEMPLATE_API_VERSION = 1;
 export const MANIFEST_NAME = "directory-addon.json";
 export const INTEGRITY_NAME = ".integrity.json";
 export const MAX_FILES = 512;
@@ -40,6 +41,8 @@ const themeSchema = z.object({
 const templateSchema = z.object({
   id: identity,
   name: displayName,
+  renderer: payloadPath.optional(),
+  templateApi: z.literal(PUBLIC_TEMPLATE_API_VERSION).optional(),
   stylesheet: payloadPath,
   supportedProfiles: z.array(z.object({
     id: z.string().min(3).max(160).regex(profileIdPattern),
@@ -92,6 +95,39 @@ function ordered(values, key) {
   return [...values].sort((left, right) => key(left).localeCompare(key(right)));
 }
 
+function validateRendererDeclaration(template, files) {
+  if (!template.renderer) {
+    if (template.templateApi !== undefined) {
+      throw new Error(`Stylesheet-only template cannot declare templateApi: ${template.id}`);
+    }
+    return;
+  }
+  if (!template.renderer.startsWith("src/") || !template.renderer.endsWith(".tsx") ||
+      !files.has(template.renderer)) {
+    throw new Error(`Template renderer is not a declared TSX payload: ${template.renderer}`);
+  }
+  if (template.supportedProfiles.length === 0) {
+    throw new Error(`Template renderer must declare a supported profile: ${template.id}`);
+  }
+  if (template.templateApi !== PUBLIC_TEMPLATE_API_VERSION) {
+    throw new Error(`Template renderer must declare templateApi ${PUBLIC_TEMPLATE_API_VERSION}: ${template.id}`);
+  }
+}
+
+function validateTemplateProfiles(template, profiles) {
+  for (const supported of template.supportedProfiles) {
+    const packaged = profiles.find(({ id }) => id === supported.id);
+    if (template.renderer && !packaged) {
+      throw new Error(`Template renderer profile is not packaged: ${supported.id}`);
+    }
+    if (packaged && !semver.satisfies(packaged.version, supported.range,
+      { includePrerelease: true })) {
+      throw new Error(`Template ${template.id} is incompatible with packaged profile ` +
+        `${packaged.id}@${packaged.version}`);
+    }
+  }
+}
+
 function validateTemplateDeclaration(template, profiles, files) {
   if (!template.stylesheet.startsWith("src/") || !template.stylesheet.endsWith(".css") ||
       !files.has(template.stylesheet)) {
@@ -99,14 +135,8 @@ function validateTemplateDeclaration(template, profiles, files) {
   }
   unique(template.supportedProfiles.map(({ id }) => id),
     `supported profile ID for template ${template.id}`);
-  for (const supported of template.supportedProfiles) {
-    const packaged = profiles.find(({ id }) => id === supported.id);
-    if (packaged && !semver.satisfies(packaged.version, supported.range,
-      { includePrerelease: true })) {
-      throw new Error(`Template ${template.id} is incompatible with packaged profile ` +
-        `${packaged.id}@${packaged.version}`);
-    }
-  }
+  validateRendererDeclaration(template, files);
+  validateTemplateProfiles(template, profiles);
 }
 
 function validateAssetAndSeedDeclarations(parsed, files) {
@@ -218,37 +248,51 @@ function objectPropertyName(property) {
   return null;
 }
 
-function themeObject(sourceFile, path) {
+function exportedObject(sourceFile, path, label) {
   const assignments = sourceFile.statements.filter((statement) =>
     ts.isExportAssignment(statement) && !statement.isExportEquals);
-  if (assignments.length !== 1) throw new Error(`Theme must have one default export: ${path}`);
+  if (assignments.length !== 1) throw new Error(`${label} must have one default export: ${path}`);
   let expression = unwrapExpression(assignments[0].expression);
   if (ts.isIdentifier(expression)) {
     const declaration = sourceFile.statements.filter(ts.isVariableStatement)
       .flatMap(({ declarationList }) => [...declarationList.declarations])
       .find((candidate) => ts.isIdentifier(candidate.name) && candidate.name.text === expression.text);
-    if (!declaration?.initializer) throw new Error(`Theme default export is not defined: ${path}`);
+    if (!declaration?.initializer) throw new Error(`${label} default export is not defined: ${path}`);
     expression = unwrapExpression(declaration.initializer);
   }
   if (!ts.isObjectLiteralExpression(expression)) {
-    throw new Error(`Theme default export must be an object literal: ${path}`);
+    throw new Error(`${label} default export must be an object literal: ${path}`);
   }
   if (expression.properties.some(ts.isSpreadAssignment)) {
-    throw new Error(`Theme default export cannot contain spreads: ${path}`);
+    throw new Error(`${label} default export cannot contain spreads: ${path}`);
   }
   return expression;
 }
 
-function literalProperty(object, name, path) {
+function literalProperty(object, name, path, label) {
   const matches = object.properties.filter((property) => objectPropertyName(property) === name);
   if (matches.length !== 1 || !ts.isPropertyAssignment(matches[0])) {
-    throw new Error(`Theme must declare one literal ${name}: ${path}`);
+    throw new Error(`${label} must declare one literal ${name}: ${path}`);
   }
   const expression = unwrapExpression(matches[0].initializer);
   if (!ts.isStringLiteral(expression) && !ts.isNoSubstitutionTemplateLiteral(expression)) {
-    throw new Error(`Theme ${name} must be a string literal: ${path}`);
+    throw new Error(`${label} ${name} must be a string literal: ${path}`);
   }
   return expression.text;
+}
+
+function typescriptPayload(files, path, label, scriptKind) {
+  const bytes = files.get(path);
+  if (!bytes) throw new Error(`${label} is missing: ${path}`);
+  const source = bytes.toString("utf8");
+  if (!Buffer.from(source, "utf8").equals(bytes)) {
+    throw new Error(`${label} is not UTF-8: ${path}`);
+  }
+  const sourceFile = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, scriptKind);
+  if (sourceFile.parseDiagnostics.length > 0) {
+    throw new Error(`${label} is not valid TypeScript: ${path}`);
+  }
+  return sourceFile;
 }
 
 export function validateThemeModules(manifest, files) {
@@ -257,26 +301,131 @@ export function validateThemeModules(manifest, files) {
     "spacing", "width", "social",
   ]);
   for (const theme of manifest.themes) {
-    const bytes = files.get(theme.entry);
-    if (!bytes) throw new Error(`Theme entry is missing: ${theme.entry}`);
-    const source = bytes.toString("utf8");
-    if (!Buffer.from(source, "utf8").equals(bytes)) {
-      throw new Error(`Theme entry is not UTF-8: ${theme.entry}`);
-    }
-    const sourceFile = ts.createSourceFile(theme.entry, source, ts.ScriptTarget.Latest, true,
-      ts.ScriptKind.TS);
-    if (sourceFile.parseDiagnostics.length > 0) {
-      throw new Error(`Theme entry is not valid TypeScript: ${theme.entry}`);
-    }
-    const object = themeObject(sourceFile, theme.entry);
+    const sourceFile = typescriptPayload(files, theme.entry, "Theme entry", ts.ScriptKind.TS);
+    const object = exportedObject(sourceFile, theme.entry, "Theme");
     const names = new Set(object.properties.map(objectPropertyName).filter(Boolean));
     if ([...required].some((name) => !names.has(name))) {
       throw new Error(`Theme entry is missing required fields: ${theme.entry}`);
     }
-    if (literalProperty(object, "id", theme.entry) !== theme.id ||
-        literalProperty(object, "name", theme.entry) !== theme.name) {
+    if (literalProperty(object, "id", theme.entry, "Theme") !== theme.id ||
+        literalProperty(object, "name", theme.entry, "Theme") !== theme.name) {
       throw new Error(`Theme identity does not match the manifest: ${theme.entry}`);
     }
+  }
+}
+
+const rendererImports = new Set([
+  "@/components/public-template-primitives",
+  "@/lib/public-template-sdk",
+]);
+const forbiddenRendererGlobals = new Set([
+  "Bun", "Deno", "document", "eval", "fetch", "Function", "globalThis", "localStorage",
+  "navigator", "process", "require", "sessionStorage", "WebSocket", "window", "Worker",
+  "XMLHttpRequest",
+]);
+
+const rendererNames = new Set([
+  "header", "home", "directory", "card", "listing", "featured", "empty", "pagination",
+  "comparison", "footer",
+]);
+
+function validateRendererStatements(sourceFile, path) {
+  for (const statement of sourceFile.statements) {
+    if (ts.isImportDeclaration(statement)) {
+      const specifier = ts.isStringLiteral(statement.moduleSpecifier)
+        ? statement.moduleSpecifier.text : "";
+      if (!rendererImports.has(specifier)) {
+        throw new Error(`Forbidden renderer import ${specifier || "<dynamic>"}: ${path}`);
+      }
+      continue;
+    }
+    if (ts.isVariableStatement(statement) || ts.isExportAssignment(statement) ||
+        ts.isTypeAliasDeclaration(statement) || ts.isInterfaceDeclaration(statement)) continue;
+    throw new Error(`Forbidden renderer top-level statement: ${path}`);
+  }
+}
+
+function isPropertyNameReference(node) {
+  return (ts.isPropertyAccessExpression(node.parent) && node.parent.name === node) ||
+    (ts.isPropertyAssignment(node.parent) && node.parent.name === node &&
+      node.parent.initializer !== node);
+}
+
+function validateRendererNode(node, path) {
+  if (ts.isCallExpression(node) && (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+      (ts.isIdentifier(node.expression) && ["eval", "require", "Function"].includes(
+        node.expression.text)))) {
+    throw new Error(`Forbidden renderer dynamic code: ${path}`);
+  }
+  if (ts.isJsxAttribute(node) && node.name.text === "dangerouslySetInnerHTML") {
+    throw new Error(`Forbidden renderer raw HTML: ${path}`);
+  }
+  if (ts.isIdentifier(node) && forbiddenRendererGlobals.has(node.text) &&
+      !isPropertyNameReference(node)) {
+    throw new Error(`Forbidden renderer global ${node.text}: ${path}`);
+  }
+  ts.forEachChild(node, (child) => validateRendererNode(child, path));
+}
+
+function rendererObject(sourceFile, path) {
+  const object = exportedObject(sourceFile, path, "Renderer");
+  const property = object.properties.find((candidate) => objectPropertyName(candidate) === "renderers");
+  if (!property || !ts.isPropertyAssignment(property)) {
+    throw new Error(`Renderer must declare one renderers object: ${path}`);
+  }
+  const value = unwrapExpression(property.initializer);
+  if (!ts.isObjectLiteralExpression(value) || value.properties.length === 0 ||
+      value.properties.some((candidate) => !ts.isMethodDeclaration(candidate) ||
+        !rendererNames.has(objectPropertyName(candidate)))) {
+    throw new Error(`Renderer must declare supported renderer methods: ${path}`);
+  }
+  unique(value.properties.map(objectPropertyName), `renderer surface in ${path}`);
+  return object;
+}
+
+function validateRendererTypes(path, source) {
+  const configPath = ts.findConfigFile(process.cwd(), ts.sys.fileExists);
+  if (!configPath) throw new Error("Starter TypeScript configuration is missing");
+  const config = ts.readConfigFile(configPath, ts.sys.readFile);
+  if (config.error) {
+    throw new Error(`Starter TypeScript configuration is invalid: ${ts.flattenDiagnosticMessageText(
+      config.error.messageText, " ")}`);
+  }
+  const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, process.cwd(), {
+    incremental: false, noEmit: true,
+  }, configPath);
+  const virtualPath = resolve(".directory-template-validation", path);
+  const host = ts.createCompilerHost(parsed.options);
+  const originalFileExists = host.fileExists.bind(host);
+  const originalReadFile = host.readFile.bind(host);
+  host.fileExists = (candidate) => candidate === virtualPath || originalFileExists(candidate);
+  host.readFile = (candidate) => candidate === virtualPath ? source : originalReadFile(candidate);
+  const program = ts.createProgram([virtualPath], parsed.options, host);
+  const diagnostics = ts.getPreEmitDiagnostics(program).filter(({ category }) =>
+    category === ts.DiagnosticCategory.Error);
+  if (diagnostics.length > 0) {
+    const detail = ts.flattenDiagnosticMessageText(diagnostics[0].messageText, " ");
+    throw new Error(`Template renderer does not satisfy templateApi 1: ${path}: ${detail}`);
+  }
+}
+
+export function validateRendererModules(manifest, files) {
+  for (const template of manifest.templates) {
+    if (!template.renderer) continue;
+    const sourceFile = typescriptPayload(files, template.renderer, "Template renderer",
+      ts.ScriptKind.TSX);
+    validateRendererStatements(sourceFile, template.renderer);
+    validateRendererNode(sourceFile, template.renderer);
+    const object = rendererObject(sourceFile, template.renderer);
+    const names = new Set(object.properties.map(objectPropertyName).filter(Boolean));
+    if (!names.has("id") || !names.has("name") || !names.has("renderers")) {
+      throw new Error(`Template renderer is missing required fields: ${template.renderer}`);
+    }
+    if (literalProperty(object, "id", template.renderer, "Renderer") !== template.id ||
+        literalProperty(object, "name", template.renderer, "Renderer") !== template.name) {
+      throw new Error(`Template renderer identity does not match the manifest: ${template.renderer}`);
+    }
+    validateRendererTypes(template.renderer, sourceFile.text);
   }
 }
 
@@ -351,6 +500,7 @@ export function readSourcePackage(source) {
     files.set(path, readFileSync(absolute));
   }
   validateThemeModules(manifest, files);
+  validateRendererModules(manifest, files);
   const profiles = validateProfileDefinitions(manifest, files);
   return { manifest, files, profiles, manifestBytes: canonicalJson(manifest), root };
 }
