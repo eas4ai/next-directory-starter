@@ -9,18 +9,19 @@ import { assignedMedia, profileMediaIds, publicProfileMediaAssets } from "@/lib/
 import { publicSeoOverrides } from "@/lib/seo-settings";
 import { database } from "@/lib/database";
 import { activeDirectoryProfiles } from "@/lib/directory-profiles";
-import type { DirectoryProfileField, ProfileValueSet } from "@/lib/directory-profile-types";
+import type { ProfileValueSet } from "@/lib/directory-profile-types";
 import { getThemeSelection } from "@/lib/theme-selection";
 import { publicTemplateDefinition } from "@/lib/public-template-registry";
 import { TemplateListingDetail } from "@/components/public-template-primitives";
+import { publicTemplateFields, type PublicTemplateField } from "@/lib/public-template-sdk";
 
 export const instant = false;
 
-function publicProfileProperties(fields: DirectoryProfileField[], values: ProfileValueSet) {
+function publicProfileProperties(fields: readonly PublicTemplateField[], values: ProfileValueSet) {
   const scalarTypes = new Set(["short-text", "boolean", "integer", "decimal", "money",
     "single-choice", "date", "datetime", "duration"]);
-  return fields.filter((field) => field.visibility === "public" && field.placement !== "hidden" &&
-    scalarTypes.has(field.type) && Object.hasOwn(values, field.key)).map((field) => {
+  return fields.filter((field) => scalarTypes.has(field.type) &&
+    Object.hasOwn(values, field.key)).map((field) => {
       const raw = values[field.key];
       const value = field.type === "money" && raw && typeof raw === "object"
         ? `${(raw as { currency: string }).currency}:${(raw as { amountMinor: number }).amountMinor}`
@@ -55,7 +56,7 @@ export default async function ListingPage({ params }: PageProps<"/listings/[slug
   const featured = activeFeaturedSlugs([listing.slug]).has(listing.slug);
   const image = assignedMedia("listing", listing.slug, "public");
   const profiles = activeDirectoryProfiles();
-  const fields = profiles.definitions.flatMap((definition) => definition.fields);
+  const fields = publicTemplateFields(profiles);
   const properties = publicProfileProperties(fields, listing.profileValues);
   const profileMedia = publicProfileMediaAssets([...profileMediaIds(listing.profileValues, profiles)]);
   const definition = publicTemplateDefinition(getThemeSelection().templateId);

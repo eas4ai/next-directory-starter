@@ -13,6 +13,7 @@ import { getThemePreset } from "@/lib/theme";
 import { profileMediaIds, publicProfileMediaAssets } from "@/lib/media";
 import { getThemeSelection } from "@/lib/theme-selection";
 import { publicTemplateDefinition } from "@/lib/public-template-registry";
+import { publicTemplateFields } from "@/lib/public-template-sdk";
 import { DefaultPublicDirectory } from "@/components/public-template-defaults";
 
 export async function generateMetadata({ searchParams }: PageProps<"/listings">) {
@@ -29,7 +30,7 @@ export default async function ListingsPage({ searchParams }: PageProps<"/listing
   await connection();
   const input = await searchParams;
   const profiles = activeDirectoryProfiles();
-  const fields = profiles.definitions.flatMap((definition) => definition.fields);
+  const fields = publicTemplateFields(profiles);
   const descriptors = profileDiscoveryDescriptors(profiles);
   const query = parseProfileDirectoryQuery(input, profiles);
   const result = searchProfileDirectory(query);

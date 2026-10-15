@@ -1,10 +1,37 @@
 import type { ComponentType, ReactNode } from "react";
-import type { DirectoryProfileField } from "@/lib/directory-profile-types";
+import type { ActiveProfileSet, DirectoryProfileField } from "@/lib/directory-profile-types";
 import type { Listing } from "@/lib/listings";
 import type { MediaAsset } from "@/lib/media";
 import type { SiteConfig } from "@/lib/site-config";
 
 export const PUBLIC_TEMPLATE_API_VERSION = 1 as const;
+
+type DeepReadonly<T> = T extends (...args: never[]) => unknown ? T
+  : T extends readonly (infer Item)[] ? readonly DeepReadonly<Item>[]
+    : T extends object ? { readonly [Key in keyof T]: DeepReadonly<T[Key]> } : T;
+
+export type PublicTemplateField = DeepReadonly<DirectoryProfileField> & {
+  readonly visibility: "public";
+  readonly placement: Exclude<DirectoryProfileField["placement"], "hidden">;
+};
+
+function frozenClone<T>(value: T): DeepReadonly<T> {
+  if (Array.isArray(value)) return Object.freeze(value.map(frozenClone)) as DeepReadonly<T>;
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value).map(([key, entry]) => [key, frozenClone(entry)]);
+    return Object.freeze(Object.fromEntries(entries)) as DeepReadonly<T>;
+  }
+  return value as DeepReadonly<T>;
+}
+
+export function publicTemplateFields(profiles: ActiveProfileSet): readonly PublicTemplateField[] {
+  const fields = profiles.definitions.flatMap(({ fields: definitionFields }) => definitionFields)
+    .filter((field): field is DirectoryProfileField & { visibility: "public";
+      placement: Exclude<DirectoryProfileField["placement"], "hidden"> } =>
+      field.visibility === "public" && field.placement !== "hidden")
+    .map((field) => frozenClone(field) as PublicTemplateField);
+  return Object.freeze(fields);
+}
 
 export type PublicTemplateNavigationItem = {
   href: string;
@@ -41,7 +68,7 @@ export type PublicTemplatePagination = {
 
 export type PublicTemplateListingCardProps = {
   listing: PublicTemplateListing;
-  fields: readonly DirectoryProfileField[];
+  fields: readonly PublicTemplateField[];
   mediaAssets: ReadonlyMap<string, MediaAsset>;
   iconLibrary: string;
   highlighted?: boolean;
@@ -50,7 +77,7 @@ export type PublicTemplateListingCardProps = {
 
 export type PublicTemplateFeaturedProps = {
   listings: readonly PublicTemplateListing[];
-  fields: readonly DirectoryProfileField[];
+  fields: readonly PublicTemplateField[];
   mediaAssets: ReadonlyMap<string, MediaAsset>;
   iconLibrary: string;
   Card: ComponentType<PublicTemplateListingCardProps>;
@@ -77,7 +104,7 @@ export type PublicTemplateDirectoryProps = {
   total: number;
   listings: readonly PublicTemplateListing[];
   featured: readonly PublicTemplateListing[];
-  fields: readonly DirectoryProfileField[];
+  fields: readonly PublicTemplateField[];
   mediaAssets: ReadonlyMap<string, MediaAsset>;
   facets: ReactNode;
   pagination: PublicTemplatePagination;
@@ -87,7 +114,7 @@ export type PublicTemplateDirectoryProps = {
 
 export type PublicTemplateListingDetailProps = {
   listing: PublicTemplateListing;
-  fields: readonly DirectoryProfileField[];
+  fields: readonly PublicTemplateField[];
   mediaAssets: ReadonlyMap<string, MediaAsset>;
   image?: MediaAsset;
   markdownHref: string;
@@ -96,7 +123,7 @@ export type PublicTemplateListingDetailProps = {
 
 export type PublicTemplateComparisonProps = {
   listings: readonly PublicTemplateListing[];
-  fields: readonly DirectoryProfileField[];
+  fields: readonly PublicTemplateField[];
   mediaAssets: ReadonlyMap<string, MediaAsset>;
   message?: string;
 };
