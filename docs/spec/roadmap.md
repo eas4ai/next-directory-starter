@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: vector-ai-tools-template
+Current: local-city-guide-template
 
 ## public-starter-and-theme
 
@@ -471,6 +471,38 @@ system and all public states remain accessible by keyboard, readable in light
 and dark mode, usable without client JavaScript, and free of horizontal
 scrolling at 320 pixels; and removal preserves explicitly seeded operator data
 while returning unchanged owned source to its prior state.
+
+## local-city-guide-template
+
+Requirements: TPL-003
+
+Delivery: extend the public-template home view with bounded immutable eligible
+listings, public profile fields, featured state, and public media so installed
+templates can build live discovery from operator-managed data. Extend explicit
+add-on seeding with validated packaged images and coordinated idempotent
+listing, typed-value, media-record, and runtime-file handling. Use those shared
+capabilities to ship BOROUGH as a complete local-city directory add-on with its
+approved editorial design, original street photography, versioned place
+profile, functional neighborhood and place discovery, operator-authored
+curator notes and editorial picks, curated place trails, representative seed
+content, product documents, and a reproducible distributable archive.
+
+Done-when: the home view exposes only bounded immutable eligible public data
+and reflects operator edits without renderer storage access or hardcoded
+listing identities; invalid, unsafe, corrupt, conflicting, or undeclared seed
+images fail before state changes; failed or repeated explicit seeds leave no
+partial files, records, or duplicates; backup and restore preserve seeded
+media; installation and removal do not mutate operator data; BOROUGH's archive
+completes a clean validate-install-build-activate-seed-select-remove round
+trip; every advertised neighborhood, place type, location, price,
+accessibility, best-for, duration, editorial, trail, search, filter, and sort
+control works on eligible server-rendered data; its approved visual system,
+original photography, local voices, and all public states remain accessible by
+keyboard, readable in light and dark mode, usable without client JavaScript,
+and free of horizontal scrolling at 320 pixels; metadata, Markdown, social,
+and structured data agree with visible records; and removal preserves
+explicitly seeded operator data and media while returning unchanged owned
+source to its prior state.
 
 ## cli-env-local-mismatch
 
