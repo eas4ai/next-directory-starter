@@ -320,9 +320,15 @@ const rendererImports = new Set([
   "@/lib/public-template-sdk",
 ]);
 const forbiddenRendererGlobals = new Set([
-  "Bun", "Deno", "document", "eval", "fetch", "Function", "globalThis", "localStorage",
-  "navigator", "process", "require", "sessionStorage", "WebSocket", "window", "Worker",
-  "XMLHttpRequest",
+  "__dirname", "__filename", "Buffer", "Bun", "Deno", "document", "eval", "exports",
+  "fetch", "Function", "global", "globalThis", "localStorage", "module", "navigator",
+  "Object", "process", "Proxy", "Reflect", "require", "sessionStorage", "WebAssembly",
+  "WebSocket", "window", "Worker", "XMLHttpRequest",
+]);
+const forbiddenRendererProperties = new Set([
+  "__proto__", "arguments", "callee", "caller", "constructor", "create", "defineProperties",
+  "defineProperty", "getOwnPropertyDescriptor", "getOwnPropertyDescriptors", "getPrototypeOf",
+  "prototype", "setPrototypeOf",
 ]);
 
 const rendererNames = new Set([
@@ -352,6 +358,26 @@ function isPropertyNameReference(node) {
       node.parent.initializer !== node);
 }
 
+function rendererElementAccessName(node, path) {
+  const argument = unwrapExpression(node.argumentExpression);
+  if (ts.isStringLiteral(argument) || ts.isNoSubstitutionTemplateLiteral(argument) ||
+      ts.isNumericLiteral(argument)) return argument.text;
+  throw new Error(`Forbidden renderer computed property: ${path}`);
+}
+
+function rendererBindingName(node, path) {
+  if (!node.propertyName) return null;
+  if (ts.isIdentifier(node.propertyName) || ts.isStringLiteral(node.propertyName) ||
+      ts.isNumericLiteral(node.propertyName)) return node.propertyName.text;
+  if (ts.isComputedPropertyName(node.propertyName)) {
+    const expression = unwrapExpression(node.propertyName.expression);
+    if (ts.isStringLiteral(expression) || ts.isNoSubstitutionTemplateLiteral(expression) ||
+        ts.isNumericLiteral(expression)) return expression.text;
+    throw new Error(`Forbidden renderer computed property: ${path}`);
+  }
+  return null;
+}
+
 function validateRendererNode(node, path) {
   if (ts.isCallExpression(node) && (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
       (ts.isIdentifier(node.expression) && ["eval", "require", "Function"].includes(
@@ -360,6 +386,15 @@ function validateRendererNode(node, path) {
   }
   if (ts.isJsxAttribute(node) && node.name.text === "dangerouslySetInnerHTML") {
     throw new Error(`Forbidden renderer raw HTML: ${path}`);
+  }
+  if (ts.isMetaProperty(node)) {
+    throw new Error(`Forbidden renderer module metadata: ${path}`);
+  }
+  const property = ts.isPropertyAccessExpression(node) ? node.name.text
+    : ts.isElementAccessExpression(node) ? rendererElementAccessName(node, path)
+      : ts.isBindingElement(node) ? rendererBindingName(node, path) : null;
+  if (property && forbiddenRendererProperties.has(property)) {
+    throw new Error(`Forbidden renderer dynamic code property ${property}: ${path}`);
   }
   if (ts.isIdentifier(node) && forbiddenRendererGlobals.has(node.text) &&
       !isPropertyNameReference(node)) {

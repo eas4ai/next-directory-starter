@@ -67,13 +67,12 @@ const vectorTemplate = {
       const mark = known.has(listing.slug)
         ? `/addons/vector-ai-tools/marks/${listing.slug}.svg`
         : "/addons/vector-ai-tools/vector-mark.svg";
-      const key = (name: string) => `vector-ai-tools.ai-tools.${name}`;
-      const rawPrice = listing.profileValues[key("starting-price")];
+      const rawPrice = listing.profileValues["vector-ai-tools.ai-tools.starting-price"];
       const amount = rawPrice && typeof rawPrice === "object"
         ? (rawPrice as { amountMinor?: unknown }).amountMinor : undefined;
       const price = typeof amount === "number" && amount === 0 ? "Free"
         : typeof amount === "number" ? `$${(amount / 100).toFixed(0)} / mo`
-          : listing.profileValues[key("pricing-model")] === "enterprise"
+          : listing.profileValues["vector-ai-tools.ai-tools.pricing-model"] === "enterprise"
             ? "Contact sales" : "Price unavailable";
       return <article className="vector-tool-card">
         <div className="vector-card-top">
@@ -84,9 +83,9 @@ const vectorTemplate = {
         </div>
         <p>{listing.summary}</p>
         <div className="vector-fact-row"><strong>{price}</strong>
-          {listing.profileValues[key("free-tier")] === true && <span>Free tier</span>}
-          {listing.profileValues[key("open-source")] === true && <span>Open source</span>}
-          {listing.profileValues[key("verified-launch")] === true &&
+          {listing.profileValues["vector-ai-tools.ai-tools.free-tier"] === true && <span>Free tier</span>}
+          {listing.profileValues["vector-ai-tools.ai-tools.open-source"] === true && <span>Open source</span>}
+          {listing.profileValues["vector-ai-tools.ai-tools.verified-launch"] === true &&
             <span className="vector-verified">● Verified</span>}
         </div>
         <TemplateProfileValues fields={fields} listing={listing} mediaAssets={mediaAssets}
@@ -96,12 +95,11 @@ const vectorTemplate = {
       </article>;
     },
     directory(value) {
-      const key = (name: string) => `vector-ai-tools.ai-tools.${name}`;
       const Card = value.slots?.card ?? TemplateListingCard;
       const launches = [...value.listings].filter((listing) =>
-        listing.profileValues[key("launch-status")] === "new").sort((left, right) =>
-        String(right.profileValues[key("launch-date")]).localeCompare(
-          String(left.profileValues[key("launch-date")]))).slice(0, 3);
+        listing.profileValues["vector-ai-tools.ai-tools.launch-status"] === "new").sort((left, right) =>
+        String(right.profileValues["vector-ai-tools.ai-tools.launch-date"]).localeCompare(
+          String(left.profileValues["vector-ai-tools.ai-tools.launch-date"]))).slice(0, 3);
       return <main className="vector-directory">
         <section className="vector-directory-intro">
           <div className="vector-kicker">VECTOR / DIRECTORY</div>
@@ -117,7 +115,7 @@ const vectorTemplate = {
           <div className="vector-launch-grid">{launches.map((listing) =>
             <TemplateLink key={listing.slug} href={`/listings/${listing.slug}`}>
               <strong>{listing.name}</strong><span>{listing.category}</span>
-              {listing.profileValues[key("verified-launch")] === true &&
+              {listing.profileValues["vector-ai-tools.ai-tools.verified-launch"] === true &&
                 <em>● Verified</em>}
             </TemplateLink>)}</div>
         </section>

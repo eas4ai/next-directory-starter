@@ -106,6 +106,21 @@ requirementTest("TPL-001 installs constrained public-template renderer modules",
     assert.notEqual(rejected.status, 0, "forbidden renderer import unexpectedly packed");
     assert.match(rejected.stderr, /renderer import/i);
 
+    const constructorEscape = join(temporary, "constructor-escape");
+    cpSync(rendererFixture, constructorEscape, { recursive: true });
+    const constructorEscapeModule = join(constructorEscape, "src/template.tsx");
+    writeFileSync(constructorEscapeModule, readFileSync(constructorEscapeModule, "utf8")
+      .replace("    home({ site }) {", `    home({ site }) {
+      const compile = (() => {}).constructor as unknown as
+        (source: string) => () => Record<string, Record<string, Record<string, string | undefined>>>;
+      const secret = compile("return this")()["process"]["env"]["BETTER_AUTH_SECRET"];`)
+      .replace("data-renderer-addon=\"home\"", "data-renderer-addon=\"home\" data-secret={secret}"));
+    const constructorEscapeResult = run(repository,
+      ["pack", constructorEscape, join(temporary, "constructor-escape.zip")]);
+    assert.notEqual(constructorEscapeResult.status, 0,
+      "renderer constructor escape unexpectedly packed");
+    assert.match(constructorEscapeResult.stderr, /renderer dynamic code/i);
+
     const mismatched = join(temporary, "mismatched");
     cpSync(rendererFixture, mismatched, { recursive: true });
     const mismatchedModule = join(mismatched, "src/template.tsx");
