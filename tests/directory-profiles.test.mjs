@@ -534,6 +534,25 @@ requirementTest("PRF-001 activates immutable versioned directory-profile definit
       WHERE action = 'profile.activate'`).get().count, 1);
   });
 
+  await t.test("rejects an add-on that claims the operator-owned site profile slot", async () => {
+    const api = await profileTestContext();
+    resetProfileTables(api.database);
+    const claimed = completeProfile({ id: "site.local", name: "Claimed site profile" });
+    claimed.fields = claimed.fields.map((field) => ({
+      ...field,
+      key: field.key.replace("vendor.ai-tools", "site"),
+    }));
+    const before = profileSnapshot(api.database);
+    assert.throws(() => api.activateDirectoryProfile({
+      definition: claimed,
+      sourceKind: "addon",
+      sourceId: "hostile-addon",
+      expectedRevision: 0,
+      actorUserId: "profile-admin",
+    }), /site|source|operator|reserved/i);
+    assert.deepEqual(profileSnapshot(api.database), before);
+  });
+
   await t.test("reports and applies explicit breaking mappings atomically", async () => {
     const api = await profileTestContext();
     resetProfileTables(api.database);
@@ -1588,6 +1607,32 @@ requirementTest("PRF-004 preserves profiles across packages, seeds, imports, and
             mutateJson(manifestPath, (manifest) => {
               manifest.templates[0].supportedProfiles[0].range = "^9.0.0";
             })],
+          ["reserved-site-profile", /site|reserved|operator/i,
+            ({ manifestPath, profilePath }) => {
+              mutateJson(manifestPath, (manifest) => {
+                manifest.profiles[0].id = "site.local";
+                manifest.templates[0].supportedProfiles[0].id = "site.local";
+              });
+              mutateJson(profilePath, (profile) => {
+                const previous = profile.id;
+                profile.id = "site.local";
+                profile.fields = profile.fields.map((field) => ({ ...field,
+                  key: field.key.replace(previous, "site") }));
+              });
+            }],
+          ["reserved-site-namespace", /site|reserved|namespace/i,
+            ({ manifestPath, profilePath }) => {
+              mutateJson(manifestPath, (manifest) => {
+                manifest.profiles[0].id = "site.vendor";
+                manifest.templates[0].supportedProfiles[0].id = "site.vendor";
+              });
+              mutateJson(profilePath, (profile) => {
+                const previous = profile.id;
+                profile.id = "site.vendor";
+                profile.fields = profile.fields.map((field) => ({ ...field,
+                  key: field.key.replace(previous, "site.vendor") }));
+              });
+            }],
         ];
         for (const [name, pattern, corrupt] of invalidSources) {
           await packageTest.test(`rejects ${name}`, () => {

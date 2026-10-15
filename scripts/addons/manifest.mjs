@@ -49,7 +49,8 @@ const templateSchema = z.object({
 }).strict();
 
 const profileSchema = z.object({
-  id: z.string().min(3).max(160).regex(profileIdPattern),
+  id: z.string().min(3).max(160).regex(profileIdPattern)
+    .refine((value) => !value.startsWith("site."), "The site profile namespace is reserved"),
   version: z.string().refine((value) => semver.valid(value) !== null, "Invalid profile version"),
   schema: payloadPath,
 }).strict();
@@ -294,6 +295,10 @@ export function validateProfileDefinitions(manifest, files) {
     try { input = JSON.parse(source); }
     catch { throw new Error(`Profile schema is not valid JSON: ${profile.schema}`); }
     const definition = parseDirectoryProfileDefinition(input);
+    if (definition.id.startsWith("site.") ||
+        definition.fields.some(({ key }) => key.startsWith("site."))) {
+      throw new Error(`Add-on profiles cannot claim the reserved site namespace: ${profile.schema}`);
+    }
     if (definition.id !== profile.id || definition.version !== profile.version) {
       throw new Error(`Profile identity or version does not match the manifest: ${profile.schema}`);
     }
