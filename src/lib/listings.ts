@@ -79,6 +79,13 @@ export function directoryCategories(): string[] {
   return rows.map(({ name }) => name);
 }
 
+export function publicDirectoryCategories(): string[] {
+  const rows = database.prepare(`SELECT DISTINCT l.category AS name FROM listings l
+    WHERE ${PUBLIC_LISTING_PREDICATE} ORDER BY l.category COLLATE NOCASE`)
+    .all() as { name: string }[];
+  return rows.map(({ name }) => name);
+}
+
 export type ListingSearch = { q?: string; category?: string; page?: string };
 
 function publicFilter(q: string, category: string): { where: string; args: string[] } {

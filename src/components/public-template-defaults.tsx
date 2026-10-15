@@ -2,11 +2,11 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PresetExternalLinkIcon } from "@/components/preset-icon";
 import {
-  TemplateListingCard, TemplatePagination,
+  TemplateListingCard, TemplatePagination, TemplateProfileValues,
 } from "@/components/public-template-primitives";
 import type {
-  PublicTemplateDirectoryProps, PublicTemplateEmptyProps, PublicTemplateFeaturedProps,
-  PublicTemplateHeaderProps, PublicTemplateHomeProps,
+  PublicTemplateComparisonProps, PublicTemplateDirectoryProps, PublicTemplateEmptyProps,
+  PublicTemplateFeaturedProps, PublicTemplateHeaderProps, PublicTemplateHomeProps,
 } from "@/lib/public-template-sdk";
 
 export function DefaultPublicHeader({ site, navigation, appearanceControl,
@@ -91,5 +91,25 @@ export function DefaultPublicDirectory(value: PublicTemplateDirectoryProps) {
     </section>
     {value.listings.length === 0 && <Empty message="No listings match these filters." />}
     <Pagination value={value.pagination} />
+  </main>;
+}
+
+export function DefaultPublicComparison({ listings, fields,
+  mediaAssets, message }: PublicTemplateComparisonProps) {
+  return <main className="site-container wrap-anywhere">
+    <Link href="/listings" className="text-sm text-muted-foreground hover:text-foreground">
+      ← Listings
+    </Link>
+    <h1 className="mt-8 text-4xl font-semibold tracking-tight">Compare listings</h1>
+    {message && <p className="mt-4 text-muted-foreground" role="status">{message}</p>}
+    <div className="template-listing-grid mt-8">
+      {listings.map((listing) => <article key={listing.slug}>
+        <h2 className="text-xl font-semibold"><Link href={`/listings/${listing.slug}`}>
+          {listing.name}
+        </Link></h2>
+        <p className="mt-2 text-muted-foreground">{listing.summary}</p>
+        <TemplateProfileValues fields={fields} listing={listing} mediaAssets={mediaAssets} />
+      </article>)}
+    </div>
   </main>;
 }

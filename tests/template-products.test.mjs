@@ -1,17 +1,68 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash, randomBytes } from "node:crypto";
 import {
-  cpSync, existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync,
+  cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, rmSync,
+  symlinkSync, writeFileSync,
 } from "node:fs";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
-import { spawnSync } from "node:child_process";
+import { join, relative, resolve, sep } from "node:path";
+import { spawn, spawnSync } from "node:child_process";
+import Database from "better-sqlite3";
+import { chromium } from "playwright-core";
 
 const repository = resolve(import.meta.dirname, "..");
 const selectedRequirement = process.env.TEMPLATE_REQUIREMENT;
 
 function requirementTest(name, body) {
   if (!selectedRequirement || name.startsWith(selectedRequirement)) test(name, body);
+}
+
+const ignoredCopyRoots = new Set([
+  ".git", ".next", ".runtime", ".claude", ".gstack", ".superpowers", "node_modules",
+]);
+
+function copyStarter(destination) {
+  cpSync(repository, destination, { recursive: true, filter(source) {
+    const path = relative(repository, source);
+    return !path || !ignoredCopyRoots.has(path.split(sep)[0]);
+  } });
+  symlinkSync(join(repository, "node_modules"), join(destination, "node_modules"), "dir");
+}
+
+function treeSnapshot(root) {
+  const rows = [];
+  function visit(directory) {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const absolute = join(directory, entry.name);
+      const path = relative(root, absolute).split(sep).join("/");
+      if (ignoredCopyRoots.has(path.split("/")[0])) continue;
+      if (entry.isDirectory()) visit(absolute);
+      else if (entry.isSymbolicLink()) rows.push([path, `link:${readlinkSync(absolute)}`]);
+      else rows.push([path, createHash("sha256").update(readFileSync(absolute)).digest("hex")]);
+    }
+  }
+  visit(root);
+  return rows.sort(([left], [right]) => left.localeCompare(right));
+}
+
+async function freePort() {
+  const server = createServer();
+  await new Promise((resolveReady) => server.listen(0, "127.0.0.1", resolveReady));
+  const port = server.address().port;
+  await new Promise((resolveClosed) => server.close(resolveClosed));
+  return port;
+}
+
+function contrastRatio(rgbA, rgbB) {
+  const luminance = (value) => {
+    const channels = value.match(/\d+/g).slice(0, 3).map((channel) => Number(channel) / 255)
+      .map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  };
+  const values = [luminance(rgbA), luminance(rgbB)].sort((left, right) => right - left);
+  return (values[0] + 0.05) / (values[1] + 0.05);
 }
 
 requirementTest("TPL-001 installs constrained public-template renderer modules", () => {
@@ -113,13 +164,13 @@ requirementTest("TPL-001 installs constrained public-template renderer modules",
   }
 });
 
-requirementTest("TPL-002 packages the complete VECTOR directory product", () => {
+requirementTest("TPL-002 packages the complete VECTOR directory product", async () => {
   const fixture = join(repository, "fixtures/addons/vector-ai-tools");
   assert.ok(existsSync(join(fixture, "directory-addon.json")),
     "the VECTOR add-on package is missing");
   for (const path of [
     "src/theme.ts", "src/template.tsx", "src/template.css", "src/ai-tools.profile.json",
-    "seed/catalog.json", "docs/README.md", "docs/CHANGELOG.md", "docs/LICENSE.md",
+    "seed/catalog.json", "docs/readme.md", "docs/changelog.md", "docs/license.md",
   ]) {
     assert.ok(existsSync(join(fixture, path)), `VECTOR is missing ${path}`);
   }
@@ -128,5 +179,238 @@ requirementTest("TPL-002 packages the complete VECTOR directory product", () => 
     .map((path) => readFileSync(join(fixture, path), "utf8")).join("\n").toUpperCase();
   for (const token of ["#0A1020", "#141D30", "#EDF2FF", "#81A4FF", "#74D5B1"]) {
     assert.match(combinedDesignSource, new RegExp(token), `VECTOR is missing ${token}`);
+  }
+
+  const profile = JSON.parse(readFileSync(join(fixture, "src/ai-tools.profile.json"), "utf8"));
+  const fieldBySuffix = new Map(profile.fields.map((field) =>
+    [field.key.replace("vector-ai-tools.ai-tools.", ""), field]));
+  for (const name of ["pricing-model", "starting-price", "free-tier", "platforms", "integrations",
+    "open-source", "verified-launch", "launch-status", "launch-date", "last-verified"]) {
+    assert.ok(fieldBySuffix.has(name), `VECTOR profile is missing ${name}`);
+  }
+  assert.equal(fieldBySuffix.get("verified-launch").writeAuthority, "operator");
+  assert.equal(fieldBySuffix.get("last-verified").writeAuthority, "operator");
+  const seed = JSON.parse(readFileSync(join(fixture, "seed/catalog.json"), "utf8"));
+  assert.ok(seed.listings.length >= 9, "VECTOR needs representative public and private seed states");
+  assert.ok(seed.listings.some(({ status }) => status === "draft"),
+    "VECTOR seed does not exercise an ineligible draft");
+  assert.ok(seed.listings.some(({ profileValues }) =>
+    profileValues["vector-ai-tools.ai-tools.verified-launch"] === false),
+  "VECTOR seed does not exercise an unverified launch");
+
+  const temporary = mkdtempSync(join(tmpdir(), "vector-template-product-"));
+  let application;
+  const addon = (cwd, args) => spawnSync(process.execPath, ["scripts/addons.mjs", ...args], {
+    cwd, encoding: "utf8", timeout: 300_000, env: { ...process.env, CI: "1" },
+  });
+  const npm = (cwd, args, env, timeout = 600_000) => spawnSync("npm", args, {
+    cwd, encoding: "utf8", timeout, env: { ...process.env, CI: "1", ...env },
+  });
+  const expectSuccess = (result, label) => assert.equal(result.status, 0,
+    `${label}: ${result.stderr || result.stdout}`);
+  try {
+    const firstArchive = join(temporary, "vector-first.zip");
+    const secondArchive = join(temporary, "vector-second.zip");
+    expectSuccess(addon(repository, ["pack", fixture, firstArchive]), "pack VECTOR archive");
+    expectSuccess(addon(repository, ["pack", fixture, secondArchive]), "repack VECTOR archive");
+    assert.deepEqual(readFileSync(firstArchive), readFileSync(secondArchive),
+      "equal VECTOR sources did not produce a byte-identical archive");
+    expectSuccess(addon(repository, ["validate", firstArchive]), "validate VECTOR archive");
+
+    const starter = join(temporary, "starter");
+    copyStarter(starter);
+    const baseline = treeSnapshot(starter);
+    const databasePath = join(temporary, `vector-${randomBytes(6).toString("hex")}.db`);
+    const port = await freePort();
+    const origin = `http://127.0.0.1:${port}`;
+    const env = {
+      DATABASE_URL: `file:${databasePath}`,
+      DIRECTORY_EXPLICIT_MIGRATIONS: "1",
+      BETTER_AUTH_SECRET: randomBytes(32).toString("hex"),
+      SITE_URL: origin,
+      BETTER_AUTH_URL: origin,
+    };
+    assert.equal(existsSync(databasePath), false);
+    expectSuccess(addon(starter, ["install", firstArchive]), "install VECTOR archive");
+    assert.equal(existsSync(databasePath), false, "VECTOR installation opened the operator database");
+    assert.ok(existsSync(join(starter, "src/addons/vector-ai-tools/docs/readme.md")));
+    expectSuccess(npm(starter, ["run", "db:migrate"], env), "migrate VECTOR database");
+    expectSuccess(npm(starter, ["run", "build"], env), "build installed VECTOR product");
+
+    const activate = spawnSync(process.execPath,
+      ["--import", "tsx", "--input-type=module", "--eval", `
+        const profilesModule = await import("./src/lib/directory-profiles.ts");
+        const databaseModule = await import("./src/lib/database.ts");
+        const profiles = profilesModule.default ?? profilesModule;
+        const database = databaseModule.database ?? databaseModule.default?.database;
+        const now = new Date().toISOString();
+        database.prepare('INSERT INTO "user" (id, name, email, emailVerified, createdAt, updatedAt, role, banned) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+          .run("vector-admin", "VECTOR Admin", "vector-admin@example.invalid", 1,
+            now, now, "admin", 0);
+        const available = profiles.availableDirectoryProfiles();
+        if (!available.some((item) => item.profileId === "vector-ai-tools.ai-tools" &&
+            item.version === "1.0.0" && item.sourceId === "vector-ai-tools")) process.exit(2);
+        profiles.activateDirectoryProfile({
+          definition: profiles.availableDirectoryProfileDefinition(
+            "vector-ai-tools.ai-tools", "1.0.0"),
+          sourceKind: "addon", sourceId: "vector-ai-tools", expectedRevision: 0,
+          actorUserId: "vector-admin",
+        });`],
+      { cwd: starter, encoding: "utf8", env: { ...process.env, CI: "1", NODE_ENV: "test", ...env } });
+    expectSuccess(activate, "activate VECTOR profile");
+    expectSuccess(npm(starter, ["run", "addon:seed", "--", "vector-ai-tools"], env),
+      "seed VECTOR catalog");
+
+    const select = spawnSync(process.execPath,
+      ["--import", "tsx", "--input-type=module", "--eval", `
+        const imported = await import("./src/lib/theme-selection.ts");
+        const api = imported.default ?? imported;
+        if (!api.templateOptions.some((item) => item.id === "vector-ai-tools")) process.exit(2);
+        if (!api.themeChoices.some((item) => item.id === "vector-ai-tools")) process.exit(3);
+        const selection = api.saveThemeSelection({ themeId: "vector-ai-tools",
+          templateId: "vector-ai-tools" }, "vector-admin");
+        if (selection.templateId !== "vector-ai-tools") process.exit(4);`],
+      { cwd: starter, encoding: "utf8", env: { ...process.env, CI: "1", NODE_ENV: "test", ...env } });
+    expectSuccess(select, "select VECTOR theme and template");
+
+    application = spawn("npm", ["run", "start", "--", "-p", String(port)], {
+      cwd: starter, env: { ...process.env, CI: "1", ...env }, detached: true, stdio: "ignore",
+    });
+    let ready = false;
+    for (let attempt = 0; attempt < 80; attempt += 1) {
+      try {
+        if ((await fetch(origin, { signal: AbortSignal.timeout(1000) })).status < 500) {
+          ready = true;
+          break;
+        }
+      } catch { /* wait for the production server */ }
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, 250));
+    }
+    assert.ok(ready, "installed VECTOR production server did not start");
+    const html = async (path) => {
+      const response = await fetch(`${origin}${path}`);
+      const body = await response.text();
+      assert.equal(response.status, 200, `${path}: ${body}`);
+      return body;
+    };
+    const results = (body) => [...body.matchAll(/data-vector-result="([a-z0-9-]+)"/g)]
+      .map((match) => match[1]);
+
+    assert.match(await html("/"), /Discover tools that/);
+    const directory = await html("/listings");
+    assert.deepEqual(new Set(results(directory)), new Set([
+      "agent-relay", "arc-forge", "briefly", "codepilot-local", "data-lens", "pixel-flow",
+      "signal-lab", "voice-mesh",
+    ]));
+    assert.doesNotMatch(directory, /Shadow Preview/);
+    assert.doesNotMatch(directory, /<option value="Video">/,
+      "a category backed only by a draft leaked into public filters");
+
+    const filtered = async (entries) => results(await html(`/listings?${new URLSearchParams(entries)}`));
+    assert.deepEqual(new Set(await filtered([["facet.vector-ai-tools.ai-tools.pricing-model", "usage"]])),
+      new Set(["agent-relay", "signal-lab"]));
+    assert.deepEqual(new Set(await filtered([["facet.vector-ai-tools.ai-tools.integrations", "github"]])),
+      new Set(["agent-relay", "codepilot-local", "signal-lab"]));
+    assert.deepEqual(new Set(await filtered([["facet.vector-ai-tools.ai-tools.open-source", "true"]])),
+      new Set(["agent-relay", "codepilot-local", "signal-lab"]));
+    assert.deepEqual(new Set(await filtered([["facet.vector-ai-tools.ai-tools.verified-launch", "true"]])),
+      new Set(["arc-forge", "codepilot-local", "data-lens", "pixel-flow", "signal-lab", "voice-mesh"]));
+    assert.deepEqual(new Set(await filtered([["facet.vector-ai-tools.ai-tools.launch-status", "new"]])),
+      new Set(["agent-relay", "arc-forge", "pixel-flow"]));
+    assert.deepEqual(new Set(await filtered([["facet.vector-ai-tools.ai-tools.free-tier", "true"]])),
+      new Set(["agent-relay", "arc-forge", "briefly", "codepilot-local", "signal-lab"]));
+    assert.deepEqual(await filtered([["q", "residency"]]), ["codepilot-local"]);
+    const launchOrder = await filtered([["sort", "vector-ai-tools.ai-tools.launch-date:desc"]]);
+    assert.deepEqual(launchOrder.slice(0, 3), ["agent-relay", "arc-forge", "pixel-flow"]);
+
+    const comparison = await html("/compare?tool=arc-forge&tool=signal-lab");
+    assert.match(comparison, /Arc Forge/);
+    assert.match(comparison, /Signal Lab/);
+    assert.match(comparison, /Starting price/);
+    assert.match(comparison, /Verified launch/);
+    assert.match(await html("/compare?tool=arc-forge&tool=arc-forge"), /2 to 4 unique tools/);
+    assert.match(await html("/compare?tool=arc-forge&tool=signal-lab&tool=briefly&tool=pixel-flow&tool=voice-mesh"),
+      /2 to 4 unique tools/);
+    const ineligible = await html("/compare?tool=arc-forge&tool=shadow-preview");
+    assert.match(ineligible, /One or more tools are unavailable/);
+    assert.doesNotMatch(ineligible, /Shadow Preview/);
+
+    const detail = await html("/listings/arc-forge");
+    assert.match(detail, new RegExp(`<link rel="canonical" href="${origin}/listings/arc-forge"`));
+    assert.match(detail, /application\/ld\+json/);
+    assert.match(detail, /Verified launch/);
+    const markdown = await fetch(`${origin}/markdown/listings/arc-forge`);
+    assert.equal(markdown.status, 200);
+    assert.match(await markdown.text(), /Arc Forge/);
+
+    const browser = await chromium.launch({ headless: true,
+      ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: "chrome" }),
+      args: ["--no-sandbox"] });
+    try {
+      const narrow = await browser.newContext({ viewport: { width: 320, height: 900 },
+        colorScheme: "dark", javaScriptEnabled: false });
+      await narrow.addCookies([{ name: "site_appearance", value: "dark", url: origin }]);
+      const page = await narrow.newPage();
+      await page.goto(`${origin}/listings`);
+      assert.equal(await page.locator("html").getAttribute("data-template"), "vector-ai-tools");
+      assert.equal(await page.locator("body").evaluate((element) => getComputedStyle(element).backgroundColor),
+        "rgb(10, 16, 32)");
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth), "VECTOR overflows at 320 pixels");
+      const background = await page.locator("body").evaluate((element) =>
+        getComputedStyle(element).backgroundColor);
+      const foreground = await page.locator("body").evaluate((element) =>
+        getComputedStyle(element).color);
+      assert.ok(contrastRatio(background, foreground) >= 7,
+        `VECTOR dark text contrast is too low: ${background} / ${foreground}`);
+      await page.locator('input[name="tool"][value="arc-forge"]').focus();
+      await page.keyboard.press("Space");
+      assert.ok(await page.locator('input[name="tool"][value="arc-forge"]').isChecked());
+      await page.locator('input[name="tool"][value="signal-lab"]').check();
+      await Promise.all([
+        page.waitForURL(/\/compare\?/),
+        page.getByRole("button", { name: /Compare selected/ }).click(),
+      ]);
+      assert.match(await page.locator("body").innerText(), /Compare your shortlist/i);
+      await narrow.close();
+
+      const light = await browser.newContext({ viewport: { width: 1280, height: 900 },
+        colorScheme: "light" });
+      await light.addCookies([{ name: "site_appearance", value: "light", url: origin }]);
+      const lightPage = await light.newPage();
+      await lightPage.goto(origin);
+      assert.equal(await lightPage.locator("body").evaluate((element) =>
+        getComputedStyle(element).backgroundColor), "rgb(244, 247, 255)");
+      await light.close();
+    } finally {
+      await browser.close();
+    }
+
+    process.kill(-application.pid, "SIGTERM");
+    application = null;
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 500));
+    expectSuccess(addon(starter, ["remove", "vector-ai-tools"]), "remove VECTOR archive");
+    const retained = new Database(databasePath, { readonly: true });
+    try {
+      assert.equal(retained.prepare("SELECT COUNT(*) FROM listings WHERE slug = ?")
+        .pluck().get("arc-forge"), 1, "VECTOR removal deleted seeded operator data");
+    } finally {
+      retained.close();
+    }
+    const fallback = spawnSync(process.execPath,
+      ["--import", "tsx", "--input-type=module", "--eval", `
+        const imported = await import("./src/lib/theme-selection.ts");
+        const api = imported.default ?? imported;
+        const selected = api.getThemeSelection();
+        if (selected.themeId !== "preset" || selected.templateId !== "classic") process.exit(2);`],
+      { cwd: starter, encoding: "utf8", env: { ...process.env, CI: "1", NODE_ENV: "test", ...env } });
+    expectSuccess(fallback, "fallback after VECTOR removal");
+    assert.deepEqual(treeSnapshot(starter), baseline,
+      "VECTOR remove did not restore the unchanged starter source");
+  } finally {
+    if (application?.pid) {
+      try { process.kill(-application.pid, "SIGTERM"); } catch { /* already stopped */ }
+    }
+    rmSync(temporary, { recursive: true, force: true });
   }
 });

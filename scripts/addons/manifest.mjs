@@ -186,6 +186,7 @@ export function targetForPayload(addonId, value) {
   if (path.startsWith("src/")) return `src/addons/${addonId}/${path.slice(4)}`;
   if (path.startsWith("public/")) return `public/addons/${addonId}/${path.slice(7)}`;
   if (path.startsWith("seed/")) return `src/addons/${addonId}/seed/${path.slice(5)}`;
+  if (path.startsWith("docs/")) return `src/addons/${addonId}/docs/${path.slice(5)}`;
   throw new Error(`Unsupported payload root: ${path}`);
 }
 

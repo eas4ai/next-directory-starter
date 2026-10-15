@@ -44,6 +44,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const navigation = [
     { href: "/owner/listings", label: "Submit a link" },
     { href: "/articles", label: "Articles" },
+    { href: "/compare", label: "Compare" },
     { href: "/listings", label: "Listings", emphasis: "primary" as const },
   ];
 

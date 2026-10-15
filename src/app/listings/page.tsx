@@ -6,7 +6,7 @@ import {
   parseProfileDirectoryQuery, profileDiscoveryDescriptors, searchProfileDirectory,
   serializeProfileDirectoryQuery,
 } from "@/lib/profile-discovery";
-import { activeFeaturedSlugs, directoryCategories, LISTINGS_PER_PAGE } from "@/lib/listings";
+import { activeFeaturedSlugs, LISTINGS_PER_PAGE, publicDirectoryCategories } from "@/lib/listings";
 import { pageMetadata, publicUrl } from "@/lib/page-metadata";
 import { getSiteConfig } from "@/lib/site-config";
 import { getThemePreset } from "@/lib/theme";
@@ -47,7 +47,7 @@ export default async function ListingsPage({ searchParams }: PageProps<"/listing
   const definition = publicTemplateDefinition(getThemeSelection().templateId);
   const Renderer = definition?.renderers.directory ?? DefaultPublicDirectory;
   const facets = <ProfileFacets descriptors={descriptors} query={query}
-    facetCounts={result.facetCounts} categories={directoryCategories()} />;
+    facetCounts={result.facetCounts} categories={publicDirectoryCategories()} />;
 
   return <>
     <JsonLd data={{
