@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: local-city-guide-template
+Current: events-conferences-template
 
 ## public-starter-and-theme
 
@@ -503,6 +503,43 @@ and free of horizontal scrolling at 320 pixels; metadata, Markdown, social,
 and structured data agree with visible records; and removal preserves
 explicitly seeded operator data and media while returning unchanged owned
 source to its prior state.
+
+## events-conferences-template
+
+Requirements: PRF-003, TPL-004
+
+Delivery: extend generic profile discovery with bounded canonical date/time
+range facets that require explicit offsets and compare normalized UTC instants.
+Use the public-template module SDK, versioned directory profiles, packaged
+media seeding, and the add-on lifecycle to ship NOW/NEXT as a complete events-
+and-conferences directory product. Build its approved poster-led light and dark
+design, original event art and portraits, date-first home and result layouts,
+event cards and details, and an event profile covering topics, attendance,
+time-zone-aware start and end times, venue and location, price, tickets,
+accessibility, speakers, schedules, and public media. Include working All
+Dates, Today, This Week, date-range, city, topic, attendance-mode, search, and
+chronological-sort paths; representative event states; product documents; and
+a reproducible distributable archive.
+
+Done-when: NOW/NEXT's archive completes a clean validate-install-build-
+activate-seed-select-remove round trip; equal sources produce equal archives;
+installation and removal do not mutate operator data implicitly; every public
+event, profile value, media asset, count, filter, date state, and sort comes
+from eligible server-rendered data; All Dates, Today, This Week, date-range,
+city, topic, attendance-mode, search, chronological sorting, and pagination
+return and retain the correct records; ambiguous or excessive date/time query
+bounds fail closed, canonical URLs preserve normalized instants, and upcoming,
+in-progress, and past states are correct at stored time-zone boundaries;
+schedules, speakers, venue,
+tickets, price, accessibility, and attendance facts remain accurate and make
+no booking or attendee-verification claim; the approved visual hierarchy keeps
+date, time, location, and attendance clearer than event art; every required
+surface, original asset, representative state, preview, selection, and product
+document is present; public pages remain keyboard accessible, readable in
+light and dark mode, usable without client JavaScript, and free of horizontal
+scrolling at 320 pixels; metadata, Markdown, social, and structured data agree
+with visible records; and removal preserves explicitly seeded operator data
+and media while returning unchanged owned source to its prior state.
 
 ## cli-env-local-mismatch
 
