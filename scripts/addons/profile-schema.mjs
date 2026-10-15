@@ -457,7 +457,7 @@ function validateProfileRelationships(profile) {
     if (field.facet) {
       facets += 1;
       if (!["boolean", "integer", "decimal", "money", "single-choice", "multiple-choice",
-        "date", "date-range", "duration", "location"].includes(field.type)) {
+        "date", "datetime", "date-range", "duration", "location"].includes(field.type)) {
         throw new Error(`Field type cannot be a facet: ${field.key}`);
       }
     }

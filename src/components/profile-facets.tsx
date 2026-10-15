@@ -42,6 +42,7 @@ function ChoiceFacet({ field, query, counts }: { field: DirectoryProfileField;
 function rangeInput(field: DirectoryProfileField): { type: "text" | "number" | "date"; step?: string;
   placeholder?: string } {
   if (field.type === "date" || field.type === "date-range") return { type: "date" };
+  if (field.type === "datetime") return { type: "text", placeholder: "2026-10-15T13:00:00Z" };
   if (field.type === "decimal") return { type: "number",
     step: String(1 / (10 ** Number(field.constraints.scale))) };
   if (field.type === "money") return { type: "text", placeholder: "USD:1000" };
