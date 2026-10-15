@@ -3,6 +3,8 @@ import { isInstalledTheme, installedThemes } from "@/lib/theme-sdk";
 import { readSiteSetting, writeSiteSetting } from "@/lib/site-settings";
 import { database } from "@/lib/database";
 import { addonTemplateOptions } from "@/addons/generated";
+import { activeDirectoryProfiles } from "@/lib/directory-profiles";
+import { templateSupportsProfiles } from "@/lib/template-compatibility";
 
 export const templateOptions = [
   { id: "classic", name: "Classic" },
@@ -39,7 +41,8 @@ export function getThemeSelection(): ThemeSelection {
   try {
     const selection = parseThemeSelection(JSON.parse(value));
     // A removed theme or template must not take the site offline.
-    return selection ?? defaultThemeSelection;
+    return selection && templateSupportsProfiles(selection.templateId, activeDirectoryProfiles())
+      ? selection : defaultThemeSelection;
   } catch {
     return defaultThemeSelection;
   }
@@ -48,6 +51,9 @@ export function getThemeSelection(): ThemeSelection {
 export function saveThemeSelection(input: unknown, actorId: string): ThemeSelection {
   const selection = parseThemeSelection(input);
   if (!selection) throw new Error("Invalid theme or template choice");
+  if (!templateSupportsProfiles(selection.templateId, activeDirectoryProfiles())) {
+    throw new Error("The selected template is not compatible with the active directory profile");
+  }
   database.transaction(() => {
     writeSiteSetting("theme_selection", JSON.stringify(selection));
     recordAudit("site.theme.select", actorId, `${selection.themeId}:${selection.templateId}`);

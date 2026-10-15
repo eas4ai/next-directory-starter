@@ -16,6 +16,8 @@ import {
 import {
   PROFILE_LIMITS, canonicalProfileJson, parseDirectoryProfileDefinition, profileDigest,
 } from "../../scripts/addons/profile-schema.mjs";
+import { readSiteSetting, writeSiteSetting } from "@/lib/site-settings";
+import { templateSupportsProfiles } from "@/lib/template-compatibility";
 
 export { canonicalProfileJson, parseDirectoryProfileDefinition, profileDigest };
 
@@ -600,6 +602,25 @@ function validateDefinitionSource(definition: DirectoryProfileDefinition,
   }
 }
 
+function fallbackIncompatibleTemplate(profiles: ActiveProfileSet, actorUserId: string): void {
+  const raw = readSiteSetting("theme_selection");
+  if (raw === null) return;
+  let selection: { themeId?: unknown; templateId?: unknown };
+  try {
+    selection = JSON.parse(raw) as { themeId?: unknown; templateId?: unknown };
+  } catch {
+    // Invalid saved selections already fall back when read.
+    return;
+  }
+  if (typeof selection.themeId !== "string" || typeof selection.templateId !== "string" ||
+      templateSupportsProfiles(selection.templateId, profiles)) return;
+  writeSiteSetting("theme_selection", JSON.stringify({
+    themeId: selection.themeId, templateId: "classic",
+  }));
+  recordAudit("site.template.compatibility-fallback", actorUserId,
+    `${selection.templateId}:classic`);
+}
+
 function activateNow(input: {
   definition: unknown;
   sourceKind: "addon" | "site";
@@ -713,6 +734,7 @@ function activateNow(input: {
     );
     const state = directoryProfileState();
     const profiles = activeDirectoryProfiles();
+    fallbackIncompatibleTemplate(profiles, input.actorUserId);
     for (const listing of affectedListings) reindexProfileSearch(listing, profiles);
     const kind = options.kind ?? (current && current.profileId !== definition.id ? "switch" : "activate");
     database.prepare(`INSERT INTO directory_profile_changes
