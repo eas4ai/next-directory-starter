@@ -1,19 +1,18 @@
 {
-  "command": "node mechanisms/check-directory-profiles.mjs",
-  "requirements": ["PRF-001", "PRF-002", "PRF-003", "PRF-004"],
+  "command": "node mechanisms/check-template-products.mjs",
+  "requirements": ["TPL-001", "TPL-002", "TPL-003", "TPL-004"],
   "results": "per-requirement",
   "inputs": [
     "docs/operator-manual.md",
-    "docs/superpowers/plans/2026-10-14-directory-profile-standard.md",
     "fixtures/addons",
-    "mechanisms/check-directory-profiles.mjs",
-    "mechanisms/directory-profiles.def.json",
+    "mechanisms/check-template-products.mjs",
     "mechanisms/tap-results.mjs",
+    "mechanisms/template-products.def.json",
     "package.json",
     "package-lock.json",
     "scripts",
     "src",
-    "tests/directory-profiles.test.mjs"
+    "tests/template-products.test.mjs"
   ],
   "identity": {
     "env": [],
