@@ -1,0 +1,14 @@
+{
+  "command": "node mechanisms/check-account-access.mjs",
+  "requirements": ["ACC-001", "ACC-002", "ACC-003", "ACC-004"],
+  "results": "per-requirement",
+  "inputs": [
+    ".env.example", "README.md", "mechanisms/account-access.def.json",
+    "mechanisms/check-account-access.mjs", "package.json", "package-lock.json",
+    "scripts", "src", "tests"
+  ],
+  "identity": {
+    "env": [],
+    "tools": { "node": "node --version", "npm": "npm --version" }
+  }
+}
