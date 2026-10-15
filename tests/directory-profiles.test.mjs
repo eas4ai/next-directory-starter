@@ -584,6 +584,35 @@ requirementTest("PRF-001 activates immutable versioned directory-profile definit
       row.archived_at !== null), true);
   });
 
+  await t.test("rejects an aggregate mapping that exceeds the retained target constraints", async () => {
+    const api = await profileTestContext();
+    resetProfileTables(api.database);
+    const original = completeProfile();
+    const integrations = original.fields.find(({ key }) => key === "vendor.ai-tools.integrations");
+    original.fields.push({ ...structuredClone(integrations), key: "vendor.ai-tools.channels",
+      label: "Channels" });
+    activate(api, original, 0);
+    const groupItems = (prefix) => Array.from({ length: 20 }, (_, index) => ({
+      id: `${prefix}-${index}`,
+      values: { name: `${prefix} ${index}` },
+    }));
+    const values = completeProfileValues({ includeSystem: false });
+    delete values["vendor.ai-tools.screenshot"];
+    values["vendor.ai-tools.integrations"] = groupItems("integration");
+    values["vendor.ai-tools.channels"] = groupItems("channel");
+    const listingApi = await import("../src/lib/listings.ts");
+    listingApi.createListing(parseListing(listingInput("aggregate-profile", values, 1)),
+      "profile-admin");
+    const next = completeProfile({ version: "2.0.0" });
+    const before = profileSnapshot(api.database);
+    assert.throws(() => activate(api, next, 1, { fields: {
+      "vendor.ai-tools.channels": {
+        action: "map", to: "vendor.ai-tools.integrations", onInvalid: "reject",
+      },
+    }, defaults: {} }), /migration|aggregate|group items|too many/i);
+    assert.deepEqual(profileSnapshot(api.database), before);
+  });
+
   await t.test("keeps media ownership aligned when a media field is mapped", async () => {
     const api = await profileTestContext();
     resetProfileTables(api.database);
