@@ -1401,7 +1401,7 @@ requirementTest("TPL-004 packages the complete NOW/NEXT events directory product
       assert.match(inProgressDetail,
         /href="https:\/\/formfunction\.example\/speakers\/mara-chen"[^>]*>Speaker profile/,
       "NOW/NEXT omitted a public speaker profile URL");
-    assert.match(inProgressDetail, /Check tickets with organizer/);
+      assert.match(inProgressDetail, /Ticket details with organizer/);
     assert.doesNotMatch(inProgressDetail, /verified attendee|book(?:ing)? confirmed/i);
     assert.match(inProgressDetail, /application\/ld\+json/);
     assert.match(inProgressDetail,
@@ -1409,7 +1409,8 @@ requirementTest("TPL-004 packages the complete NOW/NEXT events directory product
     assert.match(inProgressDetail, /property="og:title"/);
     const pastDetail = await html("/listings/after-dark-sessions");
     assert.match(pastDetail, /data-now-next-state="past"/);
-    assert.match(pastDetail, /Organizer archive/);
+      assert.match(pastDetail, /Ticket details with organizer/);
+      assert.doesNotMatch(pastDetail, /Organizer archive/);
     const upcomingDetail = await html("/listings/signal-rooftop");
     assert.match(upcomingDetail, /data-now-next-state="upcoming"/);
     const markdown = await fetch(`${origin}/markdown/listings/form-function-forum`);
