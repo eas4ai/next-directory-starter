@@ -47,6 +47,9 @@ const boroughTemplate = {
       return <header className="borough-header">
         <nav className="borough-nav" aria-label="Main navigation">
           <TemplateLink href="/" className="borough-wordmark" aria-label={`${site.name} home`}>
+            {/* Installed add-on assets use their stable namespaced public path. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/addons/borough-city-guide/borough-mark.svg" alt="" width="32" height="32" />
             <strong>BOROUGH</strong><span>{site.name}</span>
           </TemplateLink>
           <div className="borough-nav-links">

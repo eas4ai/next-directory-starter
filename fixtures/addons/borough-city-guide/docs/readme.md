@@ -1,5 +1,7 @@
 # BOROUGH Local City Guide
 
+The package includes the namespaced `public/borough-mark.svg` brand mark used by the public header.
+
 BOROUGH turns the directory starter into an editorial neighborhood guide. Photography and operator-authored local notes lead the public experience. Search, filters, sorting, neighborhood collections, and curated trails use the active directory profile and current eligible public records.
 
 ## Install

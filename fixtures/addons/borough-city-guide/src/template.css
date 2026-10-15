@@ -23,6 +23,7 @@
 .borough-header { border-bottom: 1px solid var(--sidebar-border); background: var(--sidebar); color: var(--sidebar-foreground); }
 .borough-nav { display: flex; width: min(100% - 2rem, var(--theme-page-width)); min-width: 0; margin-inline: auto; align-items: center; justify-content: space-between; gap: 1.25rem; padding-block: 0.8rem; }
 .borough-wordmark { display: flex; min-width: 0; align-items: baseline; gap: 0.75rem; }
+.borough-wordmark img { align-self: center; width: 2rem; height: 2rem; border-radius: 2px; }
 .borough-wordmark strong { color: var(--sidebar-primary); font-family: var(--preset-heading-font); font-size: 1.35rem; letter-spacing: 0.08em; }
 .borough-wordmark span { overflow: hidden; color: var(--sidebar-accent-foreground); font-size: 0.72rem; letter-spacing: 0.1em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
 .borough-nav-links { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.2rem; font-size: 0.8rem; }

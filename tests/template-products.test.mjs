@@ -580,6 +580,13 @@ requirementTest("TPL-003 packages the complete BOROUGH local-city directory prod
   assert.equal(new Set(imageSources).size, imageSources.length,
     "BOROUGH seed reuses a packaged photograph identity");
   const manifest = JSON.parse(readFileSync(join(fixture, "directory-addon.json"), "utf8"));
+  const brandAsset = "public/borough-mark.svg";
+  assert.ok(manifest.assets.includes(brandAsset),
+    "BOROUGH does not declare its namespaced brand asset");
+  assert.ok(manifest.files.includes(brandAsset),
+    "BOROUGH brand asset is not owned by the package");
+  assert.match(readFileSync(join(fixture, brandAsset), "utf8"), /<svg[\s>]/i,
+    "BOROUGH brand asset is not an SVG mark");
   for (const source of imageSources) {
     assert.match(source, /^seed\/media\/[a-z0-9][a-z0-9._-]*$/,
       `unsafe BOROUGH seed media path: ${source}`);
@@ -826,6 +833,8 @@ requirementTest("TPL-003 packages the complete BOROUGH local-city directory prod
 
     const home = await html("/");
     assert.match(home, /The city, known by locals\./);
+    assert.match(home, /\/addons\/borough-city-guide\/borough-mark\.svg/,
+      "BOROUGH does not render its installed namespaced brand mark");
     assert.match(home, /data-borough-neighborhood=/);
     assert.match(home, /data-borough-trail=/);
     assert.doesNotMatch(home, /hidden-draft/);

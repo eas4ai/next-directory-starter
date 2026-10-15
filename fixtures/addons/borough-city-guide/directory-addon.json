@@ -36,12 +36,15 @@
       "schema": "src/places.profile.json"
     }
   ],
-  "assets": [],
+  "assets": [
+    "public/borough-mark.svg"
+  ],
   "seed": "seed/catalog.json",
   "files": [
     "docs/changelog.md",
     "docs/license.md",
     "docs/readme.md",
+    "public/borough-mark.svg",
     "seed/catalog.json",
     "seed/media/atlas-books.webp",
     "seed/media/borough-market.webp",
