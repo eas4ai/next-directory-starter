@@ -386,6 +386,10 @@ requirementTest("TPL-002 packages the complete VECTOR directory product", async 
     assert.doesNotMatch(directory, /Shadow Preview/);
     assert.doesNotMatch(directory, /<option value="Video">/,
       "a category backed only by a draft leaked into public filters");
+    assert.doesNotMatch(directory, /\$(?:1|5) \/ mo/,
+      "usage pricing was presented as an invented monthly price");
+    assert.match(directory, /From \$1\.00/);
+    assert.match(directory, /From \$5\.00/);
 
     const filtered = async (entries) => results(await html(`/listings?${new URLSearchParams(entries)}`));
     assert.deepEqual(new Set(await filtered([["facet.vector-ai-tools.ai-tools.pricing-model", "usage"]])),

@@ -68,10 +68,15 @@ const vectorTemplate = {
         ? `/addons/vector-ai-tools/marks/${listing.slug}.svg`
         : "/addons/vector-ai-tools/vector-mark.svg";
       const rawPrice = listing.profileValues["vector-ai-tools.ai-tools.starting-price"];
-      const amount = rawPrice && typeof rawPrice === "object"
-        ? (rawPrice as { amountMinor?: unknown }).amountMinor : undefined;
+      const money = rawPrice && typeof rawPrice === "object"
+        ? rawPrice as { amountMinor?: unknown; currency?: unknown } : undefined;
+      const amount = money?.amountMinor;
+      const currency = money?.currency;
+      const formatted = typeof amount === "number" && typeof currency === "string"
+        ? new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount / 100)
+        : undefined;
       const price = typeof amount === "number" && amount === 0 ? "Free"
-        : typeof amount === "number" ? `$${(amount / 100).toFixed(0)} / mo`
+        : formatted ? `From ${formatted}`
           : listing.profileValues["vector-ai-tools.ai-tools.pricing-model"] === "enterprise"
             ? "Contact sales" : "Price unavailable";
       return <article className="vector-tool-card">
