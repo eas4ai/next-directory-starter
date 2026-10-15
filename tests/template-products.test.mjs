@@ -997,7 +997,7 @@ requirementTest("TPL-003 packages the complete BOROUGH local-city directory prod
   }
 });
 
-requirementTest("TPL-004 packages the complete NOW/NEXT events directory product", () => {
+requirementTest("TPL-004 packages the complete NOW/NEXT events directory product", async () => {
   const fixture = join(repository, "fixtures/addons/now-next-events");
   assert.ok(existsSync(join(fixture, "directory-addon.json")),
     "the NOW/NEXT add-on package is missing");
@@ -1060,4 +1060,452 @@ requirementTest("TPL-004 packages the complete NOW/NEXT events directory product
   ]) assert.match(source, behavior, `NOW/NEXT renderer omits ${behavior}`);
   assert.doesNotMatch(source, /verified attendee|book(?:ing)? confirmed/i,
     "NOW/NEXT implies booking or attendee verification");
+
+  const publishedSeed = seed.listings.filter(({ status }) => status === "published");
+  assert.ok(publishedSeed.length > 12, "NOW/NEXT needs enough public events to exercise pagination");
+  const imageSources = seed.listings.flatMap(({ media = [] }) => media.map(({ source }) => source));
+  assert.ok(imageSources.length >= 10, "NOW/NEXT needs a representative event media set");
+  assert.equal(new Set(imageSources).size, imageSources.length,
+    "NOW/NEXT seed reuses a packaged media identity");
+  const manifest = JSON.parse(readFileSync(join(fixture, "directory-addon.json"), "utf8"));
+  const brandAsset = "public/now-next-mark.svg";
+  assert.ok(manifest.assets.includes(brandAsset), "NOW/NEXT does not declare its brand mark");
+  assert.ok(manifest.files.includes(brandAsset), "NOW/NEXT brand mark is not package owned");
+  assert.match(readFileSync(join(fixture, brandAsset), "utf8"), /<svg[\s>]/i);
+  for (const mediaSource of imageSources) {
+    assert.match(mediaSource, /^seed\/media\/[a-z0-9][a-z0-9._-]*$/,
+      `unsafe NOW/NEXT seed media path: ${mediaSource}`);
+    assert.ok(manifest.files.includes(mediaSource), `NOW/NEXT media is undeclared: ${mediaSource}`);
+    assert.ok(readFileSync(join(fixture, mediaSource)).length > 1_024,
+      `NOW/NEXT media is empty or implausibly small: ${mediaSource}`);
+  }
+  const imageDigests = imageSources.map((mediaSource) =>
+    createHash("sha256").update(readFileSync(join(fixture, mediaSource))).digest("hex"));
+  assert.equal(new Set(imageDigests).size, imageDigests.length,
+    "NOW/NEXT repeats the same image under different names");
+
+  const referenceTime = Date.parse("2026-10-15T16:00:00Z");
+  const phase = (entry) => {
+    const start = Date.parse(entry.profileValues[key("starts-at")]);
+    const end = Date.parse(entry.profileValues[key("ends-at")]);
+    return referenceTime < start ? "upcoming" : referenceTime < end ? "in-progress" : "past";
+  };
+  for (const expected of ["upcoming", "in-progress", "past"]) {
+    assert.ok(publishedSeed.some((entry) => phase(entry) === expected),
+      `NOW/NEXT seed does not exercise ${expected} events`);
+  }
+  assert.ok(publishedSeed.some((entry) =>
+    Date.parse(entry.profileValues[key("ends-at")]) - Date.parse(entry.profileValues[key("starts-at")]) >
+      86_400_000), "NOW/NEXT seed does not exercise a multi-day event");
+  assert.ok(publishedSeed.every((entry) => entry.profileValues[key("speakers")].length >= 1 &&
+    entry.profileValues[key("speakers")].length <= 8), "NOW/NEXT speaker rosters are not bounded");
+  assert.ok(publishedSeed.every((entry) => entry.profileValues[key("schedule")].length >= 1 &&
+    entry.profileValues[key("schedule")].length <= 16), "NOW/NEXT schedules are not bounded");
+
+  const temporary = mkdtempSync(join(tmpdir(), "now-next-template-product-"));
+  let application;
+  const addon = (cwd, args) => spawnSync(process.execPath, ["scripts/addons.mjs", ...args], {
+    cwd, encoding: "utf8", timeout: 300_000, env: { ...process.env, CI: "1" },
+  });
+  const npm = (cwd, args, env, timeout = 600_000) => spawnSync("npm", args, {
+    cwd, encoding: "utf8", timeout, env: { ...process.env, CI: "1", ...env },
+  });
+  const expectSuccess = (result, label) => assert.equal(result.status, 0,
+    `${label}: ${result.stderr || result.stdout}`);
+  try {
+    const firstArchive = join(temporary, "now-next-first.zip");
+    const secondArchive = join(temporary, "now-next-second.zip");
+    expectSuccess(addon(repository, ["pack", fixture, firstArchive]), "pack NOW/NEXT archive");
+    expectSuccess(addon(repository, ["pack", fixture, secondArchive]), "repack NOW/NEXT archive");
+    assert.deepEqual(readFileSync(firstArchive), readFileSync(secondArchive),
+      "equal NOW/NEXT sources did not produce a byte-identical archive");
+    expectSuccess(addon(repository, ["validate", firstArchive]), "validate NOW/NEXT archive");
+
+    const corrupt = join(temporary, "corrupt-source");
+    cpSync(fixture, corrupt, { recursive: true });
+    writeFileSync(join(corrupt, imageSources[0]), "not an image");
+    const corruptResult = addon(repository, ["pack", corrupt, join(temporary, "corrupt.zip")]);
+    assert.notEqual(corruptResult.status, 0, "corrupt NOW/NEXT media unexpectedly packed");
+    assert.match(corruptResult.stderr, /image|media|photograph/i);
+
+    const escaping = join(temporary, "escaping-source");
+    cpSync(fixture, escaping, { recursive: true });
+    const escapingSeedPath = join(escaping, "seed/catalog.json");
+    const escapingSeed = JSON.parse(readFileSync(escapingSeedPath, "utf8"));
+    escapingSeed.listings[0].media[0].source = "seed/media/../outside.webp";
+    writeFileSync(escapingSeedPath, `${JSON.stringify(escapingSeed, null, 2)}\n`);
+    const escapingResult = addon(repository,
+      ["pack", escaping, join(temporary, "escaping.zip")]);
+    assert.notEqual(escapingResult.status, 0, "path-escaping NOW/NEXT media unexpectedly packed");
+    assert.match(escapingResult.stderr, /path|media|unsafe/i);
+
+    const starter = join(temporary, "starter");
+    copyStarter(starter);
+    const baseline = treeSnapshot(starter);
+    const databasePath = join(temporary, `now-next-${randomBytes(6).toString("hex")}.db`);
+    const mediaDirectory = join(dirname(databasePath), "media");
+    const port = await freePort();
+    const origin = `http://127.0.0.1:${port}`;
+    const billingKey = randomBytes(32).toString("base64url");
+    const env = {
+      DATABASE_URL: `file:${databasePath}`,
+      DIRECTORY_EXPLICIT_MIGRATIONS: "1",
+      BETTER_AUTH_SECRET: randomBytes(32).toString("hex"),
+      BILLING_ENCRYPTION_KEY: billingKey,
+      BILLING_CHECKOUT_MODE: "test",
+      SITE_URL: origin,
+      BETTER_AUTH_URL: origin,
+    };
+    assert.equal(existsSync(databasePath), false);
+    expectSuccess(addon(starter, ["install", firstArchive]), "install NOW/NEXT archive");
+    assert.equal(existsSync(databasePath), false, "NOW/NEXT installation opened the operator database");
+    assert.equal(existsSync(mediaDirectory), false, "NOW/NEXT installation wrote runtime media");
+    expectSuccess(npm(starter, ["run", "db:migrate"], env), "migrate NOW/NEXT database");
+    expectSuccess(npm(starter, ["run", "build"], env), "build installed NOW/NEXT product");
+
+    const activate = spawnSync(process.execPath,
+      ["--import", "tsx", "--input-type=module", "--eval", `
+        const profilesModule = await import("./src/lib/directory-profiles.ts");
+        const databaseModule = await import("./src/lib/database.ts");
+        const themeModule = await import("./src/lib/theme-selection.ts");
+        const profiles = profilesModule.default ?? profilesModule;
+        const database = databaseModule.database ?? databaseModule.default?.database;
+        const themes = themeModule.default ?? themeModule;
+        const now = new Date().toISOString();
+        database.prepare('INSERT INTO "user" (id, name, email, emailVerified, createdAt, updatedAt, role, banned) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+          .run("now-next-admin", "NOW/NEXT Admin", "now-next-admin@example.invalid", 1,
+            now, now, "admin", 0);
+        const definition = profiles.availableDirectoryProfileDefinition(
+          "now-next-events.events", "1.0.0");
+        profiles.activateDirectoryProfile({ definition, sourceKind: "addon",
+          sourceId: "now-next-events", expectedRevision: 0,
+          actorUserId: "now-next-admin" });
+        const selected = themes.saveThemeSelection({ themeId: "now-next-events",
+          templateId: "now-next-events" }, "now-next-admin");
+        if (selected.templateId !== "now-next-events") process.exit(2);`],
+      { cwd: starter, encoding: "utf8",
+        env: { ...process.env, CI: "1", NODE_ENV: "test", ...env } });
+    expectSuccess(activate, "activate and select NOW/NEXT");
+
+    const failureDb = new Database(databasePath);
+    try {
+      failureDb.exec(`CREATE TRIGGER reject_now_next_media BEFORE INSERT ON media_assets
+        BEGIN SELECT RAISE(ABORT, 'deliberate NOW/NEXT media failure'); END`);
+    } finally {
+      failureDb.close();
+    }
+    const mediaBeforeFailure = existsSync(mediaDirectory) ? readdirSync(mediaDirectory).sort() : [];
+    const failedSeed = npm(starter, ["run", "addon:seed", "--", "now-next-events"], env);
+    assert.notEqual(failedSeed.status, 0, "NOW/NEXT seed ignored a media transaction failure");
+    const afterFailureDb = new Database(databasePath);
+    try {
+      assert.equal(afterFailureDb.prepare("SELECT COUNT(*) FROM listings").pluck().get(), 0,
+        "failed NOW/NEXT seed left listings behind");
+      assert.equal(afterFailureDb.prepare("SELECT COUNT(*) FROM media_assets").pluck().get(), 0,
+        "failed NOW/NEXT seed left media records behind");
+      assert.equal(afterFailureDb.prepare("SELECT COUNT(*) FROM directory_profile_seed_runs")
+        .pluck().get(), 0, "failed NOW/NEXT seed was recorded as complete");
+      afterFailureDb.exec("DROP TRIGGER reject_now_next_media");
+    } finally {
+      afterFailureDb.close();
+    }
+    assert.deepEqual(existsSync(mediaDirectory) ? readdirSync(mediaDirectory).sort() : [],
+      mediaBeforeFailure, "failed NOW/NEXT seed left runtime media behind");
+
+    expectSuccess(npm(starter, ["run", "addon:seed", "--", "now-next-events"], env),
+      "seed NOW/NEXT catalogue and media");
+    const seededDb = new Database(databasePath);
+    let mediaRows;
+    const featuredSlug = "form-function-forum";
+    const runtimeNow = Date.now();
+    const runtimeDates = new Map([
+      ["after-dark-sessions", new Date(runtimeNow - 172_800_000).toISOString()],
+      ["form-function-forum", new Date(runtimeNow - 3_600_000).toISOString()],
+      ["signal-rooftop", new Date(runtimeNow + 86_400_000).toISOString()],
+    ]);
+    try {
+      assert.equal(seededDb.prepare("SELECT COUNT(*) FROM listings").pluck().get(),
+        seed.listings.length);
+      mediaRows = seededDb.prepare(`SELECT a.id, a.target_slug, a.alt, p.state
+        FROM media_assets a JOIN directory_profile_media p ON p.asset_id = a.id
+        ORDER BY a.target_slug, a.id`).all();
+      assert.equal(mediaRows.length, imageSources.length,
+        "NOW/NEXT did not create one media record per packaged image");
+      assert.equal(seededDb.prepare("SELECT COUNT(*) FROM directory_profile_media").pluck().get(),
+        imageSources.length, "NOW/NEXT media is not assigned to profile values");
+      assert.equal(seededDb.prepare("SELECT COUNT(*) FROM directory_profile_seed_runs")
+        .pluck().get(), 1);
+
+      const updateDate = seededDb.prepare(`UPDATE directory_profile_values SET date_start = ?, updated_at = ?
+        WHERE listing_slug = ? AND field_key = ? AND archived_at IS NULL`);
+      for (const [slug, startsAt] of runtimeDates) {
+        const endsAt = slug === "form-function-forum"
+          ? new Date(runtimeNow + 3_600_000).toISOString()
+          : slug === "signal-rooftop" ? new Date(runtimeNow + 93_600_000).toISOString()
+            : new Date(runtimeNow - 86_400_000).toISOString();
+        const updatedAt = new Date().toISOString();
+        assert.equal(updateDate.run(startsAt, updatedAt, slug, key("starts-at")).changes, 1);
+        assert.equal(updateDate.run(endsAt, updatedAt, slug, key("ends-at")).changes, 1);
+      }
+
+      const featuredStartsAt = new Date(runtimeNow - 60_000).toISOString();
+      const featuredEndsAt = new Date(runtimeNow + 86_400_000).toISOString();
+      seededDb.prepare(`INSERT INTO publishing_plans
+        (key, name, description, mode, billing_mode, amount_minor, currency, duration_days,
+          featured, enabled, updated_at)
+        VALUES ('now-next-featured', 'Featured event', '', 'test', 'one-time',
+          2500, 'usd', 1, 1, 1, ?)`).run(featuredStartsAt);
+      seededDb.prepare(`INSERT INTO purchases
+        (id, listing_slug, owner_user_id, plan_key, plan_mode, billing_mode, plan_name,
+          plan_description, amount_minor, currency, duration_days, accepted_duration_days,
+          featured, stripe_session_id, status, created_at, provider)
+        VALUES ('now-next-featured-purchase', ?, 'now-next-admin', 'now-next-featured', 'test',
+          'one-time', 'Featured event', '', 2500, 'usd', 1, 1, 1,
+          'pending:now-next-featured-purchase', 'paid', ?, 'stripe')`)
+        .run(featuredSlug, featuredStartsAt);
+      seededDb.prepare(`INSERT INTO entitlements
+        (purchase_id, listing_slug, starts_at, ends_at, featured, revoked_at)
+        VALUES ('now-next-featured-purchase', ?, ?, ?, 1, NULL)`)
+        .run(featuredSlug, featuredStartsAt, featuredEndsAt);
+    } finally {
+      seededDb.close();
+    }
+    for (const { id } of mediaRows) {
+      assert.ok(existsSync(join(mediaDirectory, `${id}.webp`)),
+        `seeded NOW/NEXT media file is missing: ${id}`);
+    }
+    expectSuccess(npm(starter, ["run", "addon:seed", "--", "now-next-events"], env),
+      "repeat NOW/NEXT seed");
+    const repeatedDb = new Database(databasePath, { readonly: true });
+    try {
+      assert.equal(repeatedDb.prepare("SELECT COUNT(*) FROM listings").pluck().get(),
+        seed.listings.length, "repeated NOW/NEXT seed duplicated listings");
+      assert.equal(repeatedDb.prepare("SELECT COUNT(*) FROM media_assets").pluck().get(),
+        imageSources.length, "repeated NOW/NEXT seed duplicated media");
+    } finally {
+      repeatedDb.close();
+    }
+
+    application = spawn("npm", ["run", "start", "--", "-p", String(port)], {
+      cwd: starter, env: { ...process.env, CI: "1", ...env }, detached: true, stdio: "ignore",
+    });
+    let ready = false;
+    for (let attempt = 0; attempt < 80; attempt += 1) {
+      try {
+        if ((await fetch(origin, { signal: AbortSignal.timeout(1000) })).status < 500) {
+          ready = true;
+          break;
+        }
+      } catch { /* wait for the production server */ }
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, 250));
+    }
+    assert.ok(ready, "installed NOW/NEXT production server did not start");
+    const html = async (path) => {
+      const response = await fetch(`${origin}${path}`);
+      const body = await response.text();
+      assert.equal(response.status, 200, `${path}: ${body}`);
+      return body;
+    };
+    const results = (body) => [...body.matchAll(/data-now-next-result="([a-z0-9-]+)"/g)]
+      .map((match) => match[1]);
+    const publicSlugs = publishedSeed.map(({ slug }) => slug).sort();
+
+    const home = await html("/");
+    assert.match(home, /The calendar with a pulse\./);
+    assert.match(home, /WHAT(?:&#x27;|')S/);
+    assert.match(home, /\/addons\/now-next-events\/now-next-mark\.svg/,
+      "NOW/NEXT does not render its installed namespaced brand mark");
+    assert.match(home, />All Dates</);
+    assert.match(home, />Today</);
+    assert.match(home, />This Week</);
+    assert.match(home, /data-now-next-state=/);
+    assert.doesNotMatch(home, /city-systems-closing/);
+    assert.ok([...home.matchAll(/data-now-next-event=/g)].length <= 7,
+      "NOW/NEXT home discovery is not bounded");
+
+    const directory = await html(`/listings?sort=${encodeURIComponent(`${key("starts-at")}:asc`)}`);
+    const secondPage = await html(`/listings?sort=${encodeURIComponent(`${key("starts-at")}:asc`)}&page=2`);
+    assert.deepEqual([...results(directory), ...results(secondPage)].sort(), publicSlugs);
+    assert.doesNotMatch(`${directory}${secondPage}`, /city-systems-closing/);
+    assert.match(`${directory}${secondPage}`, /src="\/media\/[0-9a-f-]{36}"/,
+      "NOW/NEXT directory does not use eligible runtime event media");
+
+    const featured = await html("/listings?q=Form%20%2F%20Function%20Forum");
+    assert.match(featured, new RegExp(`data-now-next-featured="${featuredSlug}"`));
+    assert.match(featured, /Featured placement/);
+
+    const filtered = async (entries) => results(await html(`/listings?${new URLSearchParams(entries)}`));
+    const firstEventType = publishedSeed[0].profileValues[key("event-type")];
+    const expectedEventType = publishedSeed.filter(({ profileValues }) =>
+      profileValues[key("event-type")] === firstEventType).map(({ slug }) => slug).sort();
+    assert.deepEqual((await filtered([[`facet.${key("event-type")}`, firstEventType]])).sort(),
+      expectedEventType);
+    const expectedDesign = publishedSeed.filter(({ profileValues }) =>
+      profileValues[key("topics")].includes("design")).map(({ slug }) => slug).sort();
+    assert.deepEqual((await filtered([[`facet.${key("topics")}`, "design"]])).sort(), expectedDesign);
+    const expectedOnline = publishedSeed.filter(({ profileValues }) =>
+      profileValues[key("attendance-mode")] === "online").map(({ slug }) => slug).sort();
+    assert.deepEqual((await filtered([[`facet.${key("attendance-mode")}`, "online"]])).sort(),
+      expectedOnline);
+    const expectedNewYork = publishedSeed.filter(({ profileValues }) => {
+      const location = profileValues[key("location")];
+      return location.countryCode === "US" && location.region === "NY" && location.locality === "New York";
+    }).map(({ slug }) => slug).sort();
+    assert.deepEqual((await filtered([[`facet.${key("location")}`, "US|NY|New York"]])).sort(),
+      expectedNewYork);
+    assert.deepEqual(await filtered([["q", "Material Futures Lab"]]), ["material-futures-lab"]);
+    const signalStart = runtimeDates.get("signal-rooftop");
+    assert.deepEqual(await filtered([
+      [`min.${key("starts-at")}`, signalStart], [`max.${key("starts-at")}`, signalStart],
+    ]), ["signal-rooftop"]);
+
+    const runtimeStart = (entry) => runtimeDates.get(entry.slug) ?? entry.profileValues[key("starts-at")];
+    const expectedChronological = [...publishedSeed].sort((left, right) =>
+      Date.parse(runtimeStart(left)) - Date.parse(runtimeStart(right)) || left.slug.localeCompare(right.slug))
+      .slice(0, 12).map(({ slug }) => slug);
+    assert.deepEqual(results(directory), expectedChronological);
+
+    const minimum = "2020-01-01T00:00:00.000Z";
+    const pagedBody = await html(`/listings?${new URLSearchParams([
+      [`min.${key("starts-at")}`, minimum], ["sort", `${key("starts-at")}:asc`],
+    ])}`);
+    const nextHref = [...pagedBody.matchAll(/href="([^"]+)"/g)]
+      .map((match) => match[1].replaceAll("&amp;", "&"))
+      .find((href) => new URL(href, origin).searchParams.get("page") === "2");
+    assert.ok(nextHref, "NOW/NEXT pagination did not expose a second filtered page");
+    const nextUrl = new URL(nextHref, origin);
+    assert.equal(nextUrl.searchParams.get(`min.${key("starts-at")}`), minimum);
+    assert.equal(nextUrl.searchParams.get("sort"), `${key("starts-at")}:asc`);
+
+    const inProgressDetail = await html("/listings/form-function-forum");
+    assert.match(inProgressDetail, /data-now-next-state="in-progress"/);
+    assert.match(inProgressDetail, /Schedule/);
+    assert.match(inProgressDetail, /data-now-next-schedule=/);
+    assert.match(inProgressDetail, /Speakers/);
+    assert.match(inProgressDetail, /data-now-next-speaker=/);
+    assert.match(inProgressDetail, /Check tickets with organizer/);
+    assert.doesNotMatch(inProgressDetail, /verified attendee|book(?:ing)? confirmed/i);
+    assert.match(inProgressDetail, /application\/ld\+json/);
+    assert.match(inProgressDetail,
+      new RegExp(`<link rel="canonical" href="${origin}/listings/form-function-forum"`));
+    assert.match(inProgressDetail, /property="og:title"/);
+    const pastDetail = await html("/listings/after-dark-sessions");
+    assert.match(pastDetail, /data-now-next-state="past"/);
+    assert.match(pastDetail, /Organizer archive/);
+    const upcomingDetail = await html("/listings/signal-rooftop");
+    assert.match(upcomingDetail, /data-now-next-state="upcoming"/);
+    const markdown = await fetch(`${origin}/markdown/listings/form-function-forum`);
+    assert.equal(markdown.status, 200);
+    assert.match(await markdown.text(), /Form \/ Function Forum/);
+
+    const liveEditDb = new Database(databasePath);
+    try {
+      liveEditDb.prepare("UPDATE listings SET name = ? WHERE slug = ?")
+        .run("Operator-edited live forum", featuredSlug);
+      assert.match(await html("/"), /Operator-edited live forum/,
+        "NOW/NEXT home remained stale after an operator edit");
+      const now = new Date().toISOString();
+      liveEditDb.prepare('INSERT INTO "user" (id, name, email, emailVerified, createdAt, updatedAt, role, banned) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .run("now-next-banned-owner", "Banned owner", "now-next-banned@example.invalid", 1,
+          now, now, "user", 1);
+      liveEditDb.prepare("UPDATE listings SET owner_user_id = ? WHERE slug = ?")
+        .run("now-next-banned-owner", featuredSlug);
+      assert.doesNotMatch(await html("/"), /Operator-edited live forum/,
+        "a banned owner's event leaked onto the NOW/NEXT home page");
+      liveEditDb.prepare("UPDATE listings SET owner_user_id = NULL, name = ? WHERE slug = ?")
+        .run("Form / Function Forum", featuredSlug);
+      const mediaId = mediaRows.find(({ target_slug: slug }) => slug === featuredSlug).id;
+      liveEditDb.prepare("UPDATE directory_profile_media SET state = 'draft' WHERE asset_id = ?")
+        .run(mediaId);
+      assert.doesNotMatch(await html(`/listings/${featuredSlug}`), new RegExp(`/media/${mediaId}`),
+        "private event media leaked through NOW/NEXT");
+      liveEditDb.prepare("UPDATE directory_profile_media SET state = 'public' WHERE asset_id = ?")
+        .run(mediaId);
+    } finally {
+      liveEditDb.close();
+    }
+
+    const browser = await chromium.launch({ headless: true,
+      ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: "chrome" }),
+      args: ["--no-sandbox"] });
+    try {
+      const narrow = await browser.newContext({ viewport: { width: 320, height: 900 },
+        colorScheme: "dark", javaScriptEnabled: false });
+      await narrow.addCookies([{ name: "site_appearance", value: "dark", url: origin }]);
+      const page = await narrow.newPage();
+      await page.goto(`${origin}/listings`);
+      assert.equal(await page.locator("html").getAttribute("data-template"), "now-next-events");
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth), "NOW/NEXT overflows at 320 pixels");
+      const background = await page.locator("body").evaluate((element) =>
+        getComputedStyle(element).backgroundColor);
+      const foreground = await page.locator("body").evaluate((element) =>
+        getComputedStyle(element).color);
+      assert.ok(contrastRatio(background, foreground) >= 4.5,
+        `NOW/NEXT dark text contrast is too low: ${background} / ${foreground}`);
+      const firstLink = page.locator("a").first();
+      await firstLink.focus();
+      assert.equal(await firstLink.evaluate((element) => element === document.activeElement), true,
+        "NOW/NEXT navigation cannot receive keyboard focus");
+      await narrow.close();
+
+      const light = await browser.newContext({ viewport: { width: 1280, height: 900 },
+        colorScheme: "light" });
+      await light.addCookies([{ name: "site_appearance", value: "light", url: origin }]);
+      const lightPage = await light.newPage();
+      await lightPage.goto(origin);
+      assert.equal(await lightPage.locator("body").evaluate((element) =>
+        getComputedStyle(element).backgroundColor), "rgb(245, 238, 223)");
+      await light.close();
+    } finally {
+      await browser.close();
+    }
+
+    process.kill(-application.pid, "SIGTERM");
+    application = null;
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 500));
+    const keyFile = join(temporary, "billing.key");
+    writeFileSync(keyFile, `${billingKey}\n`, { mode: 0o600 });
+    const backup = join(temporary, "backup");
+    const restored = join(temporary, "restored");
+    expectSuccess(npm(starter, ["run", "ops:backup", "--", "--output", backup,
+      "--key-file", keyFile], env), "back up NOW/NEXT data and media");
+    expectSuccess(npm(starter, ["run", "ops:restore", "--", "--backup", backup,
+      "--target", restored], env), "restore NOW/NEXT data and media");
+    for (const { id } of mediaRows) {
+      assert.ok(existsSync(join(restored, "media", `${id}.webp`)),
+        `NOW/NEXT restore lost seeded media: ${id}`);
+    }
+
+    expectSuccess(addon(starter, ["remove", "now-next-events"]), "remove NOW/NEXT archive");
+    const retained = new Database(databasePath, { readonly: true });
+    try {
+      assert.equal(retained.prepare("SELECT COUNT(*) FROM listings").pluck().get(),
+        seed.listings.length, "NOW/NEXT removal deleted seeded listings");
+      assert.equal(retained.prepare("SELECT COUNT(*) FROM media_assets").pluck().get(),
+        imageSources.length, "NOW/NEXT removal deleted seeded media records");
+    } finally {
+      retained.close();
+    }
+    for (const { id } of mediaRows) {
+      assert.ok(existsSync(join(mediaDirectory, `${id}.webp`)),
+        `NOW/NEXT removal deleted seeded media file: ${id}`);
+    }
+    const fallback = spawnSync(process.execPath,
+      ["--import", "tsx", "--input-type=module", "--eval", `
+        const imported = await import("./src/lib/theme-selection.ts");
+        const api = imported.default ?? imported;
+        const selected = api.getThemeSelection();
+        if (selected.themeId !== "preset" || selected.templateId !== "classic") process.exit(2);`],
+      { cwd: starter, encoding: "utf8",
+        env: { ...process.env, CI: "1", NODE_ENV: "test", ...env } });
+    expectSuccess(fallback, "fallback after NOW/NEXT removal");
+    assert.deepEqual(treeSnapshot(starter), baseline,
+      "NOW/NEXT remove did not restore the unchanged starter source");
+  } finally {
+    if (application?.pid) {
+      try { process.kill(-application.pid, "SIGTERM"); } catch { /* already stopped */ }
+    }
+    rmSync(temporary, { recursive: true, force: true });
+  }
 });
