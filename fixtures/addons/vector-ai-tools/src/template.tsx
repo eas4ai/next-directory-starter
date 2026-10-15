@@ -12,8 +12,12 @@ const vectorTemplate = {
       return <header className="vector-header">
         <nav className="vector-nav" aria-label="Main navigation">
           <TemplateLink href="/" className="vector-brand" aria-label={`${site.name} home`}>
-            {/* The add-on owns this fixed local asset. */}
-            <img src="/addons/vector-ai-tools/vector-mark.svg" alt="" width="220" height="52" />
+            <img src={site.logoUrl ?? "/addons/vector-ai-tools/vector-mark.svg"}
+              alt="" width="120" height="40" />
+            <span className="vector-brand-copy">
+              <strong>{site.name}</strong>
+              <span>VECTOR AI INDEX</span>
+            </span>
           </TemplateLink>
           <div className="vector-nav-links">
             <TemplateLink href="/listings">Explore</TemplateLink>

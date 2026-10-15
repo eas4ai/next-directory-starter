@@ -280,15 +280,21 @@ requirementTest("TPL-002 packages the complete VECTOR directory product", async 
     const activate = spawnSync(process.execPath,
       ["--import", "tsx", "--input-type=module", "--eval", `
         const profilesModule = await import("./src/lib/directory-profiles.ts");
+        const brandingModule = await import("./src/lib/branding.ts");
         const databaseModule = await import("./src/lib/database.ts");
         const themeModule = await import("./src/lib/theme-selection.ts");
         const profiles = profilesModule.default ?? profilesModule;
+        const branding = brandingModule.default ?? brandingModule;
         const database = databaseModule.database ?? databaseModule.default?.database;
         const themes = themeModule.default ?? themeModule;
         const now = new Date().toISOString();
         database.prepare('INSERT INTO "user" (id, name, email, emailVerified, createdAt, updatedAt, role, banned) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
           .run("vector-admin", "VECTOR Admin", "vector-admin@example.invalid", 1,
             now, now, "admin", 0);
+        branding.saveBranding({ name: "Operator Atlas",
+          description: "Operator-owned AI tool intelligence.",
+          logoUrl: "/addons/vector-ai-tools/marks/arc-forge.svg",
+          iconUrl: null, socialImage: null }, "vector-admin");
         const available = profiles.availableDirectoryProfiles();
         if (!available.some((item) => item.profileId === "vector-ai-tools.ai-tools" &&
             item.version === "1.0.0" && item.sourceId === "vector-ai-tools")) process.exit(2);
@@ -377,7 +383,10 @@ requirementTest("TPL-002 packages the complete VECTOR directory product", async 
     const results = (body) => [...body.matchAll(/data-vector-result="([a-z0-9-]+)"/g)]
       .map((match) => match[1]);
 
-    assert.match(await html("/"), /Discover tools that/);
+    const home = await html("/");
+    assert.match(home, /Discover tools that/);
+    assert.match(home, /<strong>Operator Atlas<\/strong>/);
+    assert.match(home, /src="\/addons\/vector-ai-tools\/marks\/arc-forge\.svg"/);
     const directory = await html("/listings");
     assert.deepEqual(new Set(results(directory)), new Set([
       "agent-relay", "arc-forge", "briefly", "codepilot-local", "data-lens", "pixel-flow",
