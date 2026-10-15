@@ -103,8 +103,8 @@ const scheduleTime = (input: unknown, timeZone: string) => {
 };
 const dateHref = (start: Date, end: Date) => {
   const query = new URLSearchParams();
-  query.set(`min.${key("starts-at")}`, start.toISOString());
   query.set(`max.${key("starts-at")}`, end.toISOString());
+    query.set(`min.${key("ends-at")}`, start.toISOString());
   query.set("sort", `${key("starts-at")}:asc`);
   return `/listings?${query}`;
 };
