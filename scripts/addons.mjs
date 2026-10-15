@@ -21,7 +21,7 @@ function exactArgs(args, count, command) {
 async function validate(input) {
   const path = resolve(input);
   const status = lstatSync(path);
-  const value = status.isDirectory() ? readSourcePackage(path) : await readArchive(path);
+  const value = status.isDirectory() ? await readSourcePackage(path) : await readArchive(path);
   const starter = readStarterIdentity();
   validateCompatibility(value.manifest, starter);
   return value.manifest;
@@ -56,7 +56,7 @@ async function main() {
   if (command === "seed") {
     exactArgs(args, 1, command);
     const { seedInstalledAddon } = await import("../src/lib/addon-seed.ts");
-    const { inserted, existing } = seedInstalledAddon(process.cwd(), args[0]);
+    const { inserted, existing } = await seedInstalledAddon(process.cwd(), args[0]);
     process.stdout.write(`Seeded ${inserted} new and ${existing} existing listing` +
       `${inserted + existing === 1 ? "" : "s"} from ${args[0]}\n`);
     return;

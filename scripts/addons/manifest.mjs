@@ -7,6 +7,7 @@ import { z } from "zod";
 import {
   PROFILE_LIMITS, parseDirectoryProfileDefinition, profileDigest,
 } from "./profile-schema.mjs";
+import { validatePackagedSeedMedia } from "./seed-media.mjs";
 
 export const ADDON_SCHEMA_VERSION = 1;
 export const ADDON_API_VERSION = 1;
@@ -507,7 +508,7 @@ function sourceFilePaths(root) {
   return paths.sort();
 }
 
-export function readSourcePackage(source) {
+export async function readSourcePackage(source) {
   const root = resolve(source);
   const rootStatus = lstatSync(root);
   if (!rootStatus.isDirectory() || rootStatus.isSymbolicLink()) {
@@ -538,6 +539,7 @@ export function readSourcePackage(source) {
   validateThemeModules(manifest, files);
   validateRendererModules(manifest, files);
   const profiles = validateProfileDefinitions(manifest, files);
+  await validatePackagedSeedMedia(manifest, files);
   return { manifest, files, profiles, manifestBytes: canonicalJson(manifest), root };
 }
 

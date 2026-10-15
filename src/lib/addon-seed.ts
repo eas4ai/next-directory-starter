@@ -1,19 +1,24 @@
-import { lstatSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { randomUUID } from "node:crypto";
+import { lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { readAddonLock } from "../../scripts/addons/registry.mjs";
 import { sha256, targetForPayload } from "../../scripts/addons/manifest.mjs";
 import { parseDirectoryProfileDefinition, profileDigest,
   PROFILE_LIMITS } from "../../scripts/addons/profile-schema.mjs";
+import { seedMediaDeclarations } from "../../scripts/addons/seed-media.mjs";
 import { parseListing } from "@/lib/catalog-input";
 import { database } from "@/lib/database";
 import { activeDirectoryProfiles } from "@/lib/directory-profiles";
 import { normalizeListingDestination } from "@/lib/listing-destinations";
+import { drainMediaCleanupQueue, mediaFilePath, normalizeMediaImage } from "@/lib/media";
 import { encodeProfileValue, replaceListingProfileValues,
   validateProfileValues } from "@/lib/profile-values";
 import type { ActiveProfileSet, ValidatedProfileValues } from "@/lib/directory-profile-types";
 import type { Listing } from "@/lib/listings";
 
-type AddonSeedListing = Listing & { title: string; profileValues: Record<string, unknown> };
+type AddonSeedMedia = { source: string; field: string; alt: string };
+type AddonSeedListing = Listing & { title: string; profileValues: Record<string, unknown>;
+  media: AddonSeedMedia[] };
 type AddonSeed = {
   profile: { id: string; version: string };
   listings: AddonSeedListing[];
@@ -48,12 +53,19 @@ export function parseAddonSeed(input: unknown): AddonSeed {
     throw new Error("Add-on seed must contain one profile identity and a listings array");
   }
   const identity = profile as { id: string; version: string };
+  const mediaByListing = new Map<number, AddonSeedMedia[]>();
+  for (const declaration of seedMediaDeclarations(input)) {
+    const media = mediaByListing.get(declaration.listingIndex) ?? [];
+    media.push({ source: declaration.source, field: declaration.field, alt: declaration.alt });
+    mediaByListing.set(declaration.listingIndex, media);
+  }
   const listings = value.listings.map((record, index) => {
     if (!record || typeof record !== "object" || Array.isArray(record)) {
       throw new Error(`Invalid add-on seed listing at index ${index}`);
     }
     const candidate = record as Record<string, unknown>;
-    if (!exactKeys(candidate, listingFields) ||
+    const keys = candidate.media === undefined ? listingFields : [...listingFields, "media"];
+    if (!exactKeys(candidate, keys) ||
         listingFields.slice(0, -1).some((field) => typeof candidate[field] !== "string") ||
         !candidate.profileValues || typeof candidate.profileValues !== "object" ||
         Array.isArray(candidate.profileValues)) {
@@ -62,7 +74,8 @@ export function parseAddonSeed(input: unknown): AddonSeed {
     const parsed = parseListing({ ...candidate, name: candidate.title, profileStateRevision: 0 });
     if (!parsed) throw new Error(`Invalid add-on seed listing at index ${index}`);
     return { ...parsed, title: candidate.title as string,
-      profileValues: candidate.profileValues as Record<string, unknown> };
+      profileValues: candidate.profileValues as Record<string, unknown>,
+      media: mediaByListing.get(index) ?? [] };
   });
   return { profile: identity, listings };
 }
@@ -116,7 +129,7 @@ function matchingActiveProfiles(identity: AddonSeed["profile"], digest: string):
 }
 
 type ValidatedSeedListing = { listing: Listing; values: ValidatedProfileValues;
-  destination: string };
+  rawValues: Record<string, unknown>; media: AddonSeedMedia[]; destination: string };
 
 function normalizedRowCount(values: ValidatedProfileValues, profiles: ActiveProfileSet): number {
   const fields = new Map(profiles.definitions.flatMap((definition) =>
@@ -134,6 +147,9 @@ function validateSeedListings(seed: AddonSeed, profiles: ActiveProfileSet): Vali
   const slugs = new Set<string>();
   const destinations = new Set<string>();
   let valueRows = 0;
+  const fields = new Map(profiles.definitions.flatMap((definition) =>
+    definition.fields.map((field) => [field.key, field])));
+  const sources = new Set<string>();
   return seed.listings.map((record, index) => {
     const listing = parseListing({ ...record, name: record.title,
       profileStateRevision: profiles.state.revision });
@@ -148,12 +164,65 @@ function validateSeedListings(seed: AddonSeed, profiles: ActiveProfileSet): Vali
     const values = validateProfileValues(record.profileValues, { profiles,
       authority: "system", listingSlug: listing.slug, actorUserId: "addon-seed",
       requireComplete: true });
-    valueRows += normalizedRowCount(values, profiles);
+    const mediaCounts = new Map<string, number>();
+    for (const media of record.media) {
+      const field = fields.get(media.field);
+      if (!field || field.type !== "media") {
+        throw new Error(`Seed media field does not accept photography: ${media.field}`);
+      }
+      if (Object.hasOwn(record.profileValues, media.field)) {
+        throw new Error(`Seed media conflicts with a supplied profile value: ${media.field}`);
+      }
+      const count = (mediaCounts.get(media.field) ?? 0) + 1;
+      if (field.cardinality === "one" && count > 1) {
+        throw new Error(`Seed media field accepts only one image: ${media.field}`);
+      }
+      mediaCounts.set(media.field, count);
+      if (sources.has(media.source)) throw new Error(`Duplicate seed media source: ${media.source}`);
+      sources.add(media.source);
+    }
+    valueRows += normalizedRowCount(values, profiles) + record.media.length;
     if (valueRows > PROFILE_LIMITS.migrationRows) {
       throw new Error(`Add-on seed exceeds the ${PROFILE_LIMITS.migrationRows} value row limit`);
     }
-    return { listing, values, destination };
+    return { listing, values, rawValues: record.profileValues, media: record.media, destination };
   });
+}
+
+type PreparedSeedMedia = AddonSeedMedia & { id: string; itemId: string; output: Buffer;
+  width: number; height: number; file: string };
+
+const mimeByExtension = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
+  webp: "image/webp" } as const;
+
+async function prepareSeedMedia(root: string, addon: LockAddon,
+  records: ValidatedSeedListing[]): Promise<Map<string, PreparedSeedMedia[]>> {
+  const result = new Map<string, PreparedSeedMedia[]>();
+  for (const record of records) {
+    const prepared = [];
+    for (const [index, media] of record.media.entries()) {
+      const bytes = ownedBytes(root, addon.id, media.source, addon.files, "seed media");
+      const extension = media.source.split(".").at(-1) as keyof typeof mimeByExtension;
+      const normalized = await normalizeMediaImage(bytes, mimeByExtension[extension], media.alt);
+      const id = randomUUID();
+      prepared.push({ ...media, id, itemId: `seed-photo-${index + 1}`,
+        output: normalized.output, width: normalized.width, height: normalized.height,
+        file: mediaFilePath(id) });
+    }
+    result.set(record.listing.slug, prepared);
+  }
+  return result;
+}
+
+function seedDigest(seedBytes: Buffer, root: string, addon: LockAddon,
+  records: ValidatedSeedListing[]): string {
+  const parts = [seedBytes];
+  for (const media of records.flatMap((record) => record.media)
+    .sort((left, right) => left.source.localeCompare(right.source))) {
+    const bytes = ownedBytes(root, addon.id, media.source, addon.files, "seed media");
+    parts.push(Buffer.from(`\n${media.source}\0${sha256(bytes)}`, "utf8"));
+  }
+  return sha256(Buffer.concat(parts));
 }
 
 function requireNoCatalogConflicts(records: ValidatedSeedListing[]): void {
@@ -183,50 +252,127 @@ function priorSeedRun(addon: LockAddon, seedDigest: string): number | null {
   return same.record_count;
 }
 
-export function seedInstalledAddon(rootInput: string, addonId: string): {
-  inserted: number; existing: number;
-} {
+type SeedResult = { inserted: number; existing: number };
+
+function seedStatements() {
+  return {
+    insertCategory: database.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)"),
+    insertListing: database.prepare(`INSERT INTO listings
+      (slug, name, summary, description, category, url, destination_key, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`),
+    insertAsset: database.prepare(`INSERT INTO media_assets
+      (id, target_kind, target_slug, uploaded_by, alt, width, height, created_at)
+      VALUES (?, 'listing', ?, 'addon-seed', ?, ?, ?, ?)`),
+    assignMedia: database.prepare(`INSERT INTO directory_profile_media
+      (asset_id, listing_slug, field_key, item_id, state, uploaded_by, created_at)
+      VALUES (?, ?, ?, ?, 'public', 'addon-seed', ?)`),
+    clearCleanup: database.prepare("DELETE FROM media_cleanup_queue WHERE asset_id = ?"),
+  };
+}
+
+type SeedStatements = ReturnType<typeof seedStatements>;
+
+function queuePreparedMedia(prepared: Map<string, PreparedSeedMedia[]>): void {
+  const queuedAt = new Date().toISOString();
+  const queue = database.prepare(`INSERT OR IGNORE INTO media_cleanup_queue
+    (asset_id, queued_at) VALUES (?, ?)`);
+  for (const images of prepared.values()) for (const image of images) {
+    queue.run(image.id, queuedAt);
+  }
+}
+
+function writePreparedMedia(prepared: Map<string, PreparedSeedMedia[]>): void {
+  for (const images of prepared.values()) for (const image of images) {
+    mkdirSync(dirname(image.file), { recursive: true });
+    writeFileSync(image.file, image.output, { flag: "wx" });
+  }
+}
+
+function insertSeedListing(record: ValidatedSeedListing, images: PreparedSeedMedia[],
+  profiles: ActiveProfileSet, statements: SeedStatements, now: string): void {
+  const { listing, destination } = record;
+  statements.insertCategory.run(listing.category);
+  statements.insertListing.run(listing.slug, listing.name, listing.summary, listing.description,
+    listing.category, listing.url, destination, listing.status);
+  const rawValues = { ...record.rawValues };
+  for (const image of images) {
+    statements.insertAsset.run(image.id, listing.slug, image.alt, image.width, image.height, now);
+    statements.assignMedia.run(image.id, listing.slug, image.field, image.itemId, now);
+    const values = rawValues[image.field] as { id: string; value: string }[] | undefined;
+    rawValues[image.field] = [...(values ?? []), { id: image.itemId, value: image.id }];
+    statements.clearCleanup.run(image.id);
+  }
+  const values = validateProfileValues(rawValues, { profiles, authority: "system",
+    listingSlug: listing.slug, actorUserId: "addon-seed", requireComplete: true });
+  replaceListingProfileValues({ listingSlug: listing.slug, values, profiles });
+}
+
+type SeedCommitContext = {
+  seed: AddonSeed;
+  addon: LockAddon;
+  profile: LockProfile;
+  expectedProfiles: ActiveProfileSet;
+  records: ValidatedSeedListing[];
+  prepared: Map<string, PreparedSeedMedia[]>;
+  digest: string;
+};
+
+function commitSeed({ seed, addon, profile, expectedProfiles, records, prepared,
+  digest }: SeedCommitContext): SeedResult {
+  return database.transaction(() => {
+    const profiles = matchingActiveProfiles(seed.profile, profile.digest);
+    if (profiles.state.revision !== expectedProfiles.state.revision) {
+      throw new Error("Directory profile changed before the seed transaction");
+    }
+    const repeated = priorSeedRun(addon, digest);
+    if (repeated !== null) return { inserted: 0, existing: repeated };
+    requireNoCatalogConflicts(records);
+    const now = new Date().toISOString();
+    const statements = seedStatements();
+    for (const record of records) {
+      insertSeedListing(record, prepared.get(record.listing.slug) ?? [], profiles, statements, now);
+    }
+    database.prepare(`INSERT INTO directory_profile_seed_runs
+      (addon_id, addon_version, seed_digest, profile_id, profile_version, record_count, applied_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run(addon.id, addon.version, digest, profile.id, profile.version, records.length, now);
+    return { inserted: records.length, existing: 0 };
+  }).immediate();
+}
+
+function persistPreparedSeed(context: SeedCommitContext): SeedResult {
+  drainMediaCleanupQueue();
+  queuePreparedMedia(context.prepared);
+  try {
+    writePreparedMedia(context.prepared);
+    const result = commitSeed(context);
+    drainMediaCleanupQueue();
+    return result;
+  } catch (error) {
+    drainMediaCleanupQueue();
+    throw error;
+  }
+}
+
+export async function seedInstalledAddon(rootInput: string, addonId: string): Promise<SeedResult> {
   const root = resolve(rootInput);
   const lock = readAddonLock(root) as AddonLock;
   const addon = lock.addons.find(({ id }) => id === addonId);
   if (!addon) throw new Error(`Add-on is not installed: ${addonId}`);
   if (!addon.seed) throw new Error(`Add-on does not declare sample data: ${addonId}`);
   const seedBytes = ownedBytes(root, addon.id, addon.seed, addon.files, "seed");
-  const seedDigest = sha256(seedBytes);
   let seedInput: unknown;
   try { seedInput = JSON.parse(seedBytes.toString("utf8")); }
   catch { throw new Error("Installed add-on seed is not valid JSON"); }
   const seed = parseAddonSeed(seedInput);
   const profile = installedProfile(root, addon, seed.profile);
   const profiles = matchingActiveProfiles(seed.profile, profile.digest);
-  const previous = priorSeedRun(addon, seedDigest);
-  if (previous !== null) return { inserted: 0, existing: previous };
   const records = validateSeedListings(seed, profiles);
+  const digest = seedDigest(seedBytes, root, addon, records);
+  const previous = priorSeedRun(addon, digest);
+  if (previous !== null) return { inserted: 0, existing: previous };
   requireNoCatalogConflicts(records);
-
-  return database.transaction(() => {
-    const active = matchingActiveProfiles(seed.profile, profile.digest);
-    if (active.state.revision !== profiles.state.revision) {
-      throw new Error("Directory profile changed before the seed transaction");
-    }
-    const repeated = priorSeedRun(addon, seedDigest);
-    if (repeated !== null) return { inserted: 0, existing: repeated };
-    requireNoCatalogConflicts(records);
-    const insertCategory = database.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)");
-    const insertListing = database.prepare(`INSERT INTO listings
-      (slug, name, summary, description, category, url, destination_key, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
-    for (const { listing, values, destination } of records) {
-      insertCategory.run(listing.category);
-      insertListing.run(listing.slug, listing.name, listing.summary, listing.description,
-        listing.category, listing.url, destination, listing.status);
-      replaceListingProfileValues({ listingSlug: listing.slug, values, profiles: active });
-    }
-    database.prepare(`INSERT INTO directory_profile_seed_runs
-      (addon_id, addon_version, seed_digest, profile_id, profile_version, record_count, applied_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`)
-      .run(addon.id, addon.version, seedDigest, profile.id, profile.version,
-        records.length, new Date().toISOString());
-    return { inserted: records.length, existing: 0 };
-  }).immediate();
+  const preparedMedia = await prepareSeedMedia(root, addon, records);
+  return persistPreparedSeed({ seed, addon, profile, expectedProfiles: profiles, records,
+    prepared: preparedMedia, digest });
 }
