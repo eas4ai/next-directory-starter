@@ -62,6 +62,7 @@ export default async function ListingsPage({ searchParams }: PageProps<"/listing
     <Renderer title="Listings" description="Explore the published links in this directory."
       total={result.total} listings={listings} featured={featured} fields={fields}
       mediaAssets={mediaAssets} facets={facets} iconLibrary={preset.iconLibrary}
+      slots={definition?.renderers}
       pagination={{ page: result.page, pages: result.pages,
         previousHref: result.page > 1 ? pageHref(result.page - 1) : undefined,
         nextHref: result.page < result.pages ? pageHref(result.page + 1) : undefined }} />

@@ -4,6 +4,8 @@ import type { Listing } from "@/lib/listings";
 import type { MediaAsset } from "@/lib/media";
 import type { SiteConfig } from "@/lib/site-config";
 
+export const PUBLIC_TEMPLATE_API_VERSION = 1 as const;
+
 export type PublicTemplateNavigationItem = {
   href: string;
   label: string;
@@ -37,6 +39,38 @@ export type PublicTemplatePagination = {
   nextHref?: string;
 };
 
+export type PublicTemplateListingCardProps = {
+  listing: PublicTemplateListing;
+  fields: readonly DirectoryProfileField[];
+  mediaAssets: ReadonlyMap<string, MediaAsset>;
+  iconLibrary: string;
+  highlighted?: boolean;
+  compareControl?: ReactNode;
+};
+
+export type PublicTemplateFeaturedProps = {
+  listings: readonly PublicTemplateListing[];
+  fields: readonly DirectoryProfileField[];
+  mediaAssets: ReadonlyMap<string, MediaAsset>;
+  iconLibrary: string;
+  Card: ComponentType<PublicTemplateListingCardProps>;
+};
+
+export type PublicTemplateEmptyProps = {
+  message: string;
+};
+
+export type PublicTemplatePaginationProps = {
+  value: PublicTemplatePagination;
+};
+
+export type PublicTemplateDirectorySlots = {
+  card?: ComponentType<PublicTemplateListingCardProps>;
+  featured?: ComponentType<PublicTemplateFeaturedProps>;
+  empty?: ComponentType<PublicTemplateEmptyProps>;
+  pagination?: ComponentType<PublicTemplatePaginationProps>;
+};
+
 export type PublicTemplateDirectoryProps = {
   title: string;
   description: string;
@@ -48,6 +82,7 @@ export type PublicTemplateDirectoryProps = {
   facets: ReactNode;
   pagination: PublicTemplatePagination;
   iconLibrary: string;
+  slots?: PublicTemplateDirectorySlots;
 };
 
 export type PublicTemplateListingDetailProps = {
@@ -66,7 +101,7 @@ export type PublicTemplateComparisonProps = {
   message?: string;
 };
 
-export type PublicTemplateRenderers = {
+export type PublicTemplateRenderers = PublicTemplateDirectorySlots & {
   header?: ComponentType<PublicTemplateHeaderProps>;
   home?: ComponentType<PublicTemplateHomeProps>;
   directory?: ComponentType<PublicTemplateDirectoryProps>;

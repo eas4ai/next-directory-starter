@@ -11,7 +11,7 @@ import {
   INTEGRITY_NAME, MANIFEST_NAME, MAX_ARCHIVE_BYTES, MAX_FILE_BYTES, MAX_FILES,
   MAX_PACKAGE_BYTES,
   canonicalJson, integritySchema, normalizePayloadPath, parseManifest, readSourcePackage, sha256,
-  validateProfileDefinitions, validateThemeModules,
+  validateProfileDefinitions, validateRendererModules, validateThemeModules,
 } from "./manifest.mjs";
 
 const FIXED_TIME = new Date("1980-01-01T00:00:00.000Z");
@@ -167,6 +167,7 @@ export async function readArchive(input) {
   }
   const files = new Map(manifest.files.map((name) => [name, entries.get(name)]));
   validateThemeModules(manifest, files);
+  validateRendererModules(manifest, files);
   const profiles = validateProfileDefinitions(manifest, files);
   return {
     manifest,

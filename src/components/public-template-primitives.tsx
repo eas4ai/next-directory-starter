@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +7,8 @@ import { MarkdownContent } from "@/components/markdown-content";
 import { PresetExternalLinkIcon } from "@/components/preset-icon";
 import { ProfileValuesView } from "@/components/profile-values-view";
 import type {
-  PublicTemplateListing, PublicTemplateListingDetailProps, PublicTemplatePagination,
+  PublicTemplateListing, PublicTemplateListingCardProps, PublicTemplateListingDetailProps,
+  PublicTemplatePaginationProps,
 } from "@/lib/public-template-sdk";
 import type { DirectoryProfileField } from "@/lib/directory-profile-types";
 import type { MediaAsset } from "@/lib/media";
@@ -27,14 +28,7 @@ export function TemplateProfileValues({ fields, listing, mediaAssets, placements
 }
 
 export function TemplateListingCard({ listing, fields, mediaAssets, iconLibrary,
-  highlighted = false, compareControl }: {
-  listing: PublicTemplateListing;
-  fields: readonly DirectoryProfileField[];
-  mediaAssets: ReadonlyMap<string, MediaAsset>;
-  iconLibrary: string;
-  highlighted?: boolean;
-  compareControl?: ReactNode;
-}) {
+  highlighted = false, compareControl }: PublicTemplateListingCardProps) {
   return <Card className={`template-listing-card min-w-0 ${highlighted ? "border-primary/50" : ""}`}>
     <CardHeader>
       {highlighted && <span className="w-fit rounded-full bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground">
@@ -57,7 +51,7 @@ export function TemplateListingCard({ listing, fields, mediaAssets, iconLibrary,
   </Card>;
 }
 
-export function TemplatePagination({ value }: { value: PublicTemplatePagination }) {
+export function TemplatePagination({ value }: PublicTemplatePaginationProps) {
   if (value.pages <= 1) return null;
   return <nav className="template-pagination mt-8 flex items-center justify-between gap-4"
     aria-label="Listing pages">
@@ -71,11 +65,9 @@ export function TemplatePagination({ value }: { value: PublicTemplatePagination 
   </nav>;
 }
 
-export function TemplateListingDetailBody({ value }: {
-  value: PublicTemplateListingDetailProps;
-}) {
+export function TemplateListingDetail(value: PublicTemplateListingDetailProps) {
   const { listing, fields, mediaAssets, image, markdownHref, iconLibrary } = value;
-  return <>
+  return <main className="site-container wrap-anywhere">
     <Link href="/listings" className="text-sm text-muted-foreground hover:text-foreground">← Listings</Link>
     <a href={markdownHref} type="text/markdown" rel="alternate"
       className="ml-4 text-sm underline">Markdown version</a>
@@ -98,5 +90,5 @@ export function TemplateListingDetailBody({ value }: {
         Visit {listing.name} <PresetExternalLinkIcon library={iconLibrary} />
       </a>
     </Button></div>
-  </>;
+  </main>;
 }

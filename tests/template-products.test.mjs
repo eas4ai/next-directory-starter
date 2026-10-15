@@ -34,6 +34,17 @@ requirementTest("TPL-001 installs constrained public-template renderer modules",
       "pack renderer add-on");
     expectSuccess(run(repository, ["validate", rendererArchive]), "validate renderer add-on");
 
+    const unversioned = join(temporary, "unversioned");
+    cpSync(rendererFixture, unversioned, { recursive: true });
+    const unversionedManifest = join(unversioned, "directory-addon.json");
+    const unversionedValue = JSON.parse(readFileSync(unversionedManifest, "utf8"));
+    delete unversionedValue.templates[0].templateApi;
+    writeFileSync(unversionedManifest, `${JSON.stringify(unversionedValue, null, 2)}\n`);
+    const unversionedResult = run(repository,
+      ["pack", unversioned, join(temporary, "unversioned.zip")]);
+    assert.notEqual(unversionedResult.status, 0, "unversioned renderer unexpectedly packed");
+    assert.match(unversionedResult.stderr, /templateApi 1/i);
+
     const forbidden = join(temporary, "forbidden");
     cpSync(rendererFixture, forbidden, { recursive: true });
     const forbiddenModule = join(forbidden, "src/template.tsx");
@@ -53,6 +64,16 @@ requirementTest("TPL-001 installs constrained public-template renderer modules",
       ["pack", mismatched, join(temporary, "mismatched.zip")]);
     assert.notEqual(mismatchResult.status, 0, "identity-mismatched renderer unexpectedly packed");
     assert.match(mismatchResult.stderr, /renderer identity/i);
+
+    const illTyped = join(temporary, "ill-typed");
+    cpSync(rendererFixture, illTyped, { recursive: true });
+    const illTypedModule = join(illTyped, "src/template.tsx");
+    writeFileSync(illTypedModule, readFileSync(illTypedModule, "utf8")
+      .replace("{site.name}", "{site.missingProperty}"));
+    const illTypedResult = run(repository,
+      ["pack", illTyped, join(temporary, "ill-typed.zip")]);
+    assert.notEqual(illTypedResult.status, 0, "ill-typed renderer unexpectedly packed");
+    assert.match(illTypedResult.stderr, /does not satisfy templateApi 1/i);
 
     const starter = join(temporary, "starter");
     cpSync(repository, starter, { recursive: true, filter(source) {
@@ -74,12 +95,16 @@ requirementTest("TPL-001 installs constrained public-template renderer modules",
              typeof definitions[0].renderers.home !== "function") process.exit(1);`],
       { cwd: starter, encoding: "utf8", env: { ...process.env, CI: "1" } });
     expectSuccess(imported, "import generated renderer registry");
+    const buildEnvironment = { ...process.env, CI: "1", DIRECTORY_EXPLICIT_MIGRATIONS: "1",
+      DATABASE_URL: `file:${join(temporary, "renderer-build.db")}`,
+      BETTER_AUTH_SECRET: "template-products-test-secret-template-products-test-secret",
+      SITE_URL: "http://127.0.0.1:3000" };
+    const migrate = spawnSync("npm", ["run", "db:migrate"], {
+      cwd: starter, encoding: "utf8", timeout: 300_000, env: buildEnvironment,
+    });
+    expectSuccess(migrate, "migrate isolated renderer database");
     const build = spawnSync("npm", ["run", "build"], {
-      cwd: starter, encoding: "utf8", timeout: 600_000,
-      env: { ...process.env, CI: "1", DIRECTORY_EXPLICIT_MIGRATIONS: "1",
-        DATABASE_URL: `file:${join(temporary, "renderer-build.db")}`,
-        BETTER_AUTH_SECRET: "template-products-test-secret-template-products-test-secret",
-        SITE_URL: "http://127.0.0.1:3000" },
+      cwd: starter, encoding: "utf8", timeout: 600_000, env: buildEnvironment,
     });
     expectSuccess(build, "build installed renderer add-on");
     expectSuccess(run(starter, ["remove", "renderer-addon"]), "remove renderer add-on");

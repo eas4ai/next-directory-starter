@@ -12,7 +12,7 @@ import { activeDirectoryProfiles } from "@/lib/directory-profiles";
 import type { DirectoryProfileField, ProfileValueSet } from "@/lib/directory-profile-types";
 import { getThemeSelection } from "@/lib/theme-selection";
 import { publicTemplateDefinition } from "@/lib/public-template-registry";
-import { DefaultPublicListing } from "@/components/public-template-defaults";
+import { TemplateListingDetail } from "@/components/public-template-primitives";
 
 export const instant = false;
 
@@ -59,7 +59,7 @@ export default async function ListingPage({ params }: PageProps<"/listings/[slug
   const properties = publicProfileProperties(fields, listing.profileValues);
   const profileMedia = publicProfileMediaAssets([...profileMediaIds(listing.profileValues, profiles)]);
   const definition = publicTemplateDefinition(getThemeSelection().templateId);
-  const Renderer = definition?.renderers.listing ?? DefaultPublicListing;
+  const Renderer = definition?.renderers.listing ?? TemplateListingDetail;
   const value = { listing: { ...listing, featured }, fields, mediaAssets: profileMedia,
     image, markdownHref: `/markdown/listings/${listing.slug}`, iconLibrary: preset.iconLibrary };
 

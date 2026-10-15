@@ -19,6 +19,7 @@
       "id": "renderer-addon",
       "name": "Renderer Grid",
       "renderer": "src/template.tsx",
+      "templateApi": 1,
       "stylesheet": "src/template.css",
       "supportedProfiles": [
         {

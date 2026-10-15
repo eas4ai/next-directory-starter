@@ -2,11 +2,11 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PresetExternalLinkIcon } from "@/components/preset-icon";
 import {
-  TemplateListingCard, TemplateListingDetailBody, TemplatePagination,
+  TemplateListingCard, TemplatePagination,
 } from "@/components/public-template-primitives";
 import type {
-  PublicTemplateDirectoryProps, PublicTemplateHeaderProps, PublicTemplateHomeProps,
-  PublicTemplateListingDetailProps,
+  PublicTemplateDirectoryProps, PublicTemplateEmptyProps, PublicTemplateFeaturedProps,
+  PublicTemplateHeaderProps, PublicTemplateHomeProps,
 } from "@/lib/public-template-sdk";
 
 export function DefaultPublicHeader({ site, navigation, appearanceControl,
@@ -49,7 +49,28 @@ export function DefaultPublicHome({ site }: PublicTemplateHomeProps) {
   </main>;
 }
 
+export function DefaultPublicFeatured({ listings, fields, mediaAssets, iconLibrary,
+  Card }: PublicTemplateFeaturedProps) {
+  if (listings.length === 0) return null;
+  return <section aria-label="Featured listings" className="mt-8">
+    <h2 className="text-xl font-semibold">Featured listings</h2>
+    <p className="mt-1 text-sm text-muted-foreground">Paid placements matching these filters.</p>
+    <div className="template-listing-grid mt-4">
+      {listings.map((listing) => <Card key={listing.slug} listing={listing}
+        fields={fields} mediaAssets={mediaAssets} iconLibrary={iconLibrary} highlighted />)}
+    </div>
+  </section>;
+}
+
+export function DefaultPublicEmpty({ message }: PublicTemplateEmptyProps) {
+  return <p className="mt-6 text-muted-foreground">{message}</p>;
+}
+
 export function DefaultPublicDirectory(value: PublicTemplateDirectoryProps) {
+  const Card = value.slots?.card ?? TemplateListingCard;
+  const Featured = value.slots?.featured ?? DefaultPublicFeatured;
+  const Empty = value.slots?.empty ?? DefaultPublicEmpty;
+  const Pagination = value.slots?.pagination ?? TemplatePagination;
   return <main className="site-container wrap-anywhere">
     <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">← Home</Link>
     <div className="mt-8">
@@ -60,29 +81,15 @@ export function DefaultPublicDirectory(value: PublicTemplateDirectoryProps) {
     <p className="mt-6 text-sm text-muted-foreground" role="status">
       {value.total} {value.total === 1 ? "listing" : "listings"} found
     </p>
-    {value.featured.length > 0 && <section aria-label="Featured listings" className="mt-8">
-      <h2 className="text-xl font-semibold">Featured listings</h2>
-      <p className="mt-1 text-sm text-muted-foreground">Paid placements matching these filters.</p>
-      <div className="template-listing-grid mt-4">
-        {value.featured.map((listing) => <TemplateListingCard key={listing.slug}
-          listing={listing} fields={value.fields} mediaAssets={value.mediaAssets}
-          iconLibrary={value.iconLibrary} highlighted />)}
-      </div>
-    </section>}
+    <Featured listings={value.featured} fields={value.fields} mediaAssets={value.mediaAssets}
+      iconLibrary={value.iconLibrary} Card={Card} />
     <section aria-label="Directory results" data-testid="ordinary-results"
       className="template-listing-grid mt-8">
-      {value.listings.map((listing) => <TemplateListingCard key={listing.slug}
+      {value.listings.map((listing) => <Card key={listing.slug}
         listing={listing} fields={value.fields} mediaAssets={value.mediaAssets}
         iconLibrary={value.iconLibrary} />)}
     </section>
-    {value.listings.length === 0 &&
-      <p className="mt-6 text-muted-foreground">No listings match these filters.</p>}
-    <TemplatePagination value={value.pagination} />
-  </main>;
-}
-
-export function DefaultPublicListing(value: PublicTemplateListingDetailProps) {
-  return <main className="site-container wrap-anywhere">
-    <TemplateListingDetailBody value={value} />
+    {value.listings.length === 0 && <Empty message="No listings match these filters." />}
+    <Pagination value={value.pagination} />
   </main>;
 }
