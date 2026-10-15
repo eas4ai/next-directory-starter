@@ -1,5 +1,6 @@
 import { renderImportCard } from "@/lib/agent-cards";
 import { SocialCardCapacityError } from "@/lib/social-card-cache";
+import { renderSocialCard } from "@/lib/social-cards";
 
 const uncached = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
 const cacheControl = "public, max-age=0, must-revalidate";
@@ -9,7 +10,8 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
   if (!filename.endsWith(".png")) return new Response(null, { status: 404, headers: uncached });
   const slug = filename.slice(0, -4);
   try {
-    const card = await renderImportCard(slug, false);
+    const card = await renderImportCard(slug, false) ??
+      await renderSocialCard(`/listings/${slug}`);
     if (!card) return new Response(null, { status: 404, headers: uncached });
     const etag = card.etag;
     const headers = { "Cache-Control": cacheControl, ETag: etag,

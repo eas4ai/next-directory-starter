@@ -1,0 +1,842 @@
+{
+  "profile": {
+    "id": "northstar-experts.experts",
+    "version": "1.0.0"
+  },
+  "listings": [
+    {
+      "slug": "maya-chen",
+      "title": "Maya Chen",
+      "summary": "Climate transition strategy for energy teams moving from targets to operating plans.",
+      "description": "Maya Chen works with organizations on climate strategy through clearly scoped advisory and delivery engagements. This profile lists current service facts, published qualifications, and stated availability so teams can decide whether to start a conversation.",
+      "category": "Climate strategy",
+      "url": "https://maya-chen.example",
+      "status": "published",
+      "profileValues": {
+        "northstar-experts.experts.specialties": [
+          "climate-strategy"
+        ],
+        "northstar-experts.experts.sectors": [
+          "energy",
+          "government"
+        ],
+        "northstar-experts.experts.engagement-modes": [
+          "advisory",
+          "project"
+        ],
+        "northstar-experts.experts.service-location": {
+          "countryCode": "US",
+          "region": "WA",
+          "locality": "Seattle",
+          "latitude": 47.6062,
+          "longitude": -122.3321
+        },
+        "northstar-experts.experts.time-zone": "America/Los_Angeles",
+        "northstar-experts.experts.languages": [
+          "en"
+        ],
+        "northstar-experts.experts.years-experience": 18,
+        "northstar-experts.experts.rate": {
+          "amountMinor": 45000,
+          "currency": "USD"
+        },
+        "northstar-experts.experts.availability": "this-month",
+        "northstar-experts.experts.next-available": "2026-11-03",
+        "northstar-experts.experts.credentials": [
+          {
+            "id": "credential-1",
+            "values": {
+              "name": "Climate Risk Certificate",
+              "issuer": "Global Association of Risk Professionals",
+              "year": 2021,
+              "public-url": "https://credentials.example/maya-chen"
+            }
+          }
+        ],
+        "northstar-experts.experts.credential-reviewed": true,
+        "northstar-experts.experts.credential-reviewed-at": "2026-09-18",
+        "northstar-experts.experts.contact-url": "https://maya-chen.example/contact"
+      },
+      "media": [
+        {
+          "source": "seed/media/maya-chen.webp",
+          "field": "northstar-experts.experts.portraits",
+          "alt": "Maya Chen in a naturally lit planning studio beside maps and greenery"
+        }
+      ]
+    },
+    {
+      "slug": "jonah-reed",
+      "title": "Jonah Reed",
+      "summary": "Calm operating systems for growing consumer and technology organizations.",
+      "description": "Jonah Reed works with organizations on operations through clearly scoped advisory and delivery engagements. This profile lists current service facts, published qualifications, and stated availability so teams can decide whether to start a conversation.",
+      "category": "Operations",
+      "url": "https://jonah-reed.example",
+      "status": "published",
+      "profileValues": {
+        "northstar-experts.experts.specialties": [
+          "operations"
+        ],
+        "northstar-experts.experts.sectors": [
+          "consumer",
+          "technology"
+        ],
+        "northstar-experts.experts.engagement-modes": [
+          "fractional",
+          "advisory"
+        ],
+        "northstar-experts.experts.service-location": {
+          "countryCode": "US",
+          "region": "IL",
+          "locality": "Chicago",
+          "latitude": 41.8781,
+          "longitude": -87.6298
+        },
+        "northstar-experts.experts.time-zone": "America/Chicago",
+        "northstar-experts.experts.languages": [
+          "en"
+        ],
+        "northstar-experts.experts.years-experience": 14,
+        "northstar-experts.experts.rate": {
+          "amountMinor": 32500,
+          "currency": "USD"
+        },
+        "northstar-experts.experts.availability": "available-now",
+        "northstar-experts.experts.next-available": "2026-10-26",
+        "northstar-experts.experts.credentials": [
+          {
+            "id": "credential-2",
+            "values": {
+              "name": "Lean Six Sigma Black Belt",
+              "issuer": "ASQ",
+              "year": 2019,
+              "public-url": "https://credentials.example/jonah-reed"
+            }
+          }
+        ],
+        "northstar-experts.experts.credential-reviewed": true,
+        "northstar-experts.experts.credential-reviewed-at": "2026-09-12",
+        "northstar-experts.experts.contact-url": "https://jonah-reed.example/contact"
+      },
+      "media": [
+        {
+          "source": "seed/media/jonah-reed.webp",
+          "field": "northstar-experts.experts.portraits",
+          "alt": "Jonah Reed seated at a clean workshop table with a notebook"
+        }
+      ]
+    },
+    {
+      "slug": "amina-okafor",
+      "title": "Amina Okafor",
+      "summary": "Service transformation guidance for civic and health institutions.",
+      "description": "Amina Okafor works with organizations on public sector through clearly scoped advisory and delivery engagements. This profile lists current service facts, published qualifications, and stated availability so teams can decide whether to start a conversation.",
+      "category": "Public sector",
+      "url": "https://amina-okafor.example",
+      "status": "published",
+      "profileValues": {
+        "northstar-experts.experts.specialties": [
+          "public-sector",
+          "organizational-design"
+        ],
+        "northstar-experts.experts.sectors": [
+          "government",
+          "healthcare"
+        ],
+        "northstar-experts.experts.engagement-modes": [
+          "advisory",
+          "workshop"
+        ],
+        "northstar-experts.experts.service-location": {
+          "countryCode": "GB",
+          "region": "ENG",
+          "locality": "London",
+          "latitude": 51.5072,
+          "longitude": -0.1276
+        },
+        "northstar-experts.experts.time-zone": "Europe/London",
+        "northstar-experts.experts.languages": [
+          "en",
+          "fr"
+        ],
+        "northstar-experts.experts.years-experience": 24,
+        "northstar-experts.experts.rate": {
+          "amountMinor": 52500,
+          "currency": "GBP"
+        },
+        "northstar-experts.experts.availability": "waitlist",
+        "northstar-experts.experts.next-available": "2027-01-11",
+        "northstar-experts.experts.credentials": [
+          {
+            "id": "credential-3",
+            "values": {
+              "name": "Public Leadership Certificate",
+              "issuer": "Blavatnik School of Government",
+              "year": 2018,
+              "public-url": "https://credentials.example/amina-okafor"
+            }
+          }
+        ],
+        "northstar-experts.experts.credential-reviewed": true,
+        "northstar-experts.experts.credential-reviewed-at": "2026-08-30",
+        "northstar-experts.experts.contact-url": "https://amina-okafor.example/contact"
+      },
+      "media": [
+        {
+          "source": "seed/media/amina-okafor.webp",
+          "field": "northstar-experts.experts.portraits",
+          "alt": "Amina Okafor standing in a bright civic atrium"
+        }
+      ]
+    },
+    {
+      "slug": "lucas-alvarez",
+      "title": "Lucas Alvarez",
+      "summary": "Research-led service design for complex customer and employee journeys.",
+      "description": "Lucas Alvarez works with organizations on service design through clearly scoped advisory and delivery engagements. This profile lists current service facts, published qualifications, and stated availability so teams can decide whether to start a conversation.",
+      "category": "Service design",
+      "url": "https://lucas-alvarez.example",
+      "status": "published",
+      "profileValues": {
+        "northstar-experts.experts.specialties": [
+          "service-design"
+        ],
+        "northstar-experts.experts.sectors": [
+          "finance",
+          "consumer"
+        ],
+        "northstar-experts.experts.engagement-modes": [
+          "project",
+          "research",
+          "workshop"
+        ],
+        "northstar-experts.experts.service-location": {
+          "countryCode": "US",
+          "region": "NY",
+          "locality": "Brooklyn",
+          "latitude": 40.6782,
+          "longitude": -73.9442
+        },
+        "northstar-experts.experts.time-zone": "America/New_York",
+        "northstar-experts.experts.languages": [
+          "en",
+          "es"
+        ],
+        "northstar-experts.experts.years-experience": 11,
+        "northstar-experts.experts.rate": {
+          "amountMinor": 29000,
+          "currency": "USD"
+        },
+        "northstar-experts.experts.availability": "this-month",
+        "northstar-experts.experts.next-available": "2026-11-17",
+        "northstar-experts.experts.credentials": [
+          {
+            "id": "credential-4",
+            "values": {
+              "name": "Service Design Practitioner",
+              "issuer": "Service Design Network",
+              "year": 2020,
+              "public-url": "https://credentials.example/lucas-alvarez"
+            }
+          }
+        ],
+        "northstar-experts.experts.credential-reviewed": false,
+        "northstar-experts.experts.credential-reviewed-at": "2026-07-14",
+        "northstar-experts.experts.contact-url": "https://lucas-alvarez.example/contact"
+      },
+      "media": [
+        {
+          "source": "seed/media/lucas-alvarez.webp",
+          "field": "northstar-experts.experts.portraits",
+          "alt": "Lucas Alvarez in a service design studio with paper prototypes"
+        }
+      ]
+    },
+    {
+      "slug": "priya-nair",
+      "title": "Priya Nair",
+      "summary": "Responsible AI governance that product, legal, and engineering teams can use.",
+      "description": "Priya Nair works with organizations on responsible ai through clearly scoped advisory and delivery engagements. This profile lists current service facts, published qualifications, and stated availability so teams can decide whether to start a conversation.",
+      "category": "Responsible AI",
+      "url": "https://priya-nair.example",
+      "status": "published",
+      "profileValues": {
+        "northstar-experts.experts.specialties": [
+          "responsible-ai"
+        ],
+        "northstar-experts.experts.sectors": [
+          "technology",
+          "finance",
+          "healthcare"
+        ],
+        "northstar-experts.experts.engagement-modes": [
+          "advisory",
+          "research"
+        ],
+        "northstar-experts.experts.service-location": {
+          "countryCode": "CA",
+          "region": "ON",
+          "locality": "Toronto",
+          "latitude": 43.6532,
+          "longitude": -79.3832
+        },
+        "northstar-experts.experts.time-zone": "America/Toronto",
+        "northstar-experts.experts.languages": [
+          "en",
+          "hi"
+        ],
+        "northstar-experts.experts.years-experience": 16,
+        "northstar-experts.experts.rate": {
+          "amountMinor": 60000,
+          "currency": "CAD"
+        },
+        "northstar-experts.experts.availability": "available-now",
+        "northstar-experts.experts.next-available": "2026-10-29",
+        "northstar-experts.experts.credentials": [
+          {
+            "id": "credential-5",
+            "values": {
+              "name": "AI Governance Professional",
+              "issuer": "IAPP",
+              "year": 2024,
+              "public-url": "https://credentials.example/priya-nair"
+            }
+          }
+        ],
+        "northstar-experts.experts.credential-reviewed": true,
+        "northstar-experts.experts.credential-reviewed-at": "2026-10-02",
+        "northstar-experts.experts.contact-url": "https://priya-nair.example/contact"
+      },
+      "media": [
+        {
+          "source": "seed/media/priya-nair.webp",
+          "field": "northstar-experts.experts.portraits",
+          "alt": "Priya Nair seated near a library wall with an open notebook"
+        }
+      ]
+    },
+    {
+      "slug": "elena-petrov",
+      "title": "Elena Petrov",
+      "summary": "Organization structures and decision systems for teams entering a new stage.",
+      "description": "Elena Petrov works with organizations on organizational design through clearly scoped advisory and delivery engagements. This profile lists current service facts, published qualifications, and stated availability so teams can decide whether to start a conversation.",
+      "category": "Organizational design",
+      "url": "https://elena-petrov.example",
+      "status": "published",
+      "profileValues": {
+        "northstar-experts.experts.specialties": [
+          "organizational-design",
+          "operations"
+        ],
+        "northstar-experts.experts.sectors": [
+          "technology",
+          "nonprofit"
+        ],
+        "northstar-experts.experts.engagement-modes": [
+          "fractional",
+          "workshop"
+        ],
+        "northstar-experts.experts.service-location": {
+          "countryCode": "US",
+          "region": "MA",
+          "locality": "Boston",
+          "latitude": 42.3601,
+          "longitude": -71.0589
+        },
+        "northstar-experts.experts.time-zone": "America/New_York",
+        "northstar-experts.experts.languages": [
+          "en",
+          "uk"
+        ],
+        "northstar-experts.experts.years-experience": 27,
+        "northstar-experts.experts.rate": {
+          "amountMinor": 55000,
+          "currency": "USD"
+        },
+        "northstar-experts.experts.availability": "waitlist",
+        "northstar-experts.experts.next-available": "2027-02-08",
+        "northstar-experts.experts.credentials": [
+          {
+            "id": "credential-6",
+            "values": {
+              "name": "Organization Design Certificate",
+              "issuer": "Center for Effective Organizations",
+              "year": 2017,
+              "public-url": "https://credentials.example/elena-petrov"
+            }
+          }
+        ],
+        "northstar-experts.experts.credential-reviewed": true,
+        "northstar-experts.experts.credential-reviewed-at": "2026-09-05",
+        "northstar-experts.experts.contact-url": "https://elena-petrov.example/contact"
+      },
+      "media": [
+        {
+          "source": "seed/media/elena-petrov.webp",
+          "field": "northstar-experts.experts.portraits",
+          "alt": "Elena Petrov in a naturally lit conference room with subtle diagrams"
+        }
+      ]
+    },
+    {
+      "slug": "theo-martin",
+      "title": "Theo Martin",
+      "summary": "Accessibility strategy for digital services, content operations, and design systems.",
+      "description": "Theo Martin works with organizations on accessibility through clearly scoped advisory and delivery engagements. This profile lists current service facts, published qualifications, and stated availability so teams can decide whether to start a conversation.",
+      "category": "Accessibility",
+      "url": "https://theo-martin.example",
+      "status": "published",
+      "profileValues": {
+        "northstar-experts.experts.specialties": [
+          "accessibility",
+          "service-design"
+        ],
+        "northstar-experts.experts.sectors": [
+          "technology",
+          "education"
+        ],
+        "northstar-experts.experts.engagement-modes": [
+          "advisory",
+          "workshop",
+          "research"
+        ],
+        "northstar-experts.experts.service-location": {
+          "countryCode": "US",
+          "region": "OR",
+          "locality": "Portland",
+          "latitude": 45.5152,
+          "longitude": -122.6784
+        },
+        "northstar-experts.experts.time-zone": "America/Los_Angeles",
+        "northstar-experts.experts.languages": [
+          "en"
+        ],
+        "northstar-experts.experts.years-experience": 12,
+        "northstar-experts.experts.rate": {
+          "amountMinor": 28000,
+          "currency": "USD"
+        },
+        "northstar-experts.experts.availability": "available-now",
+        "northstar-experts.experts.next-available": "2026-10-23",
+        "northstar-experts.experts.credentials": [
+          {
+            "id": "credential-7",
+            "values": {
+              "name": "Certified Professional in Accessibility Core Competencies",
+              "issuer": "IAAP",
+              "year": 2022,
+              "public-url": "https://credentials.example/theo-martin"
+            }
+          }
+        ],
+        "northstar-experts.experts.credential-reviewed": true,
+        "northstar-experts.experts.credential-reviewed-at": "2026-09-22",
+        "northstar-experts.experts.contact-url": "https://theo-martin.example/contact"
+      },
+      "media": [
+        {
+          "source": "seed/media/theo-martin.webp",
+          "field": "northstar-experts.experts.portraits",
+          "alt": "Theo Martin beside an inclusive workspace in warm window light"
+        }
+      ]
+    },
+    {
+      "slug": "samira-haddad",
+      "title": "Samira Haddad",
+      "summary": "Market entry planning for teams expanding across regions and customer segments.",
+      "description": "Samira Haddad works with organizations on market expansion through clearly scoped advisory and delivery engagements. This profile lists current service facts, published qualifications, and stated availability so teams can decide whether to start a conversation.",
+      "category": "Market expansion",
+      "url": "https://samira-haddad.example",
+      "status": "published",
+      "profileValues": {
+        "northstar-experts.experts.specialties": [
+          "market-expansion"
+        ],
+        "northstar-experts.experts.sectors": [
+          "consumer",
+          "technology"
+        ],
+        "northstar-experts.experts.engagement-modes": [
+          "advisory",
+          "research"
+        ],
+        "northstar-experts.experts.service-location": {
+          "countryCode": "CA",
+          "region": "BC",
+          "locality": "Vancouver",
+          "latitude": 49.2827,
+          "longitude": -123.1207
+        },
+        "northstar-experts.experts.time-zone": "America/Vancouver",
+        "northstar-experts.experts.languages": [
+          "en",
+          "ar",
+          "fr"
+        ],
+        "northstar-experts.experts.years-experience": 9,
+        "northstar-experts.experts.rate": {
+          "amountMinor": 24000,
+          "currency": "CAD"
+        },
+        "northstar-experts.experts.availability": "this-month",
+        "northstar-experts.experts.next-available": "2026-12-01",
+        "northstar-experts.experts.credentials": [
+          {
+            "id": "credential-8",
+            "values": {
+              "name": "International Market Entry Program",
+              "issuer": "Sauder School of Business",
+              "year": 2023,
+              "public-url": "https://credentials.example/samira-haddad"
+            }
+          }
+        ],
+        "northstar-experts.experts.credential-reviewed": true,
+        "northstar-experts.experts.credential-reviewed-at": "2026-08-19",
+        "northstar-experts.experts.contact-url": "https://samira-haddad.example/contact"
+      },
+      "media": [
+        {
+          "source": "seed/media/samira-haddad.webp",
+          "field": "northstar-experts.experts.portraits",
+          "alt": "Samira Haddad on a quiet urban terrace in morning light"
+        }
+      ]
+    },
+    {
+      "slug": "nia-brooks",
+      "title": "Nia Brooks",
+      "summary": "Portfolio operations for mission-driven organizations with distributed teams.",
+      "description": "Nia Brooks works with organizations on operations through clearly scoped advisory and delivery engagements. This profile lists current service facts, published qualifications, and stated availability so teams can decide whether to start a conversation.",
+      "category": "Operations",
+      "url": "https://nia-brooks.example",
+      "status": "published",
+      "profileValues": {
+        "northstar-experts.experts.specialties": [
+          "operations",
+          "organizational-design"
+        ],
+        "northstar-experts.experts.sectors": [
+          "nonprofit",
+          "education"
+        ],
+        "northstar-experts.experts.engagement-modes": [
+          "fractional",
+          "project"
+        ],
+        "northstar-experts.experts.service-location": {
+          "countryCode": "US",
+          "region": "GA",
+          "locality": "Atlanta",
+          "latitude": 33.749,
+          "longitude": -84.388
+        },
+        "northstar-experts.experts.time-zone": "America/New_York",
+        "northstar-experts.experts.languages": [
+          "en"
+        ],
+        "northstar-experts.experts.years-experience": 7,
+        "northstar-experts.experts.rate": {
+          "amountMinor": 21000,
+          "currency": "USD"
+        },
+        "northstar-experts.experts.availability": "available-now",
+        "northstar-experts.experts.next-available": "2026-10-21",
+        "northstar-experts.experts.credentials": [
+          {
+            "id": "credential-9",
+            "values": {
+              "name": "Project Management Professional",
+              "issuer": "Project Management Institute",
+              "year": 2021,
+              "public-url": "https://credentials.example/nia-brooks"
+            }
+          }
+        ],
+        "northstar-experts.experts.credential-reviewed": false,
+        "northstar-experts.experts.credential-reviewed-at": "2026-06-11",
+        "northstar-experts.experts.contact-url": "https://nia-brooks.example/contact",
+        "northstar-experts.experts.portraits": []
+      }
+    },
+    {
+      "slug": "anders-holm",
+      "title": "Anders Holm",
+      "summary": "Decarbonization roadmaps for industrial operations and infrastructure portfolios.",
+      "description": "Anders Holm works with organizations on climate strategy through clearly scoped advisory and delivery engagements. This profile lists current service facts, published qualifications, and stated availability so teams can decide whether to start a conversation.",
+      "category": "Climate strategy",
+      "url": "https://anders-holm.example",
+      "status": "published",
+      "profileValues": {
+        "northstar-experts.experts.specialties": [
+          "climate-strategy",
+          "operations"
+        ],
+        "northstar-experts.experts.sectors": [
+          "energy",
+          "finance"
+        ],
+        "northstar-experts.experts.engagement-modes": [
+          "advisory",
+          "research"
+        ],
+        "northstar-experts.experts.service-location": {
+          "countryCode": "GB",
+          "region": "SCT",
+          "locality": "Edinburgh",
+          "latitude": 55.9533,
+          "longitude": -3.1883
+        },
+        "northstar-experts.experts.time-zone": "Europe/London",
+        "northstar-experts.experts.languages": [
+          "en"
+        ],
+        "northstar-experts.experts.years-experience": 21,
+        "northstar-experts.experts.rate": {
+          "amountMinor": 49000,
+          "currency": "GBP"
+        },
+        "northstar-experts.experts.availability": "this-month",
+        "northstar-experts.experts.next-available": "2026-12-14",
+        "northstar-experts.experts.credentials": [
+          {
+            "id": "credential-10",
+            "values": {
+              "name": "Sustainability and Climate Risk Certificate",
+              "issuer": "GARP",
+              "year": 2022,
+              "public-url": "https://credentials.example/anders-holm"
+            }
+          }
+        ],
+        "northstar-experts.experts.credential-reviewed": true,
+        "northstar-experts.experts.credential-reviewed-at": "2026-09-28",
+        "northstar-experts.experts.contact-url": "https://anders-holm.example/contact",
+        "northstar-experts.experts.portraits": []
+      }
+    },
+    {
+      "slug": "keisha-laurent",
+      "title": "Keisha Laurent",
+      "summary": "Program strategy and service delivery for public benefit organizations.",
+      "description": "Keisha Laurent works with organizations on public sector through clearly scoped advisory and delivery engagements. This profile lists current service facts, published qualifications, and stated availability so teams can decide whether to start a conversation.",
+      "category": "Public sector",
+      "url": "https://keisha-laurent.example",
+      "status": "published",
+      "profileValues": {
+        "northstar-experts.experts.specialties": [
+          "public-sector"
+        ],
+        "northstar-experts.experts.sectors": [
+          "government",
+          "nonprofit"
+        ],
+        "northstar-experts.experts.engagement-modes": [
+          "project",
+          "workshop"
+        ],
+        "northstar-experts.experts.service-location": {
+          "countryCode": "CA",
+          "region": "QC",
+          "locality": "Montréal",
+          "latitude": 45.5019,
+          "longitude": -73.5674
+        },
+        "northstar-experts.experts.time-zone": "America/Toronto",
+        "northstar-experts.experts.languages": [
+          "en",
+          "fr"
+        ],
+        "northstar-experts.experts.years-experience": 19,
+        "northstar-experts.experts.rate": {
+          "amountMinor": 39000,
+          "currency": "CAD"
+        },
+        "northstar-experts.experts.availability": "waitlist",
+        "northstar-experts.experts.next-available": "2027-01-25",
+        "northstar-experts.experts.credentials": [
+          {
+            "id": "credential-11",
+            "values": {
+              "name": "Results-Based Management Certificate",
+              "issuer": "University of Ottawa",
+              "year": 2016,
+              "public-url": "https://credentials.example/keisha-laurent"
+            }
+          }
+        ],
+        "northstar-experts.experts.credential-reviewed": true,
+        "northstar-experts.experts.credential-reviewed-at": "2026-09-07",
+        "northstar-experts.experts.contact-url": "https://keisha-laurent.example/contact",
+        "northstar-experts.experts.portraits": []
+      }
+    },
+    {
+      "slug": "rafael-santos",
+      "title": "Rafael Santos",
+      "summary": "Customer evidence and launch planning for new international markets.",
+      "description": "Rafael Santos works with organizations on market expansion through clearly scoped advisory and delivery engagements. This profile lists current service facts, published qualifications, and stated availability so teams can decide whether to start a conversation.",
+      "category": "Market expansion",
+      "url": "https://rafael-santos.example",
+      "status": "published",
+      "profileValues": {
+        "northstar-experts.experts.specialties": [
+          "market-expansion",
+          "service-design"
+        ],
+        "northstar-experts.experts.sectors": [
+          "consumer",
+          "finance"
+        ],
+        "northstar-experts.experts.engagement-modes": [
+          "research",
+          "project"
+        ],
+        "northstar-experts.experts.service-location": {
+          "countryCode": "US",
+          "region": "FL",
+          "locality": "Miami",
+          "latitude": 25.7617,
+          "longitude": -80.1918
+        },
+        "northstar-experts.experts.time-zone": "America/New_York",
+        "northstar-experts.experts.languages": [
+          "en",
+          "es"
+        ],
+        "northstar-experts.experts.years-experience": 13,
+        "northstar-experts.experts.rate": {
+          "amountMinor": 31000,
+          "currency": "USD"
+        },
+        "northstar-experts.experts.availability": "available-now",
+        "northstar-experts.experts.next-available": "2026-11-09",
+        "northstar-experts.experts.credentials": [
+          {
+            "id": "credential-12",
+            "values": {
+              "name": "Professional Certified Marketer",
+              "issuer": "American Marketing Association",
+              "year": 2020,
+              "public-url": "https://credentials.example/rafael-santos"
+            }
+          }
+        ],
+        "northstar-experts.experts.credential-reviewed": true,
+        "northstar-experts.experts.credential-reviewed-at": "2026-08-25",
+        "northstar-experts.experts.contact-url": "https://rafael-santos.example/contact",
+        "northstar-experts.experts.portraits": []
+      }
+    },
+    {
+      "slug": "yuki-tanaka",
+      "title": "Yuki Tanaka",
+      "summary": "Model risk, human oversight, and governance operating models for product teams.",
+      "description": "Yuki Tanaka works with organizations on responsible ai through clearly scoped advisory and delivery engagements. This profile lists current service facts, published qualifications, and stated availability so teams can decide whether to start a conversation.",
+      "category": "Responsible AI",
+      "url": "https://yuki-tanaka.example",
+      "status": "published",
+      "profileValues": {
+        "northstar-experts.experts.specialties": [
+          "responsible-ai"
+        ],
+        "northstar-experts.experts.sectors": [
+          "technology",
+          "healthcare"
+        ],
+        "northstar-experts.experts.engagement-modes": [
+          "advisory",
+          "workshop"
+        ],
+        "northstar-experts.experts.service-location": {
+          "countryCode": "US",
+          "region": "CA",
+          "locality": "San Francisco",
+          "latitude": 37.7749,
+          "longitude": -122.4194
+        },
+        "northstar-experts.experts.time-zone": "America/Los_Angeles",
+        "northstar-experts.experts.languages": [
+          "en",
+          "ja"
+        ],
+        "northstar-experts.experts.years-experience": 15,
+        "northstar-experts.experts.rate": {
+          "amountMinor": 58000,
+          "currency": "USD"
+        },
+        "northstar-experts.experts.availability": "this-month",
+        "northstar-experts.experts.next-available": "2026-11-24",
+        "northstar-experts.experts.credentials": [
+          {
+            "id": "credential-13",
+            "values": {
+              "name": "Certified in Risk and Information Systems Control",
+              "issuer": "ISACA",
+              "year": 2019,
+              "public-url": "https://credentials.example/yuki-tanaka"
+            }
+          }
+        ],
+        "northstar-experts.experts.credential-reviewed": true,
+        "northstar-experts.experts.credential-reviewed-at": "2026-10-05",
+        "northstar-experts.experts.contact-url": "https://yuki-tanaka.example/contact",
+        "northstar-experts.experts.portraits": []
+      }
+    },
+    {
+      "slug": "miriam-cole",
+      "title": "Miriam Cole",
+      "summary": "Leadership systems for education organizations navigating structural change.",
+      "description": "Miriam Cole works with organizations on organizational design through clearly scoped advisory and delivery engagements. This profile lists current service facts, published qualifications, and stated availability so teams can decide whether to start a conversation.",
+      "category": "Organizational design",
+      "url": "https://miriam-cole.example",
+      "status": "draft",
+      "profileValues": {
+        "northstar-experts.experts.specialties": [
+          "organizational-design"
+        ],
+        "northstar-experts.experts.sectors": [
+          "education"
+        ],
+        "northstar-experts.experts.engagement-modes": [
+          "advisory"
+        ],
+        "northstar-experts.experts.service-location": {
+          "countryCode": "US",
+          "region": "MN",
+          "locality": "Minneapolis",
+          "latitude": 44.9778,
+          "longitude": -93.265
+        },
+        "northstar-experts.experts.time-zone": "America/Chicago",
+        "northstar-experts.experts.languages": [
+          "en"
+        ],
+        "northstar-experts.experts.years-experience": 31,
+        "northstar-experts.experts.rate": {
+          "amountMinor": 47000,
+          "currency": "USD"
+        },
+        "northstar-experts.experts.availability": "unavailable",
+        "northstar-experts.experts.next-available": "2027-04-05",
+        "northstar-experts.experts.credentials": [
+          {
+            "id": "credential-14",
+            "values": {
+              "name": "Strategic Leadership Certificate",
+              "issuer": "University of Minnesota",
+              "year": 2015,
+              "public-url": "https://credentials.example/miriam-cole"
+            }
+          }
+        ],
+        "northstar-experts.experts.credential-reviewed": false,
+        "northstar-experts.experts.credential-reviewed-at": "2026-05-18",
+        "northstar-experts.experts.contact-url": "https://miriam-cole.example/contact",
+        "northstar-experts.experts.portraits": []
+      }
+    }
+  ]
+}
