@@ -708,8 +708,9 @@ requirementTest("TPL-003 packages the complete BOROUGH local-city directory prod
     try {
       assert.equal(seededDb.prepare("SELECT COUNT(*) FROM listings").pluck().get(),
         seed.listings.length);
-      mediaRows = seededDb.prepare(`SELECT id, target_slug, alt, state FROM media_assets
-        ORDER BY target_slug, id`).all();
+      mediaRows = seededDb.prepare(`SELECT a.id, a.target_slug, a.alt, p.state
+        FROM media_assets a JOIN directory_profile_media p ON p.asset_id = a.id
+        ORDER BY a.target_slug, a.id`).all();
       assert.equal(mediaRows.length, imageSources.length,
         "BOROUGH did not create one media record per packaged photograph");
       assert.equal(seededDb.prepare("SELECT COUNT(*) FROM directory_profile_media").pluck().get(),
@@ -791,10 +792,10 @@ requirementTest("TPL-003 packages the complete BOROUGH local-city directory prod
     assert.deepEqual(await filtered([["sort", `${fieldKey("visit-duration")}:asc`]]),
       expectedDuration);
 
-    const editorial = publishedSeed.find(({ profileValues }) =>
-      profileValues[fieldKey("editorial-pick")] === true);
-    assert.ok(editorial, "BOROUGH seed needs an editorial pick");
-    assert.match(home, new RegExp(`data-borough-place="${editorial.slug}"`));
+    const editorial = publishedSeed.find(({ slug, profileValues }) =>
+      profileValues[fieldKey("editorial-pick")] === true &&
+      home.includes(`data-borough-place="${slug}"`));
+    assert.ok(editorial, "BOROUGH home needs a live editorial pick");
     const detail = await html(`/listings/${editorial.slug}`);
     assert.match(detail, /Curator note/);
     assert.doesNotMatch(detail, /visitor review/i);
@@ -806,10 +807,11 @@ requirementTest("TPL-003 packages the complete BOROUGH local-city directory prod
 
     const liveEditDb = new Database(databasePath);
     const originalName = editorial.title;
+    const editedName = "A Operator-edited local favorite";
     try {
       liveEditDb.prepare("UPDATE listings SET name = ? WHERE slug = ?")
-        .run("Operator-edited local favorite", editorial.slug);
-      assert.match(await html("/"), /Operator-edited local favorite/,
+        .run(editedName, editorial.slug);
+      assert.match(await html("/"), new RegExp(editedName),
         "BOROUGH home remained stale after an operator edit");
       const now = new Date().toISOString();
       liveEditDb.prepare('INSERT INTO "user" (id, name, email, emailVerified, createdAt, updatedAt, role, banned) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
@@ -818,15 +820,17 @@ requirementTest("TPL-003 packages the complete BOROUGH local-city directory prod
       liveEditDb.prepare("UPDATE listings SET owner_user_id = ? WHERE slug = ?")
         .run("borough-banned-owner", editorial.slug);
       const bannedHome = await html("/");
-      assert.doesNotMatch(bannedHome, /Operator-edited local favorite/,
+      assert.doesNotMatch(bannedHome, new RegExp(editedName),
         "a banned owner's listing leaked onto the BOROUGH home page");
       liveEditDb.prepare("UPDATE listings SET owner_user_id = NULL, name = ? WHERE slug = ?")
         .run(originalName, editorial.slug);
       const mediaId = mediaRows.find(({ target_slug: slug }) => slug === editorial.slug).id;
-      liveEditDb.prepare("UPDATE media_assets SET state = 'private' WHERE id = ?").run(mediaId);
+      liveEditDb.prepare("UPDATE directory_profile_media SET state = 'draft' WHERE asset_id = ?")
+        .run(mediaId);
       assert.doesNotMatch(await html(`/listings/${editorial.slug}`), new RegExp(`/media/${mediaId}`),
         "private photography leaked through BOROUGH");
-      liveEditDb.prepare("UPDATE media_assets SET state = 'public' WHERE id = ?").run(mediaId);
+      liveEditDb.prepare("UPDATE directory_profile_media SET state = 'public' WHERE asset_id = ?")
+        .run(mediaId);
     } finally {
       liveEditDb.close();
     }

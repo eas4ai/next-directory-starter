@@ -141,7 +141,7 @@ export async function readBoundedImage(request: Request): Promise<Buffer> {
   return Buffer.concat(chunks, total);
 }
 
-async function normalizePrivateImage(bytes: Buffer, mimeType: string, altInput: string): Promise<{
+export async function normalizeMediaImage(bytes: Buffer, mimeType: string, altInput: string): Promise<{
   output: Buffer; alt: string; width: number; height: number;
 }> {
   if (!Buffer.isBuffer(bytes) || bytes.length === 0 || bytes.length > MAX_IMAGE_BYTES) {
@@ -172,7 +172,7 @@ export async function uploadPrivateImage(input: {
   bytes: Buffer; mimeType: string; alt: string;
 }): Promise<MediaAsset> {
   ensureUploadPermission(input.kind, input.slug, input.actorId, input.actorRole);
-  const { output, alt, width, height } = await normalizePrivateImage(
+  const { output, alt, width, height } = await normalizeMediaImage(
     input.bytes, input.mimeType, input.alt);
   const id = randomUUID();
   const directory = mediaDirectory();
@@ -276,7 +276,7 @@ export async function uploadProfileMedia(input: {
 }): Promise<MediaAsset> {
   ensureProfileMediaPermission(input.listingSlug, input.fieldKey, input.itemId,
     input.actorUserId, input.actorRole);
-  const { output, alt, width, height } = await normalizePrivateImage(
+  const { output, alt, width, height } = await normalizeMediaImage(
     input.bytes, input.mimeType, input.alt);
   const id = randomUUID();
   const file = mediaFilePath(id);

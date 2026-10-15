@@ -13,6 +13,7 @@ import {
   canonicalJson, integritySchema, normalizePayloadPath, parseManifest, readSourcePackage, sha256,
   validateProfileDefinitions, validateRendererModules, validateThemeModules,
 } from "./manifest.mjs";
+import { validatePackagedSeedMedia } from "./seed-media.mjs";
 
 const FIXED_TIME = new Date("1980-01-01T00:00:00.000Z");
 const FILE_MODE = 0o100644;
@@ -56,7 +57,7 @@ async function writeZip(path, entries) {
 }
 
 export async function packAddon(source, output) {
-  const value = readSourcePackage(source);
+  const value = await readSourcePackage(source);
   const integrityBytes = canonicalJson(integrityFor(value.manifestBytes, value.files));
   const entries = [
     [MANIFEST_NAME, value.manifestBytes],
@@ -169,6 +170,7 @@ export async function readArchive(input) {
   validateThemeModules(manifest, files);
   validateRendererModules(manifest, files);
   const profiles = validateProfileDefinitions(manifest, files);
+  await validatePackagedSeedMedia(manifest, files);
   return {
     manifest,
     files,

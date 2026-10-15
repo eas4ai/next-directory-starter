@@ -53,11 +53,41 @@ export type PublicTemplateFooterProps = {
 
 export type PublicTemplateHomeProps = {
   site: SiteConfig;
+  listings: readonly PublicTemplateListing[];
+  featured: readonly PublicTemplateListing[];
+  fields: readonly PublicTemplateField[];
+  mediaAssets: ReadonlyMap<string, MediaAsset>;
+  iconLibrary: string;
 };
 
 export type PublicTemplateListing = Listing & {
   featured: boolean;
 };
+
+export function publicTemplateListings(listings: readonly PublicTemplateListing[]):
+readonly PublicTemplateListing[] {
+  return Object.freeze(listings.map((listing) => frozenClone(listing))) as
+    readonly PublicTemplateListing[];
+}
+
+export function publicTemplateMediaAssets(assets: ReadonlyMap<string, MediaAsset>):
+ReadonlyMap<string, MediaAsset> {
+  const values = new Map([...assets].map(([id, asset]) => [id, frozenClone(asset) as MediaAsset]));
+  const view: ReadonlyMap<string, MediaAsset> = Object.freeze({
+    get size() { return values.size; },
+    get(id: string) { return values.get(id); },
+    has(id: string) { return values.has(id); },
+    entries() { return values.entries(); },
+    keys() { return values.keys(); },
+    values() { return values.values(); },
+    forEach(callback: (value: MediaAsset, key: string, map: ReadonlyMap<string, MediaAsset>) => void,
+      thisArg?: unknown) {
+      values.forEach((value, key) => callback.call(thisArg, value, key, view));
+    },
+    [Symbol.iterator]() { return values[Symbol.iterator](); },
+  });
+  return view;
+}
 
 export type PublicTemplatePagination = {
   page: number;
