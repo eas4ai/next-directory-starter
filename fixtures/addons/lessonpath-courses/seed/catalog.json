@@ -1,0 +1,865 @@
+{
+  "profile": {
+    "id": "lessonpath-courses.courses",
+    "version": "1.0.0"
+  },
+  "listings": [
+    {
+      "slug": "systems-thinking",
+      "title": "Systems Thinking in Practice",
+      "summary": "A intermediate cohort course with a clearly stated learning path.",
+      "description": "Systems Thinking in Practice combines guided explanation, practical exercises, and reflection around systems. Its public profile states schedule, pace, prerequisite, instructor, price, certificate, and provider-supplied outcomes before enrollment.",
+      "category": "Systems",
+      "url": "https://systems-thinking.example",
+      "status": "published",
+      "profileValues": {
+        "lessonpath-courses.courses.topics": [
+          "systems"
+        ],
+        "lessonpath-courses.courses.level": "intermediate",
+        "lessonpath-courses.courses.format": [
+          "cohort",
+          "live-online"
+        ],
+        "lessonpath-courses.courses.duration": 129600,
+        "lessonpath-courses.courses.price": {
+          "amountMinor": 48000,
+          "currency": "USD"
+        },
+        "lessonpath-courses.courses.pace": "scheduled",
+        "lessonpath-courses.courses.schedule-model": "weekly",
+        "lessonpath-courses.courses.language": "en",
+        "lessonpath-courses.courses.certificate": true,
+        "lessonpath-courses.courses.prerequisites": [
+          {
+            "id": "prereq-1",
+            "values": {
+              "requirement": "Familiarity with the subject fundamentals",
+              "required": true
+            }
+          }
+        ],
+        "lessonpath-courses.courses.learning-outcomes": [
+          {
+            "id": "outcome-1",
+            "values": {
+              "outcome": "Map feedback loops and choose useful intervention points."
+            }
+          }
+        ],
+        "lessonpath-courses.courses.provider": "Lessonpath Learning Collective",
+        "lessonpath-courses.courses.instructors": [
+          {
+            "id": "instructor-1",
+            "values": {
+              "name": "Mara Chen",
+              "role": "Lead instructor for Systems",
+              "public-url": "https://instructors.example/mara-chen"
+            }
+          }
+        ],
+        "lessonpath-courses.courses.enrollment-url": "https://systems-thinking.example/course"
+      },
+      "media": [
+        {
+          "source": "seed/media/systems-thinking.webp",
+          "field": "lessonpath-courses.courses.course-media",
+          "alt": "Original subject illustration for Systems Thinking in Practice"
+        }
+      ]
+    },
+    {
+      "slug": "data-storytelling",
+      "title": "Data Storytelling Studio",
+      "summary": "A intermediate live online course with a clearly stated learning path.",
+      "description": "Data Storytelling Studio combines guided explanation, practical exercises, and reflection around data. Its public profile states schedule, pace, prerequisite, instructor, price, certificate, and provider-supplied outcomes before enrollment.",
+      "category": "Data",
+      "url": "https://data-storytelling.example",
+      "status": "published",
+      "profileValues": {
+        "lessonpath-courses.courses.topics": [
+          "data",
+          "writing"
+        ],
+        "lessonpath-courses.courses.level": "intermediate",
+        "lessonpath-courses.courses.format": [
+          "live-online"
+        ],
+        "lessonpath-courses.courses.duration": 100800,
+        "lessonpath-courses.courses.price": {
+          "amountMinor": 36000,
+          "currency": "USD"
+        },
+        "lessonpath-courses.courses.pace": "scheduled",
+        "lessonpath-courses.courses.schedule-model": "weekly",
+        "lessonpath-courses.courses.language": "en",
+        "lessonpath-courses.courses.certificate": true,
+        "lessonpath-courses.courses.prerequisites": [
+          {
+            "id": "prereq-2",
+            "values": {
+              "requirement": "Familiarity with the subject fundamentals",
+              "required": true
+            }
+          }
+        ],
+        "lessonpath-courses.courses.learning-outcomes": [
+          {
+            "id": "outcome-2",
+            "values": {
+              "outcome": "Turn evidence into clear, responsible narratives for decisions."
+            }
+          }
+        ],
+        "lessonpath-courses.courses.provider": "Lessonpath Learning Collective",
+        "lessonpath-courses.courses.instructors": [
+          {
+            "id": "instructor-2",
+            "values": {
+              "name": "Jon Bell",
+              "role": "Lead instructor for Data",
+              "public-url": "https://instructors.example/jon-bell"
+            }
+          }
+        ],
+        "lessonpath-courses.courses.enrollment-url": "https://data-storytelling.example/course"
+      },
+      "media": [
+        {
+          "source": "seed/media/data-storytelling.webp",
+          "field": "lessonpath-courses.courses.course-media",
+          "alt": "Original subject illustration for Data Storytelling Studio"
+        }
+      ]
+    },
+    {
+      "slug": "climate-literacy",
+      "title": "Climate Literacy for Teams",
+      "summary": "A introductory self paced course with a clearly stated learning path.",
+      "description": "Climate Literacy for Teams combines guided explanation, practical exercises, and reflection around climate. Its public profile states schedule, pace, prerequisite, instructor, price, certificate, and provider-supplied outcomes before enrollment.",
+      "category": "Climate",
+      "url": "https://climate-literacy.example",
+      "status": "published",
+      "profileValues": {
+        "lessonpath-courses.courses.topics": [
+          "climate"
+        ],
+        "lessonpath-courses.courses.level": "introductory",
+        "lessonpath-courses.courses.format": [
+          "self-paced"
+        ],
+        "lessonpath-courses.courses.duration": 72000,
+        "lessonpath-courses.courses.price": {
+          "amountMinor": 12000,
+          "currency": "USD"
+        },
+        "lessonpath-courses.courses.pace": "flexible",
+        "lessonpath-courses.courses.schedule-model": "on-demand",
+        "lessonpath-courses.courses.language": "en",
+        "lessonpath-courses.courses.certificate": true,
+        "lessonpath-courses.courses.prerequisites": [
+          {
+            "id": "prereq-3",
+            "values": {
+              "requirement": "Curiosity and time to practice",
+              "required": false
+            }
+          }
+        ],
+        "lessonpath-courses.courses.learning-outcomes": [
+          {
+            "id": "outcome-3",
+            "values": {
+              "outcome": "Connect climate fundamentals to everyday organizational choices."
+            }
+          }
+        ],
+        "lessonpath-courses.courses.provider": "Lessonpath Learning Collective",
+        "lessonpath-courses.courses.instructors": [
+          {
+            "id": "instructor-3",
+            "values": {
+              "name": "Asha Reed",
+              "role": "Lead instructor for Climate",
+              "public-url": "https://instructors.example/asha-reed"
+            }
+          }
+        ],
+        "lessonpath-courses.courses.enrollment-url": "https://climate-literacy.example/course"
+      },
+      "media": [
+        {
+          "source": "seed/media/climate-literacy.webp",
+          "field": "lessonpath-courses.courses.course-media",
+          "alt": "Original subject illustration for Climate Literacy for Teams"
+        }
+      ]
+    },
+    {
+      "slug": "product-writing",
+      "title": "Writing for Digital Products",
+      "summary": "A intermediate cohort course with a clearly stated learning path.",
+      "description": "Writing for Digital Products combines guided explanation, practical exercises, and reflection around writing. Its public profile states schedule, pace, prerequisite, instructor, price, certificate, and provider-supplied outcomes before enrollment.",
+      "category": "Writing",
+      "url": "https://product-writing.example",
+      "status": "published",
+      "profileValues": {
+        "lessonpath-courses.courses.topics": [
+          "writing"
+        ],
+        "lessonpath-courses.courses.level": "intermediate",
+        "lessonpath-courses.courses.format": [
+          "cohort"
+        ],
+        "lessonpath-courses.courses.duration": 86400,
+        "lessonpath-courses.courses.price": {
+          "amountMinor": 29500,
+          "currency": "USD"
+        },
+        "lessonpath-courses.courses.pace": "scheduled",
+        "lessonpath-courses.courses.schedule-model": "weekly",
+        "lessonpath-courses.courses.language": "en",
+        "lessonpath-courses.courses.certificate": true,
+        "lessonpath-courses.courses.prerequisites": [
+          {
+            "id": "prereq-4",
+            "values": {
+              "requirement": "Familiarity with the subject fundamentals",
+              "required": true
+            }
+          }
+        ],
+        "lessonpath-courses.courses.learning-outcomes": [
+          {
+            "id": "outcome-4",
+            "values": {
+              "outcome": "Write interface language that is direct, inclusive, and testable."
+            }
+          }
+        ],
+        "lessonpath-courses.courses.provider": "Lessonpath Learning Collective",
+        "lessonpath-courses.courses.instructors": [
+          {
+            "id": "instructor-4",
+            "values": {
+              "name": "Nico Alvarez",
+              "role": "Lead instructor for Writing",
+              "public-url": "https://instructors.example/nico-alvarez"
+            }
+          }
+        ],
+        "lessonpath-courses.courses.enrollment-url": "https://product-writing.example/course"
+      },
+      "media": [
+        {
+          "source": "seed/media/product-writing.webp",
+          "field": "lessonpath-courses.courses.course-media",
+          "alt": "Original subject illustration for Writing for Digital Products"
+        }
+      ]
+    },
+    {
+      "slug": "inclusive-research",
+      "title": "Inclusive Research Methods",
+      "summary": "A advanced live online course with a clearly stated learning path.",
+      "description": "Inclusive Research Methods combines guided explanation, practical exercises, and reflection around research. Its public profile states schedule, pace, prerequisite, instructor, price, certificate, and provider-supplied outcomes before enrollment.",
+      "category": "Research",
+      "url": "https://inclusive-research.example",
+      "status": "published",
+      "profileValues": {
+        "lessonpath-courses.courses.topics": [
+          "research"
+        ],
+        "lessonpath-courses.courses.level": "advanced",
+        "lessonpath-courses.courses.format": [
+          "live-online",
+          "cohort"
+        ],
+        "lessonpath-courses.courses.duration": 158400,
+        "lessonpath-courses.courses.price": {
+          "amountMinor": 52500,
+          "currency": "USD"
+        },
+        "lessonpath-courses.courses.pace": "scheduled",
+        "lessonpath-courses.courses.schedule-model": "weekly",
+        "lessonpath-courses.courses.language": "en",
+        "lessonpath-courses.courses.certificate": true,
+        "lessonpath-courses.courses.prerequisites": [
+          {
+            "id": "prereq-5",
+            "values": {
+              "requirement": "Familiarity with the subject fundamentals",
+              "required": true
+            }
+          }
+        ],
+        "lessonpath-courses.courses.learning-outcomes": [
+          {
+            "id": "outcome-5",
+            "values": {
+              "outcome": "Plan research that includes participants often excluded by default."
+            }
+          }
+        ],
+        "lessonpath-courses.courses.provider": "Lessonpath Learning Collective",
+        "lessonpath-courses.courses.instructors": [
+          {
+            "id": "instructor-5",
+            "values": {
+              "name": "Imani Cole",
+              "role": "Lead instructor for Research",
+              "public-url": "https://instructors.example/imani-cole"
+            }
+          }
+        ],
+        "lessonpath-courses.courses.enrollment-url": "https://inclusive-research.example/course"
+      },
+      "media": [
+        {
+          "source": "seed/media/inclusive-research.webp",
+          "field": "lessonpath-courses.courses.course-media",
+          "alt": "Original subject illustration for Inclusive Research Methods"
+        }
+      ]
+    },
+    {
+      "slug": "service-blueprints",
+      "title": "Service Blueprint Lab",
+      "summary": "A intermediate in person course with a clearly stated learning path.",
+      "description": "Service Blueprint Lab combines guided explanation, practical exercises, and reflection around service design. Its public profile states schedule, pace, prerequisite, instructor, price, certificate, and provider-supplied outcomes before enrollment.",
+      "category": "Service design",
+      "url": "https://service-blueprints.example",
+      "status": "published",
+      "profileValues": {
+        "lessonpath-courses.courses.topics": [
+          "service-design",
+          "systems"
+        ],
+        "lessonpath-courses.courses.level": "intermediate",
+        "lessonpath-courses.courses.format": [
+          "in-person",
+          "cohort"
+        ],
+        "lessonpath-courses.courses.duration": 115200,
+        "lessonpath-courses.courses.price": {
+          "amountMinor": 68000,
+          "currency": "USD"
+        },
+        "lessonpath-courses.courses.pace": "intensive",
+        "lessonpath-courses.courses.schedule-model": "weekend",
+        "lessonpath-courses.courses.language": "en",
+        "lessonpath-courses.courses.certificate": true,
+        "lessonpath-courses.courses.prerequisites": [
+          {
+            "id": "prereq-6",
+            "values": {
+              "requirement": "Familiarity with the subject fundamentals",
+              "required": true
+            }
+          }
+        ],
+        "lessonpath-courses.courses.learning-outcomes": [
+          {
+            "id": "outcome-6",
+            "values": {
+              "outcome": "Build a shared view of frontstage and backstage service operations."
+            }
+          }
+        ],
+        "lessonpath-courses.courses.provider": "Lessonpath Learning Collective",
+        "lessonpath-courses.courses.instructors": [
+          {
+            "id": "instructor-6",
+            "values": {
+              "name": "Elliot Park",
+              "role": "Lead instructor for Service design",
+              "public-url": "https://instructors.example/elliot-park"
+            }
+          }
+        ],
+        "lessonpath-courses.courses.enrollment-url": "https://service-blueprints.example/course"
+      },
+      "media": [
+        {
+          "source": "seed/media/service-blueprints.webp",
+          "field": "lessonpath-courses.courses.course-media",
+          "alt": "Original subject illustration for Service Blueprint Lab"
+        }
+      ]
+    },
+    {
+      "slug": "responsible-ai",
+      "title": "Responsible AI Foundations",
+      "summary": "A introductory self paced course with a clearly stated learning path.",
+      "description": "Responsible AI Foundations combines guided explanation, practical exercises, and reflection around responsible ai. Its public profile states schedule, pace, prerequisite, instructor, price, certificate, and provider-supplied outcomes before enrollment.",
+      "category": "Responsible AI",
+      "url": "https://responsible-ai.example",
+      "status": "published",
+      "profileValues": {
+        "lessonpath-courses.courses.topics": [
+          "responsible-ai"
+        ],
+        "lessonpath-courses.courses.level": "introductory",
+        "lessonpath-courses.courses.format": [
+          "self-paced",
+          "live-online"
+        ],
+        "lessonpath-courses.courses.duration": 93600,
+        "lessonpath-courses.courses.price": {
+          "amountMinor": 22000,
+          "currency": "USD"
+        },
+        "lessonpath-courses.courses.pace": "flexible",
+        "lessonpath-courses.courses.schedule-model": "on-demand",
+        "lessonpath-courses.courses.language": "en",
+        "lessonpath-courses.courses.certificate": true,
+        "lessonpath-courses.courses.prerequisites": [
+          {
+            "id": "prereq-7",
+            "values": {
+              "requirement": "Curiosity and time to practice",
+              "required": false
+            }
+          }
+        ],
+        "lessonpath-courses.courses.learning-outcomes": [
+          {
+            "id": "outcome-7",
+            "values": {
+              "outcome": "Frame AI risks, oversight choices, and accountable product practices."
+            }
+          }
+        ],
+        "lessonpath-courses.courses.provider": "Lessonpath Learning Collective",
+        "lessonpath-courses.courses.instructors": [
+          {
+            "id": "instructor-7",
+            "values": {
+              "name": "Priya Desai",
+              "role": "Lead instructor for Responsible AI",
+              "public-url": "https://instructors.example/priya-desai"
+            }
+          }
+        ],
+        "lessonpath-courses.courses.enrollment-url": "https://responsible-ai.example/course"
+      },
+      "media": [
+        {
+          "source": "seed/media/responsible-ai.webp",
+          "field": "lessonpath-courses.courses.course-media",
+          "alt": "Original subject illustration for Responsible AI Foundations"
+        }
+      ]
+    },
+    {
+      "slug": "facilitation",
+      "title": "Facilitation for Hard Problems",
+      "summary": "A advanced in person course with a clearly stated learning path.",
+      "description": "Facilitation for Hard Problems combines guided explanation, practical exercises, and reflection around facilitation. Its public profile states schedule, pace, prerequisite, instructor, price, certificate, and provider-supplied outcomes before enrollment.",
+      "category": "Facilitation",
+      "url": "https://facilitation.example",
+      "status": "published",
+      "profileValues": {
+        "lessonpath-courses.courses.topics": [
+          "facilitation"
+        ],
+        "lessonpath-courses.courses.level": "advanced",
+        "lessonpath-courses.courses.format": [
+          "in-person"
+        ],
+        "lessonpath-courses.courses.duration": 172800,
+        "lessonpath-courses.courses.price": {
+          "amountMinor": 75000,
+          "currency": "USD"
+        },
+        "lessonpath-courses.courses.pace": "intensive",
+        "lessonpath-courses.courses.schedule-model": "weekend",
+        "lessonpath-courses.courses.language": "en",
+        "lessonpath-courses.courses.certificate": true,
+        "lessonpath-courses.courses.prerequisites": [
+          {
+            "id": "prereq-8",
+            "values": {
+              "requirement": "Familiarity with the subject fundamentals",
+              "required": true
+            }
+          }
+        ],
+        "lessonpath-courses.courses.learning-outcomes": [
+          {
+            "id": "outcome-8",
+            "values": {
+              "outcome": "Design and lead working sessions where disagreement becomes useful."
+            }
+          }
+        ],
+        "lessonpath-courses.courses.provider": "Lessonpath Learning Collective",
+        "lessonpath-courses.courses.instructors": [
+          {
+            "id": "instructor-8",
+            "values": {
+              "name": "Sam Okoro",
+              "role": "Lead instructor for Facilitation",
+              "public-url": "https://instructors.example/sam-okoro"
+            }
+          }
+        ],
+        "lessonpath-courses.courses.enrollment-url": "https://facilitation.example/course"
+      },
+      "media": [
+        {
+          "source": "seed/media/facilitation.webp",
+          "field": "lessonpath-courses.courses.course-media",
+          "alt": "Original subject illustration for Facilitation for Hard Problems"
+        }
+      ]
+    },
+    {
+      "slug": "survey-design",
+      "title": "Survey Design Essentials",
+      "summary": "A introductory self paced course with a clearly stated learning path.",
+      "description": "Survey Design Essentials combines guided explanation, practical exercises, and reflection around research. Its public profile states schedule, pace, prerequisite, instructor, price, certificate, and provider-supplied outcomes before enrollment.",
+      "category": "Research",
+      "url": "https://survey-design.example",
+      "status": "published",
+      "profileValues": {
+        "lessonpath-courses.courses.topics": [
+          "research",
+          "data"
+        ],
+        "lessonpath-courses.courses.level": "introductory",
+        "lessonpath-courses.courses.format": [
+          "self-paced"
+        ],
+        "lessonpath-courses.courses.duration": 54000,
+        "lessonpath-courses.courses.price": {
+          "amountMinor": 9000,
+          "currency": "USD"
+        },
+        "lessonpath-courses.courses.pace": "flexible",
+        "lessonpath-courses.courses.schedule-model": "on-demand",
+        "lessonpath-courses.courses.language": "en",
+        "lessonpath-courses.courses.certificate": false,
+        "lessonpath-courses.courses.prerequisites": [
+          {
+            "id": "prereq-9",
+            "values": {
+              "requirement": "Curiosity and time to practice",
+              "required": false
+            }
+          }
+        ],
+        "lessonpath-courses.courses.learning-outcomes": [
+          {
+            "id": "outcome-9",
+            "values": {
+              "outcome": "Write better questions and reduce common sources of survey bias."
+            }
+          }
+        ],
+        "lessonpath-courses.courses.provider": "Lessonpath Learning Collective",
+        "lessonpath-courses.courses.instructors": [
+          {
+            "id": "instructor-9",
+            "values": {
+              "name": "Leah Martin",
+              "role": "Lead instructor for Research",
+              "public-url": "https://instructors.example/leah-martin"
+            }
+          }
+        ],
+        "lessonpath-courses.courses.enrollment-url": "https://survey-design.example/course",
+        "lessonpath-courses.courses.course-media": []
+      }
+    },
+    {
+      "slug": "content-systems",
+      "title": "Content Systems Strategy",
+      "summary": "A advanced cohort course with a clearly stated learning path.",
+      "description": "Content Systems Strategy combines guided explanation, practical exercises, and reflection around writing. Its public profile states schedule, pace, prerequisite, instructor, price, certificate, and provider-supplied outcomes before enrollment.",
+      "category": "Writing",
+      "url": "https://content-systems.example",
+      "status": "published",
+      "profileValues": {
+        "lessonpath-courses.courses.topics": [
+          "writing",
+          "systems"
+        ],
+        "lessonpath-courses.courses.level": "advanced",
+        "lessonpath-courses.courses.format": [
+          "cohort",
+          "live-online"
+        ],
+        "lessonpath-courses.courses.duration": 144000,
+        "lessonpath-courses.courses.price": {
+          "amountMinor": 44000,
+          "currency": "USD"
+        },
+        "lessonpath-courses.courses.pace": "scheduled",
+        "lessonpath-courses.courses.schedule-model": "weekly",
+        "lessonpath-courses.courses.language": "en",
+        "lessonpath-courses.courses.certificate": true,
+        "lessonpath-courses.courses.prerequisites": [
+          {
+            "id": "prereq-10",
+            "values": {
+              "requirement": "Familiarity with the subject fundamentals",
+              "required": true
+            }
+          }
+        ],
+        "lessonpath-courses.courses.learning-outcomes": [
+          {
+            "id": "outcome-10",
+            "values": {
+              "outcome": "Create a maintainable model for content across teams and channels."
+            }
+          }
+        ],
+        "lessonpath-courses.courses.provider": "Lessonpath Learning Collective",
+        "lessonpath-courses.courses.instructors": [
+          {
+            "id": "instructor-10",
+            "values": {
+              "name": "Rina Shah",
+              "role": "Lead instructor for Writing",
+              "public-url": "https://instructors.example/rina-shah"
+            }
+          }
+        ],
+        "lessonpath-courses.courses.enrollment-url": "https://content-systems.example/course",
+        "lessonpath-courses.courses.course-media": []
+      }
+    },
+    {
+      "slug": "climate-scenarios",
+      "title": "Climate Scenario Planning",
+      "summary": "A advanced live online course with a clearly stated learning path.",
+      "description": "Climate Scenario Planning combines guided explanation, practical exercises, and reflection around climate. Its public profile states schedule, pace, prerequisite, instructor, price, certificate, and provider-supplied outcomes before enrollment.",
+      "category": "Climate",
+      "url": "https://climate-scenarios.example",
+      "status": "published",
+      "profileValues": {
+        "lessonpath-courses.courses.topics": [
+          "climate",
+          "systems"
+        ],
+        "lessonpath-courses.courses.level": "advanced",
+        "lessonpath-courses.courses.format": [
+          "live-online"
+        ],
+        "lessonpath-courses.courses.duration": 187200,
+        "lessonpath-courses.courses.price": {
+          "amountMinor": 59000,
+          "currency": "USD"
+        },
+        "lessonpath-courses.courses.pace": "scheduled",
+        "lessonpath-courses.courses.schedule-model": "weekly",
+        "lessonpath-courses.courses.language": "en",
+        "lessonpath-courses.courses.certificate": true,
+        "lessonpath-courses.courses.prerequisites": [
+          {
+            "id": "prereq-11",
+            "values": {
+              "requirement": "Familiarity with the subject fundamentals",
+              "required": true
+            }
+          }
+        ],
+        "lessonpath-courses.courses.learning-outcomes": [
+          {
+            "id": "outcome-11",
+            "values": {
+              "outcome": "Use scenarios to test strategy under multiple climate futures."
+            }
+          }
+        ],
+        "lessonpath-courses.courses.provider": "Lessonpath Learning Collective",
+        "lessonpath-courses.courses.instructors": [
+          {
+            "id": "instructor-11",
+            "values": {
+              "name": "Daniel Brooks",
+              "role": "Lead instructor for Climate",
+              "public-url": "https://instructors.example/daniel-brooks"
+            }
+          }
+        ],
+        "lessonpath-courses.courses.enrollment-url": "https://climate-scenarios.example/course",
+        "lessonpath-courses.courses.course-media": []
+      }
+    },
+    {
+      "slug": "visual-evidence",
+      "title": "Visual Evidence Basics",
+      "summary": "A introductory self paced course with a clearly stated learning path.",
+      "description": "Visual Evidence Basics combines guided explanation, practical exercises, and reflection around data. Its public profile states schedule, pace, prerequisite, instructor, price, certificate, and provider-supplied outcomes before enrollment.",
+      "category": "Data",
+      "url": "https://visual-evidence.example",
+      "status": "published",
+      "profileValues": {
+        "lessonpath-courses.courses.topics": [
+          "data"
+        ],
+        "lessonpath-courses.courses.level": "introductory",
+        "lessonpath-courses.courses.format": [
+          "self-paced"
+        ],
+        "lessonpath-courses.courses.duration": 64800,
+        "lessonpath-courses.courses.price": {
+          "amountMinor": 15000,
+          "currency": "USD"
+        },
+        "lessonpath-courses.courses.pace": "flexible",
+        "lessonpath-courses.courses.schedule-model": "on-demand",
+        "lessonpath-courses.courses.language": "es",
+        "lessonpath-courses.courses.certificate": false,
+        "lessonpath-courses.courses.prerequisites": [
+          {
+            "id": "prereq-12",
+            "values": {
+              "requirement": "Curiosity and time to practice",
+              "required": false
+            }
+          }
+        ],
+        "lessonpath-courses.courses.learning-outcomes": [
+          {
+            "id": "outcome-12",
+            "values": {
+              "outcome": "Choose visual forms that preserve uncertainty and context."
+            }
+          }
+        ],
+        "lessonpath-courses.courses.provider": "Lessonpath Learning Collective",
+        "lessonpath-courses.courses.instructors": [
+          {
+            "id": "instructor-12",
+            "values": {
+              "name": "Lucía Torres",
+              "role": "Lead instructor for Data",
+              "public-url": "https://instructors.example/lucía-torres"
+            }
+          }
+        ],
+        "lessonpath-courses.courses.enrollment-url": "https://visual-evidence.example/course",
+        "lessonpath-courses.courses.course-media": []
+      }
+    },
+    {
+      "slug": "journey-research",
+      "title": "Journey Research Fieldwork",
+      "summary": "A intermediate cohort course with a clearly stated learning path.",
+      "description": "Journey Research Fieldwork combines guided explanation, practical exercises, and reflection around service design. Its public profile states schedule, pace, prerequisite, instructor, price, certificate, and provider-supplied outcomes before enrollment.",
+      "category": "Service design",
+      "url": "https://journey-research.example",
+      "status": "published",
+      "profileValues": {
+        "lessonpath-courses.courses.topics": [
+          "service-design",
+          "research"
+        ],
+        "lessonpath-courses.courses.level": "intermediate",
+        "lessonpath-courses.courses.format": [
+          "cohort"
+        ],
+        "lessonpath-courses.courses.duration": 201600,
+        "lessonpath-courses.courses.price": {
+          "amountMinor": 63000,
+          "currency": "USD"
+        },
+        "lessonpath-courses.courses.pace": "scheduled",
+        "lessonpath-courses.courses.schedule-model": "weekly",
+        "lessonpath-courses.courses.language": "en",
+        "lessonpath-courses.courses.certificate": true,
+        "lessonpath-courses.courses.prerequisites": [
+          {
+            "id": "prereq-13",
+            "values": {
+              "requirement": "Familiarity with the subject fundamentals",
+              "required": true
+            }
+          }
+        ],
+        "lessonpath-courses.courses.learning-outcomes": [
+          {
+            "id": "outcome-13",
+            "values": {
+              "outcome": "Collect and synthesize journey evidence across real service moments."
+            }
+          }
+        ],
+        "lessonpath-courses.courses.provider": "Lessonpath Learning Collective",
+        "lessonpath-courses.courses.instructors": [
+          {
+            "id": "instructor-13",
+            "values": {
+              "name": "Theo Grant",
+              "role": "Lead instructor for Service design",
+              "public-url": "https://instructors.example/theo-grant"
+            }
+          }
+        ],
+        "lessonpath-courses.courses.enrollment-url": "https://journey-research.example/course",
+        "lessonpath-courses.courses.course-media": []
+      }
+    },
+    {
+      "slug": "team-workshops",
+      "title": "Team Workshop Toolkit",
+      "summary": "A introductory self paced course with a clearly stated learning path.",
+      "description": "Team Workshop Toolkit combines guided explanation, practical exercises, and reflection around facilitation. Its public profile states schedule, pace, prerequisite, instructor, price, certificate, and provider-supplied outcomes before enrollment.",
+      "category": "Facilitation",
+      "url": "https://team-workshops.example",
+      "status": "draft",
+      "profileValues": {
+        "lessonpath-courses.courses.topics": [
+          "facilitation"
+        ],
+        "lessonpath-courses.courses.level": "introductory",
+        "lessonpath-courses.courses.format": [
+          "self-paced"
+        ],
+        "lessonpath-courses.courses.duration": 43200,
+        "lessonpath-courses.courses.price": {
+          "amountMinor": 8000,
+          "currency": "USD"
+        },
+        "lessonpath-courses.courses.pace": "flexible",
+        "lessonpath-courses.courses.schedule-model": "on-demand",
+        "lessonpath-courses.courses.language": "fr",
+        "lessonpath-courses.courses.certificate": false,
+        "lessonpath-courses.courses.prerequisites": [
+          {
+            "id": "prereq-14",
+            "values": {
+              "requirement": "Curiosity and time to practice",
+              "required": false
+            }
+          }
+        ],
+        "lessonpath-courses.courses.learning-outcomes": [
+          {
+            "id": "outcome-14",
+            "values": {
+              "outcome": "Prepare practical workshop structures for everyday team decisions."
+            }
+          }
+        ],
+        "lessonpath-courses.courses.provider": "Lessonpath Learning Collective",
+        "lessonpath-courses.courses.instructors": [
+          {
+            "id": "instructor-14",
+            "values": {
+              "name": "Camille Moreau",
+              "role": "Lead instructor for Facilitation",
+              "public-url": "https://instructors.example/camille-moreau"
+            }
+          }
+        ],
+        "lessonpath-courses.courses.enrollment-url": "https://team-workshops.example/course",
+        "lessonpath-courses.courses.course-media": []
+      }
+    }
+  ]
+}

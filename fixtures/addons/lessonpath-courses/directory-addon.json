@@ -1,0 +1,7 @@
+{
+  "schemaVersion":1,"id":"lessonpath-courses","name":"Lessonpath Courses","version":"1.0.0","compatibility":{"starter":">=1.2.0 <2.0.0","addonApi":1},
+  "themes":[{"id":"lessonpath-courses","name":"Lessonpath","entry":"src/theme.ts"}],
+  "templates":[{"id":"lessonpath-courses","name":"Lessonpath Courses","renderer":"src/template.tsx","templateApi":1,"stylesheet":"src/template.css","supportedProfiles":[{"id":"lessonpath-courses.courses","range":"^1.0.0"}]}],
+  "profiles":[{"id":"lessonpath-courses.courses","version":"1.0.0","schema":"src/courses.profile.json"}],"assets":["public/lessonpath-mark.svg"],"seed":"seed/catalog.json",
+  "files":["docs/changelog.md","docs/license.md","docs/readme.md","public/lessonpath-mark.svg","seed/catalog.json","seed/media/climate-literacy.webp","seed/media/data-storytelling.webp","seed/media/facilitation.webp","seed/media/inclusive-research.webp","seed/media/product-writing.webp","seed/media/responsible-ai.webp","seed/media/service-blueprints.webp","seed/media/systems-thinking.webp","src/courses.profile.json","src/template.css","src/template.tsx","src/theme.ts"]
+}
