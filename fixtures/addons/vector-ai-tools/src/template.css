@@ -149,6 +149,7 @@
 .vector-compare-table .profile-values { display: block; margin: 0; }
 .vector-compare-table .profile-value { border: 0; padding: 0; }
 .vector-compare-table .profile-value dt { display: none; }
+.vector-unavailable { color: var(--muted-foreground); font-style: italic; }
 
 .vector-footer { display: flex; width: min(100% - 2rem, var(--theme-page-width)); min-width: 0; margin: 4rem auto 0; align-items: center; justify-content: space-between; gap: 1rem; border-top: 1px solid var(--vector-rule); padding-block: 1.5rem 2.5rem; }
 .vector-footer > div { display: grid; gap: 0.25rem; }

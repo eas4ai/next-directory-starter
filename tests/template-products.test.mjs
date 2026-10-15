@@ -409,6 +409,9 @@ requirementTest("TPL-002 packages the complete VECTOR directory product", async 
     assert.match(comparison, /Signal Lab/);
     assert.match(comparison, /Starting price/);
     assert.match(comparison, /Verified launch/);
+    const comparisonWithMissingFact = await html("/compare?tool=arc-forge&tool=data-lens");
+    assert.match(comparisonWithMissingFact, /Not disclosed/,
+      "comparison silently blanked an optional product fact");
     assert.match(await html("/compare?tool=arc-forge&tool=arc-forge"), /2 to 4 unique tools/);
     assert.match(await html("/compare?tool=arc-forge&tool=signal-lab&tool=briefly&tool=pixel-flow&tool=voice-mesh"),
       /2 to 4 unique tools/);

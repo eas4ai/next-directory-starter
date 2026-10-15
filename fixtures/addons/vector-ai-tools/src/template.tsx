@@ -215,7 +215,9 @@ const vectorTemplate = {
               <td key={listing.slug} data-tool={listing.name}>{listing.category}</td>)}</tr>
             {fields.map((field) => <tr key={field.key}><th scope="row">{field.label}</th>
               {listings.map((listing) => <td key={listing.slug} data-tool={listing.name}>
-                <TemplateProfileValues fields={[field]} listing={listing} mediaAssets={mediaAssets} />
+                {field.key in listing.profileValues
+                  ? <TemplateProfileValues fields={[field]} listing={listing} mediaAssets={mediaAssets} />
+                  : <span className="vector-unavailable">Not disclosed</span>}
               </td>)}</tr>)}
           </tbody>
         </table></div>}
