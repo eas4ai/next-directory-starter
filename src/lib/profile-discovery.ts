@@ -103,6 +103,21 @@ function asSafeInteger(value: string): number | null {
   return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
+function normalizeMoneyRangeValue(field: DirectoryProfileField, value: string): string | null {
+  const match = moneyPattern.exec(value);
+  if (!match) return null;
+  const amountMinor = asSafeInteger(match[2]);
+  if (amountMinor === null) return null;
+  const normalized = validateProfileFieldValue(field,
+    { currency: match[1], amountMinor }) as { currency: string; amountMinor: number };
+  return `${normalized.currency}:${normalized.amountMinor}`;
+}
+
+function normalizeDateTimeRangeValue(field: DirectoryProfileField, value: string): string | null {
+  if (!explicitOffsetDateTimePattern.test(value)) return null;
+  return String(validateProfileFieldValue(field, value));
+}
+
 function normalizeRangeValue(field: DirectoryProfileField, value: string): string | null {
   try {
     if (field.type === "integer" || field.type === "duration") {
@@ -114,20 +129,13 @@ function normalizeRangeValue(field: DirectoryProfileField, value: string): strin
       return String(validateProfileFieldValue(field, value));
     }
     if (field.type === "money") {
-      const match = moneyPattern.exec(value);
-      if (!match) return null;
-      const amountMinor = asSafeInteger(match[2]);
-      if (amountMinor === null) return null;
-      const normalized = validateProfileFieldValue(field,
-        { currency: match[1], amountMinor }) as { currency: string; amountMinor: number };
-      return `${normalized.currency}:${normalized.amountMinor}`;
+      return normalizeMoneyRangeValue(field, value);
     }
     if (field.type === "date") {
       return String(validateProfileFieldValue(field, value));
     }
     if (field.type === "datetime") {
-      if (!explicitOffsetDateTimePattern.test(value)) return null;
-      return String(validateProfileFieldValue(field, value));
+      return normalizeDateTimeRangeValue(field, value);
     }
     if (field.type === "date-range") {
       if (!validProfileDate(value)) return null;
