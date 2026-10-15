@@ -37,18 +37,22 @@ const group = (entry: unknown): GroupItem[] => {
 const words = (input: unknown) => typeof input === "string"
   ? input.split("-").map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`).join(" ") : "";
 
-const mediaId = (listing: PublicTemplateListing) => {
+const mediaIds = (listing: PublicTemplateListing) => {
   const media = facts(listing).eventMedia;
-  if (typeof media === "string") return media;
-  if (!Array.isArray(media) || media.length === 0) return undefined;
-  const first = media[0];
-  return first && typeof first === "object" && "value" in first && typeof first.value === "string"
-    ? first.value : undefined;
+  if (typeof media === "string") return [media];
+  if (!Array.isArray(media)) return [];
+  return media.flatMap((entry) => entry && typeof entry === "object" && "value" in entry &&
+    typeof entry.value === "string" ? [entry.value] : []);
 };
 const image = (listing: PublicTemplateListing, assets: PublicTemplateHomeProps["mediaAssets"]) => {
-  const id = mediaId(listing);
+  const id = mediaIds(listing)[0];
   return id ? assets.get(id) : undefined;
 };
+const images = (listing: PublicTemplateListing, assets: PublicTemplateHomeProps["mediaAssets"]) =>
+  mediaIds(listing).flatMap((id) => {
+    const asset = assets.get(id);
+    return asset ? [asset] : [];
+  });
 
 const timestamp = (listing: PublicTemplateListing, suffix: "starts-at" | "ends-at") => {
   const listingFacts = facts(listing);
@@ -293,7 +297,9 @@ const nowNextTemplate = {
       </main>;
     },
     listing(detail) {
-      const artwork = detail.image ?? image(detail.listing, detail.mediaAssets);
+        const eventImages = images(detail.listing, detail.mediaAssets);
+        const artwork = detail.image ?? eventImages[0];
+        const gallery = eventImages.filter(({ id }) => id !== artwork?.id);
       const state = eventState(detail.listing);
       const listingFacts = facts(detail.listing);
       const speakers = group(listingFacts.speakers);
@@ -310,7 +316,14 @@ const nowNextTemplate = {
             <h1>{detail.listing.name}</h1><p>{detail.listing.summary}</p>
             <strong data-now-next-time-zone={text(listingFacts.timeZone)}>
               {eventRange(detail.listing)}</strong></div></header>
-        {artwork && <div className="now-next-detail-art"><TemplateContentImage asset={artwork} /></div>}
+        {artwork && <div className="now-next-detail-art" data-now-next-gallery-image={artwork.id}>
+          <TemplateContentImage asset={artwork} />
+        </div>}
+        {gallery.length > 0 && <section className="now-next-gallery" aria-label="Event gallery">
+          {gallery.map((asset) => <figure key={asset.id} data-now-next-gallery-image={asset.id}>
+            <TemplateContentImage asset={asset} />
+          </figure>)}
+        </section>}
         <div className="now-next-detail-grid">
           <article><p className="now-next-kicker">About the event</p>
             <TemplateMarkdown source={detail.listing.description} />
@@ -333,14 +346,19 @@ const nowNextTemplate = {
             </section>
             <section className="now-next-speakers" aria-labelledby="now-next-speakers-heading">
               <p className="now-next-kicker">On stage</p><h2 id="now-next-speakers-heading">Speakers</h2>
-              <div>{speakers.map((item, index) => <article key={item.id} data-now-next-speaker={item.id}>
+              <div>{speakers.map((item, index) => {
+                const portraitId = text(item.values.portrait);
+                const portrait = portraitId ? detail.mediaAssets.get(portraitId) : undefined;
+                return <article key={item.id} data-now-next-speaker={item.id}>
+                {portrait && <div className="now-next-speaker-portrait"
+                  data-now-next-speaker-portrait={item.id}><TemplateContentImage asset={portrait} /></div>}
                 <span>{String(index + 1).padStart(2, "0")}</span>
                 <strong>{String(item.values.name ?? "Speaker")}</strong>
                 <p>{String(item.values.role ?? "Program contributor")}</p>
                 {Boolean(item.values.organization) && <small>{String(item.values.organization)}</small>}
                   {Boolean(item.values["profile-url"]) && <a href={text(item.values["profile-url"])}
                     target="_blank" rel="noopener noreferrer">Speaker profile ↗</a>}
-              </article>)}</div>
+              </article>})}</div>
             </section>
           </article>
           <aside><p className="now-next-kicker">At a glance</p>

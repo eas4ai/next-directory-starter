@@ -3,6 +3,8 @@ import sharp from "sharp";
 export const SEED_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 const sourcePattern = /^seed\/media\/[a-z0-9][a-z0-9._-]*\.(?:jpe?g|png|webp)$/;
 const fieldPattern = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$/;
+const itemIdPattern = /^[a-z0-9][a-z0-9._-]{0,119}$/i;
+const childKeyPattern = /^[a-z][a-z0-9-]*$/;
 const expectedFormat = { jpg: "jpeg", jpeg: "jpeg", png: "png", webp: "webp" };
 
 function exactKeys(value, keys) {
@@ -10,15 +12,23 @@ function exactKeys(value, keys) {
 }
 
 function parseSeedMedia(media, listingIndex, mediaIndex) {
+  const nested = media && typeof media === "object" && !Array.isArray(media) &&
+    (Object.hasOwn(media, "groupItemId") || Object.hasOwn(media, "childKey"));
+  const keys = nested ? ["source", "field", "groupItemId", "childKey", "alt"]
+    : ["source", "field", "alt"];
   if (!media || typeof media !== "object" || Array.isArray(media) ||
-      !exactKeys(media, ["source", "field", "alt"]) ||
+      !exactKeys(media, keys) ||
       typeof media.source !== "string" || !sourcePattern.test(media.source) ||
       typeof media.field !== "string" || !fieldPattern.test(media.field) ||
+      (nested && (typeof media.groupItemId !== "string" ||
+        !itemIdPattern.test(media.groupItemId) || typeof media.childKey !== "string" ||
+        !childKeyPattern.test(media.childKey))) ||
       typeof media.alt !== "string" || !media.alt.trim() || media.alt !== media.alt.trim() ||
       media.alt.length > 160) {
     throw new Error(`Invalid add-on seed media at listing ${listingIndex}, item ${mediaIndex}`);
   }
-  return { listingIndex, mediaIndex, source: media.source, field: media.field, alt: media.alt };
+  return { listingIndex, mediaIndex, source: media.source, field: media.field, alt: media.alt,
+    ...(nested ? { groupItemId: media.groupItemId, childKey: media.childKey } : {}) };
 }
 
 function listingMediaDeclarations(listing, listingIndex) {

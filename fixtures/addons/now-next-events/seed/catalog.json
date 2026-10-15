@@ -35,7 +35,10 @@
         ]
       },
       "media": [
-        { "source": "seed/media/form-function-forum.webp", "field": "now-next-events.events.event-media", "alt": "Design conference keynote on a warm orange stage in a concrete hall before a full audience" }
+          { "source": "seed/media/form-function-forum.webp", "field": "now-next-events.events.event-media", "alt": "Design conference keynote on a warm orange stage in a concrete hall before a full audience" },
+          { "source": "seed/media/form-function-stage.webp", "field": "now-next-events.events.event-media", "alt": "Three speakers in conversation on an orange geometric stage before an audience" },
+          { "source": "seed/media/mara-chen-portrait.webp", "field": "now-next-events.events.speakers", "groupItemId": "mara-chen", "childKey": "portrait", "alt": "Portrait of fictional keynote speaker Mara Chen against orange and lime geometric panels" },
+          { "source": "seed/media/idris-bell-portrait.webp", "field": "now-next-events.events.speakers", "groupItemId": "idris-bell", "childKey": "portrait", "alt": "Portrait of fictional systems lead Idris Bell against cream and black geometric panels" }
       ]
     },
     {

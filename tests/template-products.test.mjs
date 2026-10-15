@@ -1034,6 +1034,9 @@ requirementTest("TPL-004 packages the complete NOW/NEXT events directory product
     "NOW/NEXT start time is not a public range facet");
   assert.ok(fieldBySuffix.get("starts-at")?.sort,
     "NOW/NEXT start time is not chronologically sortable");
+    assert.ok(fieldBySuffix.get("speakers")?.constraints.children.some(({ key: childKey, type }) =>
+      childKey === "portrait" && type === "media"),
+    "NOW/NEXT speakers do not define public portrait media");
 
   const seed = JSON.parse(readFileSync(join(fixture, "seed/catalog.json"), "utf8"));
   assert.ok(seed.listings.length >= 10,
@@ -1065,6 +1068,10 @@ requirementTest("TPL-004 packages the complete NOW/NEXT events directory product
   assert.ok(publishedSeed.length > 12, "NOW/NEXT needs enough public events to exercise pagination");
   const imageSources = seed.listings.flatMap(({ media = [] }) => media.map(({ source }) => source));
   assert.ok(imageSources.length >= 10, "NOW/NEXT needs a representative event media set");
+    const portraitMedia = seed.listings.flatMap(({ media = [] }) => media)
+      .filter(({ childKey }) => childKey === "portrait");
+    assert.deepEqual(portraitMedia.map(({ groupItemId }) => groupItemId).sort(),
+      ["idris-bell", "mara-chen"], "NOW/NEXT does not package portraits for its seeded speakers");
   assert.equal(new Set(imageSources).size, imageSources.length,
     "NOW/NEXT seed reuses a packaged media identity");
   const manifest = JSON.parse(readFileSync(join(fixture, "directory-addon.json"), "utf8"));
@@ -1226,13 +1233,16 @@ requirementTest("TPL-004 packages the complete NOW/NEXT events directory product
     try {
       assert.equal(seededDb.prepare("SELECT COUNT(*) FROM listings").pluck().get(),
         seed.listings.length);
-      mediaRows = seededDb.prepare(`SELECT a.id, a.target_slug, a.alt, p.state
+        mediaRows = seededDb.prepare(`SELECT a.id, a.target_slug, a.alt, p.field_key, p.item_id, p.state
         FROM media_assets a JOIN directory_profile_media p ON p.asset_id = a.id
         ORDER BY a.target_slug, a.id`).all();
       assert.equal(mediaRows.length, imageSources.length,
         "NOW/NEXT did not create one media record per packaged image");
       assert.equal(seededDb.prepare("SELECT COUNT(*) FROM directory_profile_media").pluck().get(),
         imageSources.length, "NOW/NEXT media is not assigned to profile values");
+        assert.deepEqual(mediaRows.filter(({ field_key }) => field_key === key("speakers"))
+          .map(({ item_id }) => item_id).sort(), ["idris-bell", "mara-chen"],
+        "NOW/NEXT speaker portraits are not assigned to their group items");
       assert.equal(seededDb.prepare("SELECT COUNT(*) FROM directory_profile_seed_runs")
         .pluck().get(), 1);
 
@@ -1398,6 +1408,10 @@ requirementTest("TPL-004 packages the complete NOW/NEXT events directory product
     assert.match(inProgressDetail, /data-now-next-schedule=/);
     assert.match(inProgressDetail, /Speakers/);
     assert.match(inProgressDetail, /data-now-next-speaker=/);
+      assert.equal([...inProgressDetail.matchAll(/data-now-next-speaker-portrait=/g)].length, 2,
+        "NOW/NEXT did not render both public speaker portraits");
+      assert.ok([...inProgressDetail.matchAll(/data-now-next-gallery-image=/g)].length >= 2,
+        "NOW/NEXT did not render its complete event image gallery");
       assert.match(inProgressDetail,
         /href="https:\/\/formfunction\.example\/speakers\/mara-chen"[^>]*>Speaker profile/,
       "NOW/NEXT omitted a public speaker profile URL");
