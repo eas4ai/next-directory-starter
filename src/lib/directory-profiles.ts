@@ -335,6 +335,30 @@ function mappedValue(value: unknown, action: ProfileMigrationAction): unknown {
   return mapOne(value);
 }
 
+function supportsProfileMedia(field: DirectoryProfileField): boolean {
+  return field.type === "media" || field.type === "group" &&
+    (field.constraints.children as { type: string }[]).some(({ type }) => type === "media");
+}
+
+function remapProfileMediaOwnership(listingSlug: string, sourceFieldKey: string,
+  targetField: DirectoryProfileField): void {
+  if (sourceFieldKey === targetField.key || !supportsProfileMedia(targetField)) return;
+  const conflict = database.prepare(`SELECT 1
+    FROM directory_profile_media AS source
+    JOIN directory_profile_media AS target
+      ON target.listing_slug = source.listing_slug
+      AND target.field_key = ?
+      AND target.item_id = source.item_id
+      AND target.state = source.state
+      AND target.asset_id <> source.asset_id
+    WHERE source.listing_slug = ? AND source.field_key = ? LIMIT 1`)
+    .get(targetField.key, listingSlug, sourceFieldKey);
+  if (conflict) throw new Error(`Profile media mapping conflicts with ${targetField.key}`);
+  database.prepare(`UPDATE directory_profile_media SET field_key = ?
+    WHERE listing_slug = ? AND field_key = ?`)
+    .run(targetField.key, listingSlug, sourceFieldKey);
+}
+
 function impactFor(definition: DirectoryProfileDefinition, expectedRevision: number,
   migration?: ProfileMigrationPlan): ProfileImpact {
   const row = stateRow();
@@ -573,6 +597,9 @@ function activateNow(input: {
         .run(now, now, listingSlug, current!.profileId, current!.version, fieldKey);
       if (targetField && targetValue !== undefined) {
         writeValue(listingSlug, definition, targetField, targetValue, now);
+        if (action?.action === "map") {
+          remapProfileMediaOwnership(listingSlug, fieldKey, targetField);
+        }
       }
       affectedListings.add(listingSlug);
     }

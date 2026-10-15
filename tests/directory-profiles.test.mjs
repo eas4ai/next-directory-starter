@@ -348,14 +348,14 @@ function insertListing(database, slug = "profile-listing", status = "published")
 function insertValue(database, {
   slug = "profile-listing", profileId = "vendor.ai-tools", version = "1.0.0",
   fieldKey = "vendor.ai-tools.starting-price", itemId = "value", valueType = "money",
-  textValue = null, integerValue = 1299, currency = "USD", archivedAt = null,
+  textValue = null, integerValue = 1299, currency = "USD", mediaId = null, archivedAt = null,
 } = {}) {
   database.prepare(`INSERT INTO directory_profile_values
     (listing_slug, profile_id, definition_version, field_key, item_id, child_key,
-      position, value_type, text_value, integer_value, currency, archived_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, '', 0, ?, ?, ?, ?, ?, ?)`)
+      position, value_type, text_value, integer_value, currency, media_id, archived_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, '', 0, ?, ?, ?, ?, ?, ?, ?)`)
     .run(slug, profileId, version, fieldKey, itemId, valueType, textValue,
-      integerValue, currency, archivedAt, "2026-10-14T00:00:00.000Z");
+      integerValue, currency, mediaId, archivedAt, "2026-10-14T00:00:00.000Z");
 }
 
 function insertProfileMedia(database, { id = "123e4567-e89b-12d3-a456-426614174000",
@@ -582,6 +582,31 @@ requirementTest("PRF-001 activates immutable versioned directory-profile definit
       row.integer_value === 1299 && row.currency === "USD" && row.archived_at === null), true);
     assert.equal(current.some((row) => row.field_key === "vendor.ai-tools.starting-price" &&
       row.archived_at !== null), true);
+  });
+
+  await t.test("keeps media ownership aligned when a media field is mapped", async () => {
+    const api = await profileTestContext();
+    resetProfileTables(api.database);
+    activate(api, completeProfile(), 0);
+    insertListing(api.database);
+    const mediaId = "123e4567-e89b-12d3-a456-426614174000";
+    insertProfileMedia(api.database, { id: mediaId, state: "public" });
+    insertValue(api.database, { fieldKey: "vendor.ai-tools.screenshot", valueType: "media",
+      integerValue: null, currency: null, mediaId });
+    const renamed = structuredClone(completeProfile({ version: "2.0.0" }));
+    const mediaField = renamed.fields.find(({ key }) => key === "vendor.ai-tools.screenshot");
+    mediaField.key = "vendor.ai-tools.hero-image";
+    mediaField.label = "Hero image";
+    activate(api, renamed, 1, { fields: {
+      "vendor.ai-tools.screenshot": {
+        action: "map", to: "vendor.ai-tools.hero-image", onInvalid: "reject",
+      },
+    }, defaults: {} });
+    assert.deepEqual(api.database.prepare(`SELECT field_key, state
+      FROM directory_profile_media WHERE asset_id = ?`).get(mediaId),
+    { field_key: "vendor.ai-tools.hero-image", state: "public" });
+    const mediaApi = await import("../src/lib/media.ts");
+    assert.equal(mediaApi.publicProfileMediaAssets([mediaId]).has(mediaId), true);
   });
 
   await t.test("rejects stale and unsatisfied required-field activation without partial writes", async () => {
