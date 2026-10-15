@@ -313,9 +313,11 @@ requirementTest("TPL-002 packages the complete VECTOR directory product", async 
       ["--import", "tsx", "--input-type=module", "--eval", `
         const imported = await import("./src/lib/theme-selection.ts");
         const profilesModule = await import("./src/lib/directory-profiles.ts");
+        const redirectsModule = await import("./src/lib/seo-redirects.ts");
         const settingsModule = await import("./src/lib/site-settings.ts");
         const api = imported.default ?? imported;
         const profiles = profilesModule.default ?? profilesModule;
+        const redirects = redirectsModule.default ?? redirectsModule;
         const settings = settingsModule.default ?? settingsModule;
         if (!api.templateOptions.some((item) => item.id === "vector-ai-tools")) process.exit(2);
         if (!api.themeChoices.some((item) => item.id === "vector-ai-tools")) process.exit(3);
@@ -333,11 +335,24 @@ requirementTest("TPL-002 packages the complete VECTOR directory product", async 
           sourceId: "vector-ai-tools", expectedRevision: 2, actorUserId: "vector-admin" });
         const restored = api.saveThemeSelection({ themeId: "vector-ai-tools",
           templateId: "vector-ai-tools" }, "vector-admin");
-        if (restored.templateId !== "vector-ai-tools") process.exit(7);`],
+        if (restored.templateId !== "vector-ai-tools") process.exit(7);
+        let redirectRejected = false;
+        try { redirects.saveRedirect("/compare", "/listings", "vector-admin"); }
+        catch (error) { redirectRejected = /shadow|live route/i.test(String(error)); }
+        if (!redirectRejected) process.exit(8);`],
       { cwd: starter, encoding: "utf8", env: { ...process.env, CI: "1", NODE_ENV: "test", ...env } });
     expectSuccess(select, "select VECTOR theme and template");
     expectSuccess(npm(starter, ["run", "addon:seed", "--", "vector-ai-tools"], env),
       "seed VECTOR catalog");
+    const legacyRedirect = new Database(databasePath);
+    try {
+      const now = new Date().toISOString();
+      legacyRedirect.prepare(`INSERT INTO seo_redirects
+        (source_path, destination_path, created_at, updated_at) VALUES (?, ?, ?, ?)`)
+        .run("/compare", "/listings", now, now);
+    } finally {
+      legacyRedirect.close();
+    }
 
     application = spawn("npm", ["run", "start", "--", "-p", String(port)], {
       cwd: starter, env: { ...process.env, CI: "1", ...env }, detached: true, stdio: "ignore",
