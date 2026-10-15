@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { tapRunPassed, tapTestPassed } from "./tap-results.mjs";
 
-const requirements = ["TPL-001", "TPL-002"];
+const requirements = ["TPL-001", "TPL-002", "TPL-003"];
 for (const requirement of requirements) {
   const test = spawnSync("node", [
     "--import", "tsx", "--test", "--test-reporter=tap",
