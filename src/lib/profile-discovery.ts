@@ -366,7 +366,9 @@ export function serializeProfileDirectoryQuery(
 }
 
 function profileIndex(field: DirectoryProfileField): string {
-  if (["single-choice", "multiple-choice"].includes(field.type)) return "directory_profile_values_text";
+  if (["short-text", "single-choice", "multiple-choice"].includes(field.type)) {
+    return "directory_profile_values_text";
+  }
   if (["boolean", "integer", "decimal", "duration"].includes(field.type)) {
     return "directory_profile_values_integer";
   }
