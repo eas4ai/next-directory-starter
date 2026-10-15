@@ -5,6 +5,7 @@ import type {
   ProfileChildField, ProfileGroupItem, ProfileLocation, ProfileMoney, ProfileRepeatedValue,
   ProfileValueSet, ValidatedProfileValues,
 } from "@/lib/directory-profile-types";
+import { validProfileDate } from "../../scripts/addons/profile-schema.mjs";
 
 type ValueContext = { isMediaAllowed?: (id: string) => boolean };
 
@@ -16,7 +17,6 @@ export class ProfileValueError extends HttpError {
 }
 
 const decimalPattern = /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/;
-const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const itemIdPattern = /^[a-z0-9][a-z0-9._-]{0,119}$/i;
 const mediaIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -34,12 +34,6 @@ function stringConstraint(field: DirectoryProfileField | ProfileChildField, key:
   const value = constraints(field)[key];
   if (typeof value !== "string") throw new Error(`Invalid ${field.key} ${key} constraint`);
   return value;
-}
-
-function validDate(value: unknown): value is string {
-  if (typeof value !== "string" || !datePattern.test(value)) return false;
-  const parsed = new Date(`${value}T00:00:00.000Z`);
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
 function safeUrl(value: unknown): value is string {
@@ -165,7 +159,7 @@ function validateScalar(field: DirectoryProfileField | ProfileChildField, input:
     return new URL(input).href;
   }
   if (field.type === "date") {
-    if (!validDate(input) || input < stringConstraint(field, "min") ||
+    if (!validProfileDate(input) || input < stringConstraint(field, "min") ||
         input > stringConstraint(field, "max")) throw new Error(`${field.label} has an invalid date`);
     return input;
   }
@@ -181,7 +175,7 @@ function validateScalar(field: DirectoryProfileField | ProfileChildField, input:
   }
   if (field.type === "date-range") {
     const value = strictValueObject(input, ["start", "end"], field.label);
-    if (!validDate(value.start) || !validDate(value.end) || value.start > value.end ||
+    if (!validProfileDate(value.start) || !validProfileDate(value.end) || value.start > value.end ||
         value.start < stringConstraint(field, "min") ||
         value.end > stringConstraint(field, "max")) {
       throw new Error(`${field.label} start and end form an invalid range`);

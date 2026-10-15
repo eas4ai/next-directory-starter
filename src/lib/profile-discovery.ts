@@ -8,6 +8,7 @@ import {
   type Listing, type StoredListing,
 } from "@/lib/listings";
 import { validateProfileFieldValue } from "@/lib/profile-values";
+import { validProfileDate } from "../../scripts/addons/profile-schema.mjs";
 
 const QUERY_BYTES = 4_096;
 const FACET_LIMIT = 12;
@@ -15,7 +16,6 @@ const FACET_VALUE_LIMIT = 20;
 const FACET_VALUE_BYTES = 120;
 const integerPattern = /^-?(?:0|[1-9]\d*)$/;
 const moneyPattern = /^([A-Z]{3}):(-?(?:0|[1-9]\d*))$/;
-const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 
 type ParsedValuesFacet = { values: string[] };
 type ParsedRangeFacet = { min?: string; max?: string };
@@ -95,12 +95,6 @@ function querySize(input: Record<string, string | string[] | undefined>): number
   return byteLength(query.toString());
 }
 
-function validDate(value: string): boolean {
-  if (!datePattern.test(value)) return false;
-  const parsed = new Date(`${value}T00:00:00.000Z`);
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
-}
-
 function asSafeInteger(value: string): number | null {
   if (!integerPattern.test(value)) return null;
   const parsed = Number(value);
@@ -130,7 +124,7 @@ function normalizeRangeValue(field: DirectoryProfileField, value: string): strin
       return String(validateProfileFieldValue(field, value));
     }
     if (field.type === "date-range") {
-      if (!validDate(value)) return null;
+      if (!validProfileDate(value)) return null;
       validateProfileFieldValue(field, { start: value, end: value });
       return value;
     }

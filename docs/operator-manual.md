@@ -69,7 +69,7 @@ Directory add-ons package themes, public page templates, public assets, and opti
    npm run build
    ```
 
-   Installation copies `src/` payload into `src/addons/<add-on-id>/`, public payload into `public/addons/<add-on-id>/`, and optional seed payload into `src/addons/<add-on-id>/seed/`. It records the package digest, contributed IDs, target paths, and file hashes in `.directory-starter/addons.lock.json`, then regenerates `src/addons/generated.ts` and `src/addons/generated.css`. Do not edit the lock or generated registries by hand. A duplicate add-on, theme, or template ID, a target collision, a changed installed file, incompatible package, or invalid archive is rejected before installation writes.
+   Installation copies `src/` payload into `src/addons/<add-on-id>/`, public payload into `public/addons/<add-on-id>/`, and optional seed payload into `src/addons/<add-on-id>/seed/`. It records the package digest, contributed IDs, profile definition digests, target paths, and file hashes in `.directory-starter/addons.lock.json`, then regenerates `src/addons/generated.ts` and `src/addons/generated.css`. Do not edit the lock or generated registries by hand. A duplicate add-on, theme, template, or profile ID, a target collision, a changed installed file, incompatible package, invalid profile definition, or invalid archive is rejected before installation writes.
 
 4. Optional catalog data is never applied during install. After the normal database migration, seed only the named installed add-on when you deliberately want its sample listings:
 
@@ -78,7 +78,7 @@ Directory add-ons package themes, public page templates, public assets, and opti
    npm run addon:seed -- add-on-id
    ```
 
-   The seed inserts only missing listing slugs and is repeatable. Removal does not delete records that were explicitly seeded.
+   A profile-bearing seed must name the exact packaged profile ID and version. The command verifies the installed seed and schema bytes, the active immutable definition digest, every core and typed profile value, media ownership, duplicate destinations, and existing slugs before opening one transaction. A successful rerun of the same seed digest reports the existing records without inserting them again. Any conflict or invalid record rejects the whole batch. Removal does not delete records that were explicitly seeded.
 
 5. Remove an installed add-on by ID, then build and inspect the site. Removal refuses to continue if an owned file or generated registry changed, so it does not erase local edits. A saved selection that names the removed design falls back to the preset theme and Classic template:
 
@@ -89,9 +89,37 @@ Directory add-ons package themes, public page templates, public assets, and opti
 
    There is no in-place add-on upgrade command in schema 1. Remove an unchanged installed version, then install and validate the replacement archive. Install and remove never open or mutate the operator database. A caught command failure restores the files and lock it started with; if the process is forcibly interrupted, inspect `git status`, restore the committed starter source if needed, and rerun validation before another add-on operation.
 
-An authoring directory contains exactly `directory-addon.json` and the files named by its `files` array. The manifest names `schemaVersion`, `id`, `name`, `version`, `compatibility.starter`, `compatibility.addonApi`, every contributed theme `{ id, name, entry }`, every template `{ id, name, stylesheet }`, public `assets`, optional JSON `seed`, and the complete `files` list. IDs use lowercase letters, numbers, and hyphens. Theme entries are TypeScript files under `src/`; template stylesheets are CSS files under `src/`; assets are under `public/`; and seed data is under `seed/`. Keep selectors scoped to `[data-template="your-id"]`, export a complete `ThemeDefinition` as the theme module default, and keep its runtime ID equal to the manifest theme ID. Direct edits to `src/themes/index.ts`, `src/lib/theme-selection.ts`, and `src/app/globals.css` are reserved for designs shipped as part of the starter; distributable designs use the manifest and generated registries. See the [reference manifest](../fixtures/addons/reference-addon/directory-addon.json), [manifest validator](../scripts/addons/manifest.mjs), [installer](../scripts/addons/workspace.mjs), and [generated registry builder](../scripts/addons/registry.mjs).
+An authoring directory contains exactly `directory-addon.json` and the files named by its `files` array. The manifest names `schemaVersion`, `id`, `name`, `version`, `compatibility.starter`, `compatibility.addonApi`, every contributed theme `{ id, name, entry }`, every template `{ id, name, stylesheet, supportedProfiles }`, every profile `{ id, version, schema }`, public `assets`, optional JSON `seed`, and the complete `files` list. Profile and field IDs use dotted namespaces; a template's `supportedProfiles` entries use a profile ID and SemVer range. Theme entries and profile schemas are under `src/`; template stylesheets are CSS files under `src/`; assets are under `public/`; and seed data is under `seed/`. Keep selectors scoped to `[data-template="your-id"]`, export a complete `ThemeDefinition` as the theme module default, and keep its runtime ID equal to the manifest theme ID. Direct edits to `src/themes/index.ts`, `src/lib/theme-selection.ts`, and `src/app/globals.css` are reserved for designs shipped as part of the starter; distributable designs use the manifest and generated registries. See the [reference manifest](../fixtures/addons/reference-addon/directory-addon.json), [manifest validator](../scripts/addons/manifest.mjs), [installer](../scripts/addons/workspace.mjs), and [generated registry builder](../scripts/addons/registry.mjs).
 
-## 3. Build the catalog
+## 3. Configure directory profiles
+
+A directory profile is a versioned field contract for one kind of directory. Packaged profiles come from installed add-ons; an administrator can also maintain a separate `site.local` profile for fields unique to one installation. Activation stores an immutable definition snapshot in SQLite. Listing values always name the definition version that validated them, including after their source add-on is removed.
+
+1. Validate and install the add-on as described in section 2, run `npm run db:migrate`, sign in as an administrator, and open `/admin/profiles`. The installer validates profile paths, identity, schema, digest, starter compatibility, and template profile ranges without opening the operator database. Installation makes the packaged definition available for review; it does not activate the profile or seed data.
+
+2. Choose a stored or installed version and select **Analyze impact**. Review the state revision, affected listings and value rows, missing required values, invalid samples, and the compatible or breaking result. Run this analysis before every first activation, version change, or switch to another profile ID. A compatible version preserves existing values under the new immutable snapshot when you select **Activate reviewed version**.
+
+3. For a breaking change, assign every reported source field an explicit action. **Map to target field** moves values to a field in the new definition; choose whether one invalid value rejects the whole migration or is archived. **Archive retained values** removes the field from current display while retaining its versioned rows for audit. Supply defaults for new required fields before activating. Activation rechecks the state revision and performs the definition snapshot, mappings, archives, defaults, active reference, search index, and audit history in one transaction. A concurrent profile change rejects the stale request so you can analyze it again.
+
+4. Use the site-field controls on `/admin/profiles` for installation-specific fields. Field keys stay in the `site.` namespace. Choose the type, constraints, write authority, visibility, placement, search, facet, and sort behavior deliberately. Saving a changed field creates a new immutable `site.local` version. Archiving a site field retains its old values; it does not permanently delete them.
+
+5. The **write authority** is enforced by every listing workflow. Operator fields appear in `/admin/catalog`; owner fields appear in the owner editor; system fields are accepted only by trusted server workflows. Staff and private visibility remain out of public cards, details, facets, sorting, and search. Owner proposals retain the exact profile revision they were created against, and approval rejects stale revisions. Agent imports may stage incomplete profile values, but direct, remote, and browser-approved publication all require the active profile's required fields to validate.
+
+6. Apply optional typed sample data only after activating the exact profile version named by the seed:
+
+   ```sh
+   npm run addon:seed -- add-on-id
+   ```
+
+   The command validates the complete batch before one transaction and records the add-on version, seed digest, profile version, and inserted count. Treat a different digest for the same installed seed provenance as a conflict to investigate. Removing the add-on later removes its source files and generated registration but leaves activated definition snapshots, current and archived values, migration history, seed provenance, and seeded listings in the database. Install the package again to make an unactivated version available; retained snapshots continue to decode existing values without it.
+
+7. Permanent deletion is a separate administrator action. In **Permanent archived-value purge**, enter the profile ID and field key, inspect the current archived-row count, type that exact count, and select **Permanently purge**. The revision and count are checked again and the deletion is audited. Create and verify a backup first because a purge is not reversible through the profile interface.
+
+8. Profile recovery uses the same commands as the rest of the installation. `npm run ops:backup` and `npm run ops:restore` verify definition digests, active references, typed current and archived rows, profile media ownership and files, migration references, seed provenance, and search references. An isolated restore must preserve all profile tables and media before an upgrade is attempted. Test the new code and migrations against that restore, then inspect `/admin/profiles`, public discovery, one operator listing, one owner listing, and any staged agent import. If the upgrade fails, stop it and recover from a new isolated restore of the verified pre-upgrade backup with the recorded old code and image. There is no database downgrade command.
+
+See the [profile schema](../scripts/addons/profile-schema.mjs), [lifecycle and migration rules](../src/lib/directory-profiles.ts), [typed value codec](../src/lib/profile-values.ts), [profile administration](../src/app/admin/profiles/profile-manager.tsx), and [recovery checks](../scripts/ops-common.mjs).
+
+## 4. Build the catalog
 
 1. An administrator or staff member with the taxonomy capability opens `/admin/taxonomy` to add listing categories before asking owners or agents to use them. Rename a category to update its existing references. A category still used by a listing or pending draft cannot be deleted. The same workspace manages article categories and tags. See [taxonomy page access](../src/app/admin/taxonomy/page.tsx), [taxonomy controls](../src/app/admin/taxonomy/taxonomy-editor.tsx), and [taxonomy rules](../src/lib/taxonomy.ts).
 
@@ -101,7 +129,7 @@ An authoring directory contains exactly `directory-addon.json` and the files nam
 
 The sample seed inserts only missing slugs. To replace samples, create your own catalog and manage publication deliberately; rerunning the seed does not erase operator content. See [sample insert behavior](../src/lib/catalog-migrations.ts).
 
-## 4. Manage accounts, owner submissions, and review
+## 5. Manage accounts, owner submissions, and review
 
 1. To accept owners, configure Resend first, then direct them to `/owner/sign-in` to create and verify an account. The form also offers password sign-in, a verified-account email link, and password recovery. An administrator creates the initial administrator with the CLI in section 1; public signup does not grant staff roles. See [owner sign-in form](../src/app/owner/sign-in/owner-auth-form.tsx), [signup gate](../src/app/api/auth/[...all]/route.ts), and [auth configuration](../src/lib/auth.ts).
 
@@ -111,7 +139,7 @@ The sample seed inserts only missing slugs. To replace samples, create your own 
 
 4. An administrator opens `/admin/accounts` to assign any combination of moderator, editor, catalog, taxonomy, and billing capabilities to a verified, active account. Suspending an account invalidates its sessions; reinstatement is available. The final active administrator cannot be demoted or suspended. See [account controls](../src/app/admin/accounts/account-roles.tsx), [role and suspension rules](../src/lib/accounts.ts), and [capabilities](../src/lib/staff-roles.ts).
 
-## 5. Publish articles, terms, and images
+## 6. Publish articles, terms, and images
 
 1. An administrator or staff member with the taxonomy capability creates article categories and tags in `/admin/taxonomy` before an editor uses them in an article. A term in use cannot be removed until references are changed. See [taxonomy page access](../src/app/admin/taxonomy/page.tsx) and [taxonomy rules](../src/lib/taxonomy.ts).
 
@@ -121,7 +149,7 @@ The sample seed inserts only missing slugs. To replace samples, create your own 
 
 4. Check `/articles`, an article detail page, and `/feed.xml` after publication. The article index supports search, category, tag, and pagination; the feed uses published articles. Withdrawing an article removes its public detail and media eligibility. See [article queries](../src/lib/articles.ts), [article index](../src/app/articles/page.tsx), and [feed route](../src/app/feed.xml/route.ts).
 
-## 6. Configure search and sharing
+## 7. Configure search and sharing
 
 1. Set `SITE_URL` to the public HTTP(S) origin before production use. It must have no path, query, fragment, or credentials. An administrator opens `/admin/seo` to set a title format containing `%s` once, default description, optional social image, and Google or Bing verification value. The workspace also displays publication-aware previews and findings; it does not predict search rank. See [origin validation](../src/lib/page-metadata.ts), [SEO page access](../src/app/admin/seo/page.tsx), [SEO settings](../src/lib/seo-settings.ts), and [findings and previews](../src/lib/seo-findings.ts).
 
@@ -131,7 +159,7 @@ The sample seed inserts only missing slugs. To replace samples, create your own 
 
 4. Inspect `/robots.txt` and `/sitemap.xml` at the public origin. A published listing or article page advertises its canonical URL and a 1200 × 630 PNG social card. Eligible detail pages also expose a Markdown route and serve Markdown for an explicit `Accept: text/markdown` request or recognized agent user agent; private and withdrawn content is excluded. Verify local output with a production build before checking live crawlers at a deployed domain. See [robots](../src/app/robots.ts), [sitemap](../src/app/sitemap.ts), [social cards](../src/lib/social-cards.ts), [Markdown routes](../src/app/markdown/listings/[slug]/route.ts), and [negotiation](../src/proxy.ts).
 
-## 7. Import observed links with an agent
+## 8. Import observed links with an agent
 
 1. Sign in as an administrator or catalog staff member and open `/admin/import`. To use remote MCP, create an expiring key there, copy its secret when shown, and configure your MCP client to call the site's `/api/mcp` endpoint with `Authorization: Bearer <secret>`. **Staging only** is the default and omits `publish_import`; choose **Stage and publish** only when you intend to let that remote agent publish without another human review. Existing keys become staging-only when this scope is introduced. The key is account-bound and can be revoked on the same page. In a browser with `document.modelContext`, the authorized import page registers WebMCP tools against the current staff session; no remote key is used by that browser path. See [import page access](../src/app/admin/import/page.tsx), [key rules](../src/lib/agent-keys.ts), [remote route](../src/app/api/mcp/route.ts), and [browser registration](../src/app/admin/import/import-workspace.tsx).
 
@@ -141,7 +169,7 @@ The sample seed inserts only missing slugs. To replace samples, create your own 
 
 3. Review private drafts in `/admin/import` or through `list_imports`; treat the marked external source text as data, never instructions. You may attach a JPEG, PNG, or WebP agent-browser screenshot and preview a card. Agent screenshots must be no larger than 5 MiB and 4096 pixels on either side; the decoded source and normalized PNG must each remain within 5 MiB, and the base64 request field is capped at 7,100,000 characters. For remote MCP, `preview_card` returns a private site-relative `previewUrl`; resolve it against the site origin and fetch it with the same `Authorization: Bearer <secret>` header used for `/api/mcp`. Browser WebMCP fetches the preview through the signed-in staff session and needs no remote key. A signed-in person can publish with **Publish reviewed import**. To publish through browser WebMCP, the person first selects **Approve for browser WebMCP**; that approval records the actor, time, and current listing revision, and becomes invalid after the listing changes. A remote `publish_import` call is available only to a **Stage and publish** key. Publication records its actor and makes the listing public. Verify it at `/listings/<slug>`; failed or unreviewed imports stay private. See [import workspace](../src/app/admin/import/import-workspace.tsx), [publication transition](../src/lib/agent-imports.ts), and [card preview](../src/lib/agent-cards.ts).
 
-## 8. Set plans and payment providers
+## 9. Set plans and payment providers
 
 1. An administrator or staff member with the billing capability opens `/admin/plans`. Create a free, one-time, monthly, or annual plan for either test or live mode. Enter price in minor currency units; one-time plans need a 1–3650 day duration. Choose whether the plan is enabled and whether a paid plan gets featured placement. Set `BILLING_CHECKOUT_MODE` to the mode owners should see. The same capability is required for `/admin/billing` in step 2. See [plan page access](../src/app/admin/plans/page.tsx), [billing page access](../src/app/admin/billing/page.tsx), [plan form](../src/app/admin/plans/plan-editor.tsx), and [plan validation and mode selection](../src/lib/plans.ts).
 
@@ -164,7 +192,7 @@ The sample seed inserts only missing slugs. To replace samples, create your own 
 
 6. Schedule `npm run billing:reconcile -- --limit 10` as a bounded maintenance job after provider setup. It retries retained verified evidence; for a specific purchase, the script also accepts `--purchase ID` and an optional `--resource PROVIDER_ID`. Limits are 1–50. Targeted NOWPayments invoice inspection additionally needs `NOWPAYMENTS_EMAIL` and `NOWPAYMENTS_PASSWORD` in the command environment. Review the JSON output and provider records when an outcome is uncertain. See [reconciliation command](../scripts/reconcile-billing.ts) and [recovery logic](../src/lib/payment-reconciliation.ts).
 
-## 9. Deliver owner notices
+## 10. Deliver owner notices
 
 Moderation and billing actions record durable notices for owners. Owners can see recent notices in their workspace even if email delivery is unavailable. To send queued email, configure the Resend sender and run a bounded worker periodically:
 
@@ -174,11 +202,11 @@ npm run notifications:deliver -- --limit 10
 
 The limit must be 1–50. The command reports attempted, sent, and failed counts; failures retry with bounded delays and stop after five attempts. An administrator can open `/admin/notifications` to see delivery state and manually retry a failed item with no next attempt. If the outcome is marked unknown, inspect Resend before retrying to avoid a duplicate message. The retry does not repeat the moderation or payment action. See [notice storage](../src/lib/notifications.ts), [delivery and retry rules](../src/lib/notification-delivery.ts), [worker command](../scripts/deliver-notifications.ts), and [delivery workspace](../src/app/admin/notifications/page.tsx).
 
-## 10. Deploy, back up, restore, and upgrade
+## 11. Deploy, back up, restore, and upgrade
 
 ### Container deployment
 
-This Compose setup runs one application instance on one host. Install Docker Engine with Compose, then copy `.env.docker.example` to `.env.docker`. Set `SITE_URL` and `BETTER_AUTH_URL` to the public HTTPS origin and replace `BETTER_AUTH_SECRET` with a unique long random value. Set `DIRECTORY_IMAGE` to a new immutable local tag for this revision, such as `next-directory-starter:2026-10-14-abc123`; never reuse that tag for another revision. Record the tag with the deployed code revision and retain the prior tagged image through each upgrade. Keep `.env.docker` private. Set optional mail and payment variables there as described above. Before the first backup, generate the key in section 8 step 2, put it in `BILLING_ENCRYPTION_KEY`, and keep its matching file outside the repository even when paid billing is unused. Compose fixes `DATABASE_URL` to `file:/app/data/directory.db` and `MEDIA_DIR` to `/app/data/media`; both live in its named volume. It maps port 3000 to `127.0.0.1` only, so configure a reverse proxy with HTTPS at the public origin. Change `DIRECTORY_PORT` if another local service uses 3000. See the [Compose topology](../compose.yaml) and [runtime image](../Dockerfile) for the service name, image variable, loopback port, persistent volume, unprivileged runtime user, and health check.
+This Compose setup runs one application instance on one host. Install Docker Engine with Compose, then copy `.env.docker.example` to `.env.docker`. Set `SITE_URL` and `BETTER_AUTH_URL` to the public HTTPS origin and replace `BETTER_AUTH_SECRET` with a unique long random value. Set `DIRECTORY_IMAGE` to a new immutable local tag for this revision, such as `next-directory-starter:2026-10-14-abc123`; never reuse that tag for another revision. Record the tag with the deployed code revision and retain the prior tagged image through each upgrade. Keep `.env.docker` private. Set optional mail and payment variables there as described above. Before the first backup, generate the key in section 9 step 2, put it in `BILLING_ENCRYPTION_KEY`, and keep its matching file outside the repository even when paid billing is unused. Compose fixes `DATABASE_URL` to `file:/app/data/directory.db` and `MEDIA_DIR` to `/app/data/media`; both live in its named volume. It maps port 3000 to `127.0.0.1` only, so configure a reverse proxy with HTTPS at the public origin. Change `DIRECTORY_PORT` if another local service uses 3000. See the [Compose topology](../compose.yaml) and [runtime image](../Dockerfile) for the service name, image variable, loopback port, persistent volume, unprivileged runtime user, and health check.
 
 Set a hard request-body limit at that proxy. The largest application request is the agent screenshot JSON envelope, capped at 7,100,000 bytes, so an 8 MiB proxy limit admits valid screenshots while bounding every public request before it reaches Next.js. The application trusts the proxy-owned `X-Real-IP` header for authentication rate limits, so the public Nginx edge must overwrite both client-IP headers with its connection address. Keep the Compose port bound to loopback so a public caller cannot reach the application with a forged trusted header. For Nginx, add the following to the TLS server block that owns the public hostname, replace the certificate paths and hostname, then run `sudo nginx -t` before reloading Nginx. The `8m` value is 8 MiB. Nginx answers a larger request with `413 Request Entity Too Large` without forwarding its body to the application.
 
@@ -267,7 +295,7 @@ The backup command reads `DATABASE_URL`, optional `MEDIA_DIR`, and `BILLING_ENCR
 npm run ops:backup -- --output /private/backups/directory-YYYYMMDD --key-file /private/keys/directory-billing.key
 ```
 
-The script uses SQLite's backup operation, copies media, checks integrity and decryptability, hashes files, writes `manifest.json`, and prints `Backup created and verified.` only after success. See [backup implementation](../scripts/backup.mjs) and [integrity checks](../scripts/ops-common.mjs).
+The script uses SQLite's backup operation, copies media, checks database integrity and decryptability, validates every directory-profile definition and reference, hashes files, writes `manifest.json`, and prints `Backup created and verified.` only after success. A profile check covers active state, typed current and archived values, media ownership, migration history, seed provenance, and search rows. See [backup implementation](../scripts/backup.mjs) and [integrity checks](../scripts/ops-common.mjs).
 
 ### Verify an isolated restore
 
@@ -277,12 +305,12 @@ Use a new target directory outside the backup and live storage trees:
 npm run ops:restore -- --backup /private/backups/directory-YYYYMMDD --target /private/restores/directory-check
 ```
 
-Restore verifies the manifest hashes, SQLite integrity, referenced media files, and the billing key before creating the target. It refuses an existing or overlapping target and prints `Isolated restore verified.` on success. The target contains `database.db`, `media/`, and `billing.key`. To use it, stop the installation and point `DATABASE_URL`, `MEDIA_DIR`, and `BILLING_ENCRYPTION_KEY` at those restored values through your deployment's secret manager. Never copy a restored database over a running one. See [restore implementation](../scripts/restore.mjs) and [path checks](../scripts/ops-common.mjs).
+Restore verifies the manifest hashes, SQLite integrity, referenced media files, billing key, and directory-profile invariants before creating the target, then validates the copied target again. It refuses an existing or overlapping target and prints `Isolated restore verified.` on success. The target contains `database.db`, `media/`, and `billing.key`. To use it, stop the installation and point `DATABASE_URL`, `MEDIA_DIR`, and `BILLING_ENCRYPTION_KEY` at those restored values through your deployment's secret manager. Never copy a restored database over a running one. See [restore implementation](../scripts/restore.mjs) and [path checks](../scripts/ops-common.mjs).
 
 ### Upgrade and recover
 
 1. Preserve the current code revision and lockfile. Create and verify a backup as above **before** running migrations or a new build against operator data.
-2. Test the new revision against an isolated restore, with its own `DATABASE_URL`, `MEDIA_DIR`, and billing key. Run `npm ci`, `npm run db:migrate`, and `npm run build`; inspect public and authorized workflows there. The [migration functions](../src/lib/catalog-migrations.ts) track applied versions and the [package scripts](../package.json) define the commands.
+2. Test the new revision against an isolated restore, with its own `DATABASE_URL`, `MEDIA_DIR`, and billing key. Run `npm ci`, `npm run db:migrate`, and `npm run build`; inspect public and authorized workflows there. When profiles are active, inspect `/admin/profiles`, public profile fields and discovery controls, current and archived listing values, profile media, and one migration-history path before touching live storage. The [migration functions](../src/lib/catalog-migrations.ts) track applied versions and the [package scripts](../package.json) define the commands.
 3. Stop the live process. Deploy the tested revision, run its migration against the intended persistent database, then start and inspect the site. Keep shell and app database environments aligned.
 4. If the new revision fails, stop it. Restore the old code and lockfile, make a **new isolated restore** from the pre-upgrade backup, and point the old installation at the restored database, media, and matching key. There is no database downgrade command in [package scripts](../package.json); rollback uses the verified restore path.
 
