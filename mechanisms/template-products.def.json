@@ -1,18 +1,18 @@
 {
-  "command": "node mechanisms/check-addon-system.mjs",
-  "requirements": ["ADD-001", "ADD-002", "ADD-003"],
+  "command": "node mechanisms/check-template-products.mjs",
+  "requirements": ["TPL-001", "TPL-002"],
   "results": "per-requirement",
   "inputs": [
     "docs/operator-manual.md",
     "fixtures/addons",
-    "mechanisms/addon-system.def.json",
-    "mechanisms/check-addon-system.mjs",
+    "mechanisms/check-template-products.mjs",
     "mechanisms/tap-results.mjs",
+    "mechanisms/template-products.def.json",
     "package.json",
     "package-lock.json",
     "scripts",
     "src",
-    "tests/addon-system.test.mjs"
+    "tests/template-products.test.mjs"
   ],
   "identity": {
     "env": [],
