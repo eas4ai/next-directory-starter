@@ -22,7 +22,7 @@ const dark = {
   "secondary-foreground": "#EDF2FF", muted: "#18243A", "muted-foreground": "#A9B7D0",
   accent: "#233A68", "accent-foreground": "#EDF2FF", destructive: "#FF8797",
   border: "#2B3A58", input: "#40516F", ring: "#81A4FF",
-  "chart-1": "#81A4FF", "chart-2": "#74D5B1", "chart-3": "#C1A3FF",
+  "chart-1": "#81A4FF", "chart-2": "#A9B7D0", "chart-3": "#C1A3FF",
   "chart-4": "#FFB47D", "chart-5": "#93A4C3", sidebar: "#0A1020",
   "sidebar-foreground": "#EDF2FF", "sidebar-primary": "#81A4FF",
   "sidebar-primary-foreground": "#0A1020", "sidebar-accent": "#141D30",
@@ -44,7 +44,7 @@ const vectorTheme = {
   controlHeight: "2.5rem",
   spacing: { section: "4rem", card: "1rem", gap: "0.75rem" },
   width: { page: "1440px", reading: "54rem" },
-  social: { background: "#0A1020", foreground: "#EDF2FF", accent: "#81A4FF", muted: "#74D5B1" },
+  social: { background: "#0A1020", foreground: "#EDF2FF", accent: "#81A4FF", muted: "#A9B7D0" },
 } satisfies ThemeDefinition;
 
 export default vectorTheme;
