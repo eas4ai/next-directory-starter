@@ -240,7 +240,8 @@
           { "key": "name", "label": "Name", "help": "The speaker's public name.", "type": "short-text", "required": true, "constraints": { "minLength": 2, "maxLength": 120 } },
           { "key": "role", "label": "Role", "help": "The speaker's role in the program.", "type": "short-text", "required": true, "constraints": { "minLength": 2, "maxLength": 120 } },
           { "key": "organization", "label": "Organization", "help": "The speaker's public organization or practice.", "type": "short-text", "required": false, "constraints": { "minLength": 0, "maxLength": 160 } },
-          { "key": "profile-url", "label": "Profile URL", "help": "An optional public profile URL for the speaker.", "type": "url", "required": false, "constraints": {} }
+            { "key": "profile-url", "label": "Profile URL", "help": "An optional public profile URL for the speaker.", "type": "url", "required": false, "constraints": {} },
+            { "key": "portrait", "label": "Portrait", "help": "An optional public portrait of the speaker.", "type": "media", "required": false, "constraints": { "maxItems": 1 } }
         ]
       }
     },

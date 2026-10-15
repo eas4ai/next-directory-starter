@@ -17,7 +17,8 @@ import { encodeProfileValue, replaceListingProfileValues,
 import type { ActiveProfileSet, ValidatedProfileValues } from "@/lib/directory-profile-types";
 import type { Listing } from "@/lib/listings";
 
-type AddonSeedMedia = { source: string; field: string; alt: string };
+type AddonSeedMedia = { source: string; field: string; alt: string;
+  groupItemId?: string; childKey?: string };
 type AddonSeedListing = Listing & { title: string; profileValues: Record<string, unknown>;
   media: AddonSeedMedia[] };
 type AddonSeed = {
@@ -57,7 +58,9 @@ export function parseAddonSeed(input: unknown): AddonSeed {
   const mediaByListing = new Map<number, AddonSeedMedia[]>();
   for (const declaration of seedMediaDeclarations(input)) {
     const media = mediaByListing.get(declaration.listingIndex) ?? [];
-    media.push({ source: declaration.source, field: declaration.field, alt: declaration.alt });
+      media.push({ source: declaration.source, field: declaration.field, alt: declaration.alt,
+        ...(declaration.groupItemId ? { groupItemId: declaration.groupItemId,
+          childKey: declaration.childKey } : {}) });
     mediaByListing.set(declaration.listingIndex, media);
   }
   const listings = value.listings.map((record, index) => {
@@ -165,20 +168,33 @@ function validateSeedListings(seed: AddonSeed, profiles: ActiveProfileSet): Vali
     const values = validateProfileValues(record.profileValues, { profiles,
       authority: "system", listingSlug: listing.slug, actorUserId: "addon-seed",
       requireComplete: true });
-    const mediaCounts = new Map<string, number>();
+      const mediaCounts = new Map<string, number>();
     for (const media of record.media) {
       const field = fields.get(media.field);
-      if (!field || field.type !== "media") {
+        const nested = Boolean(media.groupItemId && media.childKey);
+        const child = field?.type === "group" && nested
+          ? (field.constraints.children as { key: string; type: string }[])
+            .find(({ key }) => key === media.childKey) : undefined;
+        if (!field || (nested ? child?.type !== "media" : field.type !== "media")) {
         throw new Error(`Seed media field does not accept photography: ${media.field}`);
       }
-      if (Object.hasOwn(record.profileValues, media.field)) {
+        const groupItems = nested ? record.profileValues[media.field] : undefined;
+        const groupItem = Array.isArray(groupItems) ? groupItems.find((item) => item &&
+          typeof item === "object" && (item as { id?: unknown }).id === media.groupItemId) : undefined;
+        const groupValues = groupItem && typeof groupItem === "object"
+          ? (groupItem as { values?: Record<string, unknown> }).values : undefined;
+        if (nested && (!groupValues || Object.hasOwn(groupValues, media.childKey!))) {
+          throw new Error(`Seed media group target is missing or already supplied: ${media.field}`);
+        }
+        if (!nested && Object.hasOwn(record.profileValues, media.field)) {
         throw new Error(`Seed media conflicts with a supplied profile value: ${media.field}`);
       }
-      const count = (mediaCounts.get(media.field) ?? 0) + 1;
-      if (field.cardinality === "one" && count > 1) {
+        const countKey = nested ? `${media.field}\0${media.groupItemId}\0${media.childKey}` : media.field;
+        const count = (mediaCounts.get(countKey) ?? 0) + 1;
+        if ((nested || field.cardinality === "one") && count > 1) {
         throw new Error(`Seed media field accepts only one image: ${media.field}`);
       }
-      mediaCounts.set(media.field, count);
+        mediaCounts.set(countKey, count);
       if (sources.has(media.source)) throw new Error(`Duplicate seed media source: ${media.source}`);
       sources.add(media.source);
     }
@@ -190,7 +206,7 @@ function validateSeedListings(seed: AddonSeed, profiles: ActiveProfileSet): Vali
   });
 }
 
-type PreparedSeedMedia = AddonSeedMedia & { id: string; itemId: string; output: Buffer;
+type PreparedSeedMedia = AddonSeedMedia & { id: string; valueItemId: string; output: Buffer;
   width: number; height: number; file: string };
 
 const mimeByExtension = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
@@ -206,7 +222,7 @@ async function prepareSeedMedia(root: string, addon: LockAddon,
       const extension = media.source.split(".").at(-1) as keyof typeof mimeByExtension;
       const normalized = await normalizeMediaImage(bytes, mimeByExtension[extension], media.alt);
       const id = randomUUID();
-      prepared.push({ ...media, id, itemId: `seed-photo-${index + 1}`,
+        prepared.push({ ...media, id, valueItemId: `seed-photo-${index + 1}`,
         output: normalized.output, width: normalized.width, height: normalized.height,
         file: mediaFilePath(id) });
     }
@@ -301,12 +317,23 @@ function insertSeedListing(record: ValidatedSeedListing, images: PreparedSeedMed
   statements.insertCategory.run(listing.category);
   statements.insertListing.run(listing.slug, listing.name, listing.summary, listing.description,
     listing.category, listing.url, destination, listing.status);
-  const rawValues = { ...record.rawValues };
+    const rawValues = structuredClone(record.rawValues);
+    const fields = new Map(profiles.definitions.flatMap((definition) =>
+      definition.fields.map((field) => [field.key, field])));
   for (const image of images) {
     statements.insertAsset.run(image.id, listing.slug, image.alt, image.width, image.height, now);
-    statements.assignMedia.run(image.id, listing.slug, image.field, image.itemId, now);
-    const values = rawValues[image.field] as { id: string; value: string }[] | undefined;
-    rawValues[image.field] = [...(values ?? []), { id: image.itemId, value: image.id }];
+      const itemId = image.groupItemId ?? image.valueItemId;
+      statements.assignMedia.run(image.id, listing.slug, image.field, itemId, now);
+      if (image.groupItemId && image.childKey) {
+        const items = rawValues[image.field] as { id: string; values: Record<string, unknown> }[];
+        const item = items.find(({ id }) => id === image.groupItemId)!;
+        item.values[image.childKey] = image.id;
+      } else if (fields.get(image.field)?.cardinality === "one") {
+        rawValues[image.field] = image.id;
+      } else {
+        const values = rawValues[image.field] as { id: string; value: string }[] | undefined;
+        rawValues[image.field] = [...(values ?? []), { id: image.valueItemId, value: image.id }];
+      }
     statements.clearCleanup.run(image.id);
   }
   const values = validateProfileValues(rawValues, { profiles, authority: "system",
