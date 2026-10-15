@@ -4,4 +4,4 @@
 
 - Added the NOW/NEXT theme and public renderer.
 - Added the events and conferences directory profile.
-- Added ten representative event records and original packaged event media.
+- Added fourteen representative event records with original event art, stage photography, and speaker portraits.
