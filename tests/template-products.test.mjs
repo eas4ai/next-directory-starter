@@ -1398,6 +1398,9 @@ requirementTest("TPL-004 packages the complete NOW/NEXT events directory product
     assert.match(inProgressDetail, /data-now-next-schedule=/);
     assert.match(inProgressDetail, /Speakers/);
     assert.match(inProgressDetail, /data-now-next-speaker=/);
+      assert.match(inProgressDetail,
+        /href="https:\/\/formfunction\.example\/speakers\/mara-chen"[^>]*>Speaker profile/,
+      "NOW/NEXT omitted a public speaker profile URL");
     assert.match(inProgressDetail, /Check tickets with organizer/);
     assert.doesNotMatch(inProgressDetail, /verified attendee|book(?:ing)? confirmed/i);
     assert.match(inProgressDetail, /application\/ld\+json/);

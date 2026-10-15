@@ -174,6 +174,8 @@
 .now-next-speakers article > strong { display: block; margin-top: 2rem; font-family: var(--preset-heading-font); font-size: 1.7rem; text-transform: uppercase; }
 .now-next-speakers article > p { margin-top: 0.25rem; }
 .now-next-speakers article > small { color: var(--muted-foreground); }
+.now-next-speakers article > a { display: block; width: fit-content; margin-top: 0.8rem; border-bottom: 1px solid currentColor;
+  color: var(--now-orange); font-size: 0.68rem; font-weight: 900; text-transform: uppercase; }
 
 .now-next-footer { display: flex; width: min(100% - 2rem, var(--theme-page-width)); min-width: 0; margin: 0 auto; align-items: end; justify-content: space-between; gap: 2rem; border: 2px solid var(--now-rule); padding: 2rem; background: var(--sidebar); color: var(--sidebar-foreground); }
 .now-next-footer strong { color: var(--sidebar-primary); font-family: var(--preset-heading-font); font-size: 3rem; letter-spacing: -0.04em; }
