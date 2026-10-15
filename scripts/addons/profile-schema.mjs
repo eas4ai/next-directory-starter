@@ -115,7 +115,8 @@ function boundedPair(object, minKey, maxKey, label) {
   if (minimum > maximum) throw new Error(`${label} minimum exceeds maximum`);
 }
 
-function validDate(value) {
+/** @param {unknown} value @returns {value is string} */
+export function validProfileDate(value) {
   if (typeof value !== "string" || !isoDatePattern.test(value)) return false;
   const parsed = new Date(`${value}T00:00:00.000Z`);
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
@@ -180,7 +181,7 @@ function normalizeConstraints(type, input, child = false) {
   }
   if (type === "date" || type === "date-range") {
     const value = strictKeys(input, ["min", "max"], type);
-    validateRangeStrings(value, validDate, type);
+    validateRangeStrings(value, validProfileDate, type);
     return { min: value.min, max: value.max };
   }
   if (type === "datetime") {
@@ -332,7 +333,7 @@ function normalizeScalarDefault(field, value) {
     return new URL(value).href;
   }
   if (type === "date") {
-    if (!validDate(value) || value < constraints.min || value > constraints.max) {
+    if (!validProfileDate(value) || value < constraints.min || value > constraints.max) {
       throw new Error("Invalid date default");
     }
     return value;
@@ -347,7 +348,7 @@ function normalizeScalarDefault(field, value) {
   }
   if (type === "date-range") {
     const object = valueObject(value, ["start", "end"], "date-range default");
-    if (!validDate(object.start) || !validDate(object.end) || object.start > object.end ||
+    if (!validProfileDate(object.start) || !validProfileDate(object.end) || object.start > object.end ||
         object.start < constraints.min || object.end > constraints.max) {
       throw new Error("Invalid date-range default");
     }
