@@ -151,6 +151,10 @@ const nowNextTemplate = {
   id: "now-next-events",
   name: "NOW/NEXT Events & Conferences",
   supportedProfiles: [{ id: "now-next-events.events", range: "^1.0.0" }],
+  homeQuery: () => ({
+    [`min.${key("ends-at")}`]: new Date().toISOString(),
+    sort: `${key("starts-at")}:asc`,
+  }),
   renderers: {
     header({ site, navigation, appearanceControl }) {
       return <header className="now-next-header">

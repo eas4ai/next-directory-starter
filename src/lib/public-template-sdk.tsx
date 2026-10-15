@@ -171,12 +171,14 @@ export type PublicTemplateDefinition = {
   id: string;
   name: string;
   supportedProfiles?: readonly { id: string; range: string }[];
+  homeQuery?: () => Record<string, string | string[]>;
   renderers: PublicTemplateRenderers;
 };
 
 export function definePublicTemplate(definition: PublicTemplateDefinition): PublicTemplateDefinition {
   if (!/^[a-z][a-z0-9-]*$/.test(definition.id) || !definition.name.trim() ||
-      Object.keys(definition.renderers).length === 0) {
+      Object.keys(definition.renderers).length === 0 ||
+      (definition.homeQuery !== undefined && typeof definition.homeQuery !== "function")) {
     throw new Error("Invalid public template definition");
   }
   return definition;

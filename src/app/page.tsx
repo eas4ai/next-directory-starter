@@ -25,7 +25,8 @@ export default async function Home() {
   await connection();
   const site = getSiteConfig();
   const profiles = activeDirectoryProfiles();
-  const result = searchProfileDirectory(parseProfileDirectoryQuery({}, profiles));
+  const definition = publicTemplateDefinition(getThemeSelection().templateId);
+  const result = searchProfileDirectory(parseProfileDirectoryQuery(definition?.homeQuery?.() ?? {}, profiles));
   const featuredSlugs = activeFeaturedSlugs(result.listings.map(({ slug }) => slug));
   const listings = publicTemplateListings(result.listings.map((listing) => ({
     ...listing, featured: featuredSlugs.has(listing.slug),
@@ -33,7 +34,6 @@ export default async function Home() {
   const featured = Object.freeze(listings.filter(({ featured: isFeatured }) => isFeatured));
   const mediaIds = listings.flatMap((listing) => [...profileMediaIds(listing.profileValues, profiles)]);
   const mediaAssets = publicTemplateMediaAssets(publicProfileMediaAssets(mediaIds));
-  const definition = publicTemplateDefinition(getThemeSelection().templateId);
   const Renderer = definition?.renderers.home ?? DefaultPublicHome;
   return <>
     <JsonLd data={{
