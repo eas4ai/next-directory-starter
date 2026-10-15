@@ -1,0 +1,515 @@
+{
+  "schemaVersion": 1,
+  "id": "supper-restaurants.restaurants",
+  "version": "1.0.0",
+  "name": "Supper restaurants",
+  "description": "Public cuisine, neighborhood, location, price, dietary, meal, service, reservation, time-zone, hours, dish, accessibility, and media facts for a restaurant directory.",
+  "fields": [
+    {
+      "key": "supper-restaurants.restaurants.cuisines",
+      "label": "Cuisines",
+      "help": "Public cuisine categories for the restaurant.",
+      "type": "multiple-choice",
+      "cardinality": "many",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "badge",
+      "group": "Restaurant",
+      "order": 10,
+      "searchable": false,
+      "facet": {
+        "label": "Cuisine",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "seasonal",
+            "label": "Seasonal"
+          },
+          {
+            "value": "italian",
+            "label": "Italian"
+          },
+          {
+            "value": "coastal",
+            "label": "Coastal"
+          },
+          {
+            "value": "vegetarian",
+            "label": "Vegetarian"
+          },
+          {
+            "value": "east-asian",
+            "label": "East Asian"
+          },
+          {
+            "value": "middle-eastern",
+            "label": "Middle Eastern"
+          },
+          {
+            "value": "bakery",
+            "label": "Bakery"
+          },
+          {
+            "value": "mexican",
+            "label": "Mexican"
+          }
+        ]
+      }
+    },
+    {
+      "key": "supper-restaurants.restaurants.neighborhood",
+      "label": "Neighborhood",
+      "help": "The public neighborhood for local discovery.",
+      "type": "single-choice",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "card",
+      "group": "Restaurant",
+      "order": 20,
+      "searchable": false,
+      "facet": {
+        "label": "Neighborhood",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "river-ward",
+            "label": "River Ward"
+          },
+          {
+            "value": "old-quarter",
+            "label": "Old Quarter"
+          },
+          {
+            "value": "northline",
+            "label": "Northline"
+          },
+          {
+            "value": "garden-district",
+            "label": "Garden District"
+          },
+          {
+            "value": "market-row",
+            "label": "Market Row"
+          }
+        ]
+      }
+    },
+    {
+      "key": "supper-restaurants.restaurants.location",
+      "label": "Location",
+      "help": "Structured restaurant location.",
+      "type": "location",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Restaurant",
+      "order": 30,
+      "searchable": false,
+      "facet": null,
+      "sort": null,
+      "constraints": {
+        "countries": [
+          "US"
+        ]
+      }
+    },
+    {
+      "key": "supper-restaurants.restaurants.price-level",
+      "label": "Price level",
+      "help": "A broad published price signal.",
+      "type": "single-choice",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "badge",
+      "group": "Restaurant",
+      "order": 40,
+      "searchable": false,
+      "facet": {
+        "label": "Price level",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "budget",
+            "label": "$"
+          },
+          {
+            "value": "moderate",
+            "label": "$$"
+          },
+          {
+            "value": "special",
+            "label": "$$$"
+          }
+        ]
+      }
+    },
+    {
+      "key": "supper-restaurants.restaurants.typical-meal-price",
+      "label": "Typical meal price",
+      "help": "A published typical per-person meal price.",
+      "type": "money",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "card",
+      "group": "Restaurant",
+      "order": 50,
+      "searchable": false,
+      "facet": {
+        "label": "Typical price",
+        "mode": "any"
+      },
+      "sort": {
+        "label": "Typical meal price",
+        "directions": [
+          "asc",
+          "desc"
+        ]
+      },
+      "constraints": {
+        "minMinor": 500,
+        "maxMinor": 100000,
+        "currencies": [
+          "USD"
+        ]
+      }
+    },
+    {
+      "key": "supper-restaurants.restaurants.dietary-options",
+      "label": "Dietary options",
+      "help": "Dietary accommodations stated by the restaurant.",
+      "type": "multiple-choice",
+      "cardinality": "many",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Restaurant",
+      "order": 60,
+      "searchable": false,
+      "facet": {
+        "label": "Dietary",
+        "mode": "all"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "vegetarian",
+            "label": "Vegetarian"
+          },
+          {
+            "value": "vegan",
+            "label": "Vegan"
+          },
+          {
+            "value": "gluten-aware",
+            "label": "Gluten aware"
+          },
+          {
+            "value": "dairy-free",
+            "label": "Dairy free"
+          },
+          {
+            "value": "nut-aware",
+            "label": "Nut aware"
+          }
+        ]
+      }
+    },
+    {
+      "key": "supper-restaurants.restaurants.meal-periods",
+      "label": "Meal periods",
+      "help": "Meal periods currently published by the restaurant.",
+      "type": "multiple-choice",
+      "cardinality": "many",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Restaurant",
+      "order": 70,
+      "searchable": false,
+      "facet": {
+        "label": "Meal",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "breakfast",
+            "label": "Breakfast"
+          },
+          {
+            "value": "lunch",
+            "label": "Lunch"
+          },
+          {
+            "value": "dinner",
+            "label": "Dinner"
+          },
+          {
+            "value": "late-night",
+            "label": "Late night"
+          },
+          {
+            "value": "weekend-brunch",
+            "label": "Weekend brunch"
+          }
+        ]
+      }
+    },
+    {
+      "key": "supper-restaurants.restaurants.service-modes",
+      "label": "Service modes",
+      "help": "Ways food is currently served.",
+      "type": "multiple-choice",
+      "cardinality": "many",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Restaurant",
+      "order": 80,
+      "searchable": false,
+      "facet": {
+        "label": "Service",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "dine-in",
+            "label": "Dine in"
+          },
+          {
+            "value": "takeaway",
+            "label": "Takeaway"
+          },
+          {
+            "value": "patio",
+            "label": "Patio"
+          },
+          {
+            "value": "counter",
+            "label": "Counter service"
+          }
+        ]
+      }
+    },
+    {
+      "key": "supper-restaurants.restaurants.reservation-url",
+      "label": "Reservation URL",
+      "help": "The restaurant’s public reservation information page.",
+      "type": "url",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "card",
+      "group": "Restaurant",
+      "order": 90,
+      "searchable": false,
+      "facet": null,
+      "sort": null,
+      "constraints": {}
+    },
+    {
+      "key": "supper-restaurants.restaurants.time-zone",
+      "label": "Time zone",
+      "help": "The IANA time zone used for published hours.",
+      "type": "short-text",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Restaurant",
+      "order": 100,
+      "searchable": false,
+      "facet": null,
+      "sort": null,
+      "constraints": {
+        "minLength": 3,
+        "maxLength": 120,
+        "format": "iana-time-zone"
+      }
+    },
+    {
+      "key": "supper-restaurants.restaurants.opening-hours",
+      "label": "Opening hours",
+      "help": "A bounded set of published service periods in the stated time zone.",
+      "type": "group",
+      "cardinality": "many",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Visit",
+      "order": 110,
+      "searchable": false,
+      "facet": null,
+      "sort": null,
+      "constraints": {
+        "minItems": 1,
+        "maxItems": 14,
+        "children": [
+          {
+            "key": "days",
+            "label": "Days",
+            "help": "Days covered by this service period.",
+            "type": "short-text",
+            "required": true,
+            "constraints": {
+              "minLength": 2,
+              "maxLength": 80
+            }
+          },
+          {
+            "key": "opens",
+            "label": "Opens",
+            "help": "Published opening time.",
+            "type": "short-text",
+            "required": true,
+            "constraints": {
+              "minLength": 4,
+              "maxLength": 20
+            }
+          },
+          {
+            "key": "closes",
+            "label": "Closes",
+            "help": "Published closing time.",
+            "type": "short-text",
+            "required": true,
+            "constraints": {
+              "minLength": 4,
+              "maxLength": 20
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "supper-restaurants.restaurants.signature-dishes",
+      "label": "Signature dishes",
+      "help": "A bounded list of restaurant-attributed signature dishes.",
+      "type": "group",
+      "cardinality": "many",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Menu",
+      "order": 120,
+      "searchable": false,
+      "facet": null,
+      "sort": null,
+      "constraints": {
+        "minItems": 1,
+        "maxItems": 10,
+        "children": [
+          {
+            "key": "name",
+            "label": "Dish",
+            "help": "Public dish name.",
+            "type": "short-text",
+            "required": true,
+            "constraints": {
+              "minLength": 2,
+              "maxLength": 160
+            }
+          },
+          {
+            "key": "note",
+            "label": "Note",
+            "help": "Concise restaurant-supplied description.",
+            "type": "short-text",
+            "required": true,
+            "constraints": {
+              "minLength": 5,
+              "maxLength": 240
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "supper-restaurants.restaurants.accessibility",
+      "label": "Accessibility",
+      "help": "Published access features for the venue.",
+      "type": "multiple-choice",
+      "cardinality": "many",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Restaurant",
+      "order": 130,
+      "searchable": false,
+      "facet": {
+        "label": "Accessibility",
+        "mode": "all"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "step-free",
+            "label": "Step-free entrance"
+          },
+          {
+            "value": "accessible-restroom",
+            "label": "Accessible restroom"
+          },
+          {
+            "value": "outdoor-seating",
+            "label": "Outdoor seating"
+          },
+          {
+            "value": "low-sensory",
+            "label": "Low-sensory seating"
+          }
+        ]
+      }
+    },
+    {
+      "key": "supper-restaurants.restaurants.restaurant-media",
+      "label": "Restaurant media",
+      "help": "Original public food and place photography.",
+      "type": "media",
+      "cardinality": "many",
+      "required": false,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "card",
+      "group": "Restaurant",
+      "order": 140,
+      "searchable": false,
+      "facet": null,
+      "sort": null,
+      "constraints": {
+        "maxItems": 6
+      }
+    }
+  ]
+}
