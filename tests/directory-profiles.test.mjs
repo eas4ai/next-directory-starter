@@ -162,7 +162,7 @@ function completeProfile(overrides = {}) {
       { minSeconds: 0, maxSeconds: 31536000 }),
       facet: { label: "Setup time", mode: "any" } },
     { ...commonField("vendor.ai-tools.headquarters", "Headquarters", "location",
-      { countries: ["CA", "US"] }), facet: { label: "Location", mode: "any" } },
+      { countries: ["CA", "US"] }), facet: { label: "Location", mode: "all" } },
     commonField("vendor.ai-tools.screenshot", "Screenshot", "media", { maxItems: 4 }),
     commonField("vendor.ai-tools.integrations", "Integrations", "group", {
       minItems: 0,
@@ -1117,6 +1117,8 @@ requirementTest("PRF-003 parses bounded public profile facets and stable sorts",
     assert.deepEqual(slugs({ "min.vendor.ai-tools.setup-time": "3000",
       "max.vendor.ai-tools.setup-time": "4000" }), ["alpha"]);
     assert.deepEqual(slugs({ "facet.vendor.ai-tools.headquarters": "US|NY|New York" }), ["alpha"]);
+    assert.deepEqual(slugs({ "facet.vendor.ai-tools.headquarters":
+      ["US|NY|New York", "US|CA|San Francisco"] }), []);
     assert.deepEqual(slugs({ q: "Neural canvas exact phrase" }), ["alpha"]);
     assert.deepEqual(slugs({ q: "PRIVATE_PROFILE_SENTINEL_0" }), []);
     for (const sentinel of ["DRAFT_PROFILE_SENTINEL", "SUSPENDED_PROFILE_SENTINEL",
