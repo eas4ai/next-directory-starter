@@ -795,6 +795,34 @@ requirementTest("PRF-002 validates profile values with the complete listing revi
     }), /pricing-model|required/i);
   });
 
+  await t.test("requires protected fields in complete records and applies trusted defaults", async () => {
+    const api = await profileTestContext();
+    resetProfileTables(api.database);
+    const requiredSystem = authoringProfile();
+    requiredSystem.fields.find(({ key }) => key === "vendor.ai-tools.system-note").required = true;
+    activate(api, requiredSystem, 0);
+    const values = completeProfileValues({ includeSystem: false });
+    delete values["vendor.ai-tools.screenshot"];
+    const listingApi = await import("../src/lib/listings.ts");
+    const before = profileSnapshot(api.database);
+    assert.throws(() => listingApi.createListing(parseListing(listingInput(
+      "missing-required-system", values, 1, { status: "published" })), "profile-admin"),
+    /system-note|required/i);
+    assert.equal(listingApi.listingBySlug("missing-required-system"), undefined);
+    assert.deepEqual(profileSnapshot(api.database), before);
+
+    resetProfileTables(api.database);
+    const defaultedSystem = authoringProfile();
+    const systemField = defaultedSystem.fields.find(
+      ({ key }) => key === "vendor.ai-tools.system-note");
+    systemField.required = true;
+    systemField.default = "Trusted classification";
+    activate(api, defaultedSystem, 0);
+    const created = listingApi.createListing(parseListing(listingInput(
+      "defaulted-required-system", values, 1, { status: "published" })), "profile-admin");
+    assert.equal(created.profileValues["vendor.ai-tools.system-note"], "Trusted classification");
+  });
+
   await t.test("stores core and normalized values atomically and hydrates listings in a batch", async () => {
     const api = await profileTestContext();
     resetProfileTables(api.database);

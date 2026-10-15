@@ -444,12 +444,11 @@ export function validateProfileValues(input: unknown, options: {
     }
     const raw = hasValue ? supplied[field.key] : field.default;
     if (raw === undefined) {
-      if (options.requireComplete && field.required && writable(options.authority, field)) {
+      if (options.requireComplete && field.required) {
         throw new ProfileValueError(field.key, `Profile field ${field.key} is required`);
       }
       continue;
     }
-    if (!hasValue && !writable(options.authority, field)) continue;
     try {
       const value = validateProfileFieldValue(field, raw, {
         isMediaAllowed: (id) => mediaAllowed(field, options.listingSlug,
