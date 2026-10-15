@@ -1,6 +1,18 @@
 {
   "command": "node mechanisms/check-template-products.mjs",
-  "requirements": ["TPL-001", "TPL-002", "TPL-003", "TPL-004"],
+  "requirements": [
+    "TPL-001",
+    "TPL-002",
+    "TPL-003",
+    "TPL-004",
+    "TPL-005",
+    "TPL-006",
+    "TPL-007",
+    "TPL-008",
+    "TPL-009",
+    "TPL-010",
+    "TPL-011"
+  ],
   "results": "per-requirement",
   "inputs": [
     "docs/operator-manual.md",
@@ -12,7 +24,8 @@
     "package-lock.json",
     "scripts",
     "src",
-    "tests/template-products.test.mjs"
+    "tests/template-products.test.mjs",
+    "tests/template-product-series.test.mjs"
   ],
   "identity": {
     "env": [],

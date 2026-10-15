@@ -1,11 +1,14 @@
 import { spawnSync } from "node:child_process";
 import { tapRunPassed, tapTestPassed } from "./tap-results.mjs";
 
-const requirements = ["TPL-001", "TPL-002", "TPL-003", "TPL-004"];
+const requirements = [
+  "TPL-001", "TPL-002", "TPL-003", "TPL-004", "TPL-005", "TPL-006",
+  "TPL-007", "TPL-008", "TPL-009", "TPL-010", "TPL-011",
+];
 for (const requirement of requirements) {
   const test = spawnSync("node", [
     "--import", "tsx", "--test", "--test-reporter=tap",
-    "tests/template-products.test.mjs",
+    "tests/template-products.test.mjs", "tests/template-product-series.test.mjs",
   ], {
     encoding: "utf8",
     timeout: 600_000,
