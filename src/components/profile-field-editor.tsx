@@ -41,9 +41,10 @@ function nextItemId(): string {
 function atomicControl(field: FieldLike, value: unknown, onChange: Change, inputId: string,
   describedBy: string, mediaEndpoint: string, itemId = "value", profileFieldKey = field.key) {
   const common = { id: inputId, "aria-describedby": describedBy };
-  if (field.type === "short-text") return <Input {...common} type="text"
+    if (field.type === "short-text") return <Input {...common} type="text"
     required={field.required} minLength={numberConstraint(field, "minLength")}
     maxLength={numberConstraint(field, "maxLength")}
+      placeholder={field.constraints.format === "iana-time-zone" ? "America/New_York" : undefined}
     value={typeof value === "string" ? value : ""}
     onChange={(event) => onChange(event.target.value)} />;
   if (field.type === "markdown") return <textarea {...common} className={areaClass}
@@ -113,9 +114,10 @@ function atomicControl(field: FieldLike, value: unknown, onChange: Change, input
     min={stringConstraint(field, "min")} max={stringConstraint(field, "max")}
     value={typeof value === "string" ? value : ""}
     onChange={(event) => onChange(event.target.value || undefined)} />;
-  if (field.type === "datetime") return <Input {...common} type="datetime-local" required={field.required}
-    value={typeof value === "string" ? value.replace(/:00\.000Z$/, "") : ""}
-    onChange={(event) => onChange(event.target.value ? new Date(event.target.value).toISOString() : undefined)} />;
+    if (field.type === "datetime") return <Input {...common} type="text" required={field.required}
+      placeholder="2026-10-15T13:00:00-04:00"
+      value={typeof value === "string" ? value : ""}
+      onChange={(event) => onChange(event.target.value || undefined)} />;
   if (field.type === "date-range") {
     const range = value && typeof value === "object" ? value as { start?: string; end?: string } : {};
     return <fieldset className="grid gap-3 rounded-md border p-3" aria-describedby={describedBy}>

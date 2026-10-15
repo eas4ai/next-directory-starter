@@ -481,6 +481,21 @@ requirementTest("PRF-001 activates immutable versioned directory-profile definit
     const url = profile.fields.find(({ type }) => type === "url");
     assert.throws(() => api.validateProfileFieldValue(url,
       "https://user:secret@example.com", {}), /credential|URL/i);
+      const datetime = profile.fields.find(({ type }) => type === "datetime");
+      assert.throws(() => api.validateProfileFieldValue(datetime,
+        "2026-10-14T16:00:00", {}), /explicit|offset|date\/time/i);
+      const zoneDefinition = completeProfile();
+      zoneDefinition.fields.push(commonField("vendor.ai-tools.time-zone", "Time zone", "short-text",
+        { minLength: 3, maxLength: 120, format: "iana-time-zone" }));
+      const zoneField = api.parseDirectoryProfileDefinition(zoneDefinition).fields
+        .find(({ key }) => key === "vendor.ai-tools.time-zone");
+      assert.equal(api.validateProfileFieldValue(zoneField, "America/New_York", {}),
+        "America/New_York");
+      assert.throws(() => api.validateProfileFieldValue(zoneField, "Not/A_Time_Zone", {}),
+        /IANA|time zone/i);
+      const invalidFormat = structuredClone(zoneDefinition);
+      invalidFormat.fields.at(-1).constraints.format = "arbitrary-pattern";
+      assert.throws(() => api.parseDirectoryProfileDefinition(invalidFormat), /format/i);
     const repeatedMedia = { ...profile.fields.find(({ type }) => type === "media"),
       cardinality: "many", constraints: { maxItems: 2 } };
     assert.throws(() => api.validateProfileFieldValue(repeatedMedia, [
@@ -559,6 +574,12 @@ requirementTest("PRF-001 activates immutable versioned directory-profile definit
     activate(api, completeProfile(), 0);
     insertListing(api.database);
     insertValue(api.database);
+      const narrowedText = completeProfile({ version: "1.0.1" });
+      narrowedText.fields.find(({ key }) => key === "vendor.ai-tools.tagline")
+        .constraints.format = "iana-time-zone";
+      const narrowedTextImpact = api.profileImpact({ definition: narrowedText, expectedRevision: 1 });
+      assert.equal(narrowedTextImpact.compatible, false);
+      assert.ok(narrowedTextImpact.breakingFields.includes("vendor.ai-tools.tagline"));
     const compatible = completeProfile({ version: "1.1.0", fields: [
       ...completeProfile().fields,
       commonField("vendor.ai-tools.support-email", "Support email", "short-text",
@@ -941,9 +962,12 @@ requirementTest("PRF-002 validates profile values with the complete listing revi
       "Launched", "Updated", "Availability", "Setup time", "Headquarters",
       "Screenshot", "Integrations", "Add integration", "Move integration-slack up",
       "Remove integration-slack"]) assert.match(operatorHtml, new RegExp(text, "i"));
-    for (const type of ["checkbox", "number", "url", "date", "datetime-local"]) {
+      for (const type of ["checkbox", "number", "url", "date"]) {
       assert.match(operatorHtml, new RegExp(`type=["']${type}["']`, "i"));
     }
+      assert.doesNotMatch(operatorHtml, /type=["']datetime-local["']/i);
+      assert.match(operatorHtml, /value="2026-10-14T16:00:00\.000Z"/,
+        "date/time editor does not preserve the stored explicit-offset value");
     assert.match(operatorHtml, /<textarea/i);
     assert.match(operatorHtml, /aria-describedby=/i);
     assert.match(operatorHtml, /<fieldset/i);

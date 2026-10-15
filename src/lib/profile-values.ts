@@ -5,7 +5,9 @@ import type {
   ProfileChildField, ProfileGroupItem, ProfileLocation, ProfileMoney, ProfileRepeatedValue,
   ProfileValueSet, ValidatedProfileValues,
 } from "@/lib/directory-profile-types";
-import { validProfileDate } from "../../scripts/addons/profile-schema.mjs";
+import {
+  validIanaTimeZone, validProfileDate, validProfileDateTime,
+} from "../../scripts/addons/profile-schema.mjs";
 
 type ValueContext = { isMediaAllowed?: (id: string) => boolean };
 
@@ -104,6 +106,8 @@ function validateScalar(field: DirectoryProfileField | ProfileChildField, input:
     if (value.length < minimum || value.length > maximum) {
       throw new Error(`${field.label} length is outside its constraints`);
     }
+    if (field.type === "short-text" && constraints(field).format === "iana-time-zone" &&
+        !validIanaTimeZone(value)) throw new Error(`${field.label} must be a canonical IANA time zone`);
     if (field.type === "markdown" && !safeMarkdown(value)) {
       throw new Error(`${field.label} contains unsafe Markdown or active content`);
     }
@@ -164,8 +168,8 @@ function validateScalar(field: DirectoryProfileField | ProfileChildField, input:
     return input;
   }
   if (field.type === "datetime") {
-    if (typeof input !== "string" || Number.isNaN(Date.parse(input))) {
-      throw new Error(`${field.label} has an invalid date/time`);
+      if (!validProfileDateTime(input)) {
+        throw new Error(`${field.label} must include an explicit date/time offset`);
     }
     const value = new Date(input).toISOString();
     if (value < stringConstraint(field, "min") || value > stringConstraint(field, "max")) {
