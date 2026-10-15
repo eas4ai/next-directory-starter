@@ -179,7 +179,7 @@ function generatedTypescript({ themes, templates, profiles, rendererTemplates })
     templates.length
       ? `export const addonTemplateOptions = [${templates.map(({ template }) =>
         `{ id: ${JSON.stringify(template.id)}, name: ${JSON.stringify(template.name)}` +
-          (template.renderer ? `, supportedProfiles: ${JSON.stringify(template.supportedProfiles)}` : "") +
+          `, supportedProfiles: ${JSON.stringify(template.supportedProfiles)}` +
           " }").join(", ")}] as const;`
       : "export const addonTemplateOptions: readonly { id: string; name: string; " +
         "supportedProfiles?: readonly { id: string; range: string }[] }[] = [];",

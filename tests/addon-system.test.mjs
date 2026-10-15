@@ -278,6 +278,9 @@ requirementTest("ADD-002 installs and removes owned files transactionally throug
     }]);
     assert.match(generated, /addonProfileDefinitions/);
     assert.match(generated, /reference-addon\.ai-tools/);
+    assert.match(generated,
+      /supportedProfiles:\s*\[\{"id":"reference-addon\.ai-tools","range":"\^1\.0\.0"\}\]/,
+      "stylesheet templates lost their declared profile compatibility");
     assert.ok(lock.addons[0].files.every((file) => /^[a-f0-9]{64}$/.test(file.sha256)));
 
     const interruptedRemoval = run(source, ["remove", "reference-addon"], {
