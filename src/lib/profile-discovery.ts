@@ -383,9 +383,12 @@ function valuesFacetSql(descriptor: ProfileDiscoveryDescriptor, values: string[]
     const alternatives = values.map(() =>
       "(v.country_code = ? AND v.region IS ? AND v.locality IS ?)").join(" OR ");
     const args = values.flatMap(locationParts);
+    const count = field.facet?.mode === "all" ?
+      ` GROUP BY v.listing_slug HAVING COUNT(DISTINCT v.country_code || char(31) ||
+        COALESCE(v.region, '') || char(31) || COALESCE(v.locality, '')) = ?` : "";
     return { sql: `EXISTS (SELECT 1 FROM directory_profile_values AS v INDEXED BY ${index}
-      WHERE v.listing_slug = l.slug AND ${prefix.sql} AND (${alternatives}))`,
-    args: [...prefix.args, ...args] };
+      WHERE v.listing_slug = l.slug AND ${prefix.sql} AND (${alternatives})${count})`,
+    args: [...prefix.args, ...args, ...(count ? [values.length] : [])] };
   }
   const column = field.type === "boolean" ? "integer_value" : "text_value";
   const prefix = activeValuePrefix(descriptor, column);
