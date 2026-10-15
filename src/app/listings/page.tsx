@@ -63,6 +63,7 @@ export async function generateMetadata({ searchParams }: PageProps<"/listings">)
 }
 
 export default async function ListingsPage({ searchParams }: PageProps<"/listings">) {
+  await connection();
   const input = await searchParams;
   const profiles = activeDirectoryProfiles();
   const fields = profiles.definitions.flatMap((definition) => definition.fields);

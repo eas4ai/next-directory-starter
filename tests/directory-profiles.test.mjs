@@ -811,6 +811,9 @@ requirementTest("PRF-002 validates profile values with the complete listing revi
     assert.match(operatorHtml, /<textarea/i);
     assert.match(operatorHtml, /aria-describedby=/i);
     assert.match(operatorHtml, /<fieldset/i);
+    assert.match(operatorHtml,
+      /<input(?=[^>]*type="file")(?=[^>]*aria-label="Screenshot image file")[^>]*>/i,
+      "profile media file input needs a field-specific accessible label");
     const ownerHtml = renderToStaticMarkup(React.createElement(ProfileFieldEditor, {
       fields: profile.fields, values: completeProfileValues({ includeOperator: false,
         includeSystem: false }), authority: "owner", mediaEndpoint: "/api/profile-media/profile-values",
@@ -1048,7 +1051,7 @@ async function startProfileApp() {
     if (child.exitCode !== null) assert.fail(`profile browser server exited early\n${output}`);
     try {
       const response = await fetch(`${origin}/listings`);
-      if (response.ok) return { origin, child };
+      if (response.ok) return { origin, child, output: () => output };
     } catch {}
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
   }
@@ -1249,7 +1252,7 @@ requirementTest("PRF-003 parses bounded public profile facets and stable sorts",
     await setupDiscoveryCatalog();
     assert.ok(existsSync(join(repository, "src/components/profile-facets.tsx")),
       "browser discovery controls are missing");
-    const { origin, child } = await startProfileApp();
+    const { origin, child, output: serverOutput } = await startProfileApp();
     const browser = await chromium.launch({ headless: true,
       ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: "chrome" }),
       args: ["--no-sandbox"] });
@@ -1302,6 +1305,9 @@ requirementTest("PRF-003 parses bounded public profile facets and stable sorts",
         }
         await narrow.close();
       }
+      assert.doesNotMatch(serverOutput(),
+        /unstable value|blocking-prerender-current-time/i,
+        "public directory rendering must not trigger a Next.js prerender error");
     } finally {
       await browser.close();
       child.kill("SIGTERM");
