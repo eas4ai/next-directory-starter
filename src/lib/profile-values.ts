@@ -412,6 +412,17 @@ function profileFields(profiles: ActiveProfileSet): Map<string, DirectoryProfile
     definition.fields.map((field) => [field.key, field] as const)));
 }
 
+function rawProfileFieldValue(supplied: ProfileValueSet, field: DirectoryProfileField,
+  authority: "operator" | "owner" | "system", applyDefaults: boolean): unknown {
+  const suppliedField = Object.hasOwn(supplied, field.key);
+  if (suppliedField && !writable(authority, field)) {
+    throw new ProfileValueError(field.key,
+      `Profile field ${field.key} is outside ${authority} write authority`);
+  }
+  if (suppliedField && supplied[field.key] !== undefined) return supplied[field.key];
+  return applyDefaults ? field.default : undefined;
+}
+
 function mediaAllowed(field: DirectoryProfileField, listingSlug: string | undefined,
   actorUserId: string | undefined, authority: "operator" | "owner" | "system", id: string): boolean {
   if (!listingSlug || !actorUserId) return false;
@@ -427,6 +438,7 @@ export function validateProfileValues(input: unknown, options: {
   listingSlug?: string;
   actorUserId?: string;
   requireComplete: boolean;
+  applyDefaults?: boolean;
 }): ValidatedProfileValues {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     throw new ProfileValueError("_profile", "Profile values must be an object");
@@ -437,12 +449,8 @@ export function validateProfileValues(input: unknown, options: {
   if (unknown) throw new ProfileValueError(unknown, `Unknown profile field: ${unknown}`);
   const result: ProfileValueSet = {};
   for (const field of fields.values()) {
-    const hasValue = Object.hasOwn(supplied, field.key) && supplied[field.key] !== undefined;
-    if (hasValue && !writable(options.authority, field)) {
-      throw new ProfileValueError(field.key,
-        `Profile field ${field.key} is outside ${options.authority} write authority`);
-    }
-    const raw = hasValue ? supplied[field.key] : field.default;
+    const raw = rawProfileFieldValue(supplied, field, options.authority,
+      options.applyDefaults !== false);
     if (raw === undefined) {
       if (options.requireComplete && field.required) {
         throw new ProfileValueError(field.key, `Profile field ${field.key} is required`);

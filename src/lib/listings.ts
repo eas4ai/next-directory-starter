@@ -1,4 +1,5 @@
 import { database } from "@/lib/database";
+import { isDeepStrictEqual } from "node:util";
 import { migrateCatalog } from "@/lib/catalog-migrations";
 import { recordAudit } from "@/lib/audit";
 import { checkoutMode } from "@/lib/plans";
@@ -154,6 +155,32 @@ export function createListing(listing: Listing, actorUserId: string): Listing {
   }).immediate();
 }
 
+function changedProfileValues(current: ProfileValueSet, proposed: ProfileValueSet): {
+  keys: string[];
+  values: ProfileValueSet;
+} {
+  const keys = [...new Set([...Object.keys(current), ...Object.keys(proposed)])]
+    .filter((key) => !isDeepStrictEqual(current[key], proposed[key]));
+  return { keys, values: Object.fromEntries(keys.map((key) =>
+    [key, Object.hasOwn(proposed, key) ? proposed[key] : undefined])) };
+}
+
+function validatedProfileUpdate(current: ProfileValueSet, proposed: ProfileValueSet,
+  profiles: ReturnType<typeof activeDirectoryProfiles>, listingSlug: string,
+  actorUserId: string): ReturnType<typeof validateProfileValues> {
+  const changes = changedProfileValues(current, proposed);
+  const authorized = validateProfileValues(changes.values, { profiles,
+    authority: "operator", listingSlug, actorUserId, requireComplete: false,
+    applyDefaults: false });
+  const merged = { ...current };
+  for (const key of changes.keys) {
+    if (Object.hasOwn(authorized, key)) merged[key] = authorized[key];
+    else delete merged[key];
+  }
+  return validateProfileValues(merged, { profiles, authority: "system", listingSlug,
+    actorUserId, requireComplete: true });
+}
+
 export function updateListing(listing: Listing, actorUserId: string, expectedRevision: number): Listing {
   return database.transaction(() => {
     const current = database.prepare("SELECT * FROM listings WHERE slug = ?")
@@ -182,8 +209,10 @@ export function updateListing(listing: Listing, actorUserId: string, expectedRev
     if (listing.profileStateRevision !== profiles.state.revision) {
       throw new HttpError(409, "Directory profile changed since this listing was opened");
     }
-    const values = validateProfileValues(listing.profileValues, { profiles,
-      authority: "operator", listingSlug: listing.slug, actorUserId, requireComplete: true });
+    const currentValues = profileValuesForListings([listing.slug], { includePrivate: true })
+      .get(listing.slug) ?? {};
+    const values = validatedProfileUpdate(currentValues, listing.profileValues, profiles,
+      listing.slug, actorUserId);
     database.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)").run(listing.category);
     database.prepare(`UPDATE listings SET name = ?, summary = ?, description = ?,
         category = ?, url = ?, destination_key = ?, status = ?, revision = revision + 1
