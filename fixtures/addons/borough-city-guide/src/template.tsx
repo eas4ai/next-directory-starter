@@ -159,9 +159,11 @@ const boroughTemplate = {
             <div className="borough-results-heading"><h2>{value.total} local {value.total === 1 ? "place" : "places"}</h2>
               <span>Current, public recommendations</span></div>
             {value.listings.length === 0
-              ? <div className="borough-empty"><h3>No places fit that route yet.</h3>
-                <p>Clear a filter to return to the full city guide.</p>
-                <TemplateLink href="/listings">Clear filters</TemplateLink></div>
+              ? <section className="borough-empty" aria-live="polite">
+                <strong>This route is quiet today.</strong>
+                <span>Clear a filter to return to the full city guide.</span>
+                <TemplateLink href="/listings">Browse every place</TemplateLink>
+              </section>
               : <div className="borough-card-grid">{value.listings.map((listing) =>
                 <div key={listing.slug} data-borough-result={listing.slug}>
                   <Card listing={listing} fields={value.fields} mediaAssets={value.mediaAssets}
@@ -195,10 +197,6 @@ const boroughTemplate = {
               listing={detail.listing} mediaAssets={detail.mediaAssets} /></aside>
         </div>
       </main>;
-    },
-    empty({ message }) {
-      return <div className="borough-empty"><h3>No places fit that route yet.</h3><p>{message}</p>
-        <TemplateLink href="/listings">Clear filters</TemplateLink></div>;
     },
     pagination({ value }) {
       return <TemplatePagination value={value} />;

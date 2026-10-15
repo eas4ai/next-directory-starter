@@ -9,6 +9,27 @@ function exactKeys(value, keys) {
   return Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 }
 
+function parseSeedMedia(media, listingIndex, mediaIndex) {
+  if (!media || typeof media !== "object" || Array.isArray(media) ||
+      !exactKeys(media, ["source", "field", "alt"]) ||
+      typeof media.source !== "string" || !sourcePattern.test(media.source) ||
+      typeof media.field !== "string" || !fieldPattern.test(media.field) ||
+      typeof media.alt !== "string" || !media.alt.trim() || media.alt !== media.alt.trim() ||
+      media.alt.length > 160) {
+    throw new Error(`Invalid add-on seed media at listing ${listingIndex}, item ${mediaIndex}`);
+  }
+  return { listingIndex, mediaIndex, source: media.source, field: media.field, alt: media.alt };
+}
+
+function listingMediaDeclarations(listing, listingIndex) {
+  if (!listing || typeof listing !== "object" || Array.isArray(listing) ||
+      listing.media === undefined) return [];
+  if (!Array.isArray(listing.media) || listing.media.length > 20) {
+    throw new Error(`Invalid add-on seed media at listing index ${listingIndex}`);
+  }
+  return listing.media.map((media, mediaIndex) => parseSeedMedia(media, listingIndex, mediaIndex));
+}
+
 export function seedMediaDeclarations(input) {
   if (!input || typeof input !== "object" || Array.isArray(input) || !Array.isArray(input.listings)) {
     return [];
@@ -16,25 +37,12 @@ export function seedMediaDeclarations(input) {
   const declarations = [];
   const sources = new Set();
   for (const [listingIndex, listing] of input.listings.entries()) {
-    if (!listing || typeof listing !== "object" || Array.isArray(listing) || listing.media === undefined) {
-      continue;
-    }
-    if (!Array.isArray(listing.media) || listing.media.length > 20) {
-      throw new Error(`Invalid add-on seed media at listing index ${listingIndex}`);
-    }
-    for (const [mediaIndex, media] of listing.media.entries()) {
-      if (!media || typeof media !== "object" || Array.isArray(media) ||
-          !exactKeys(media, ["source", "field", "alt"]) ||
-          typeof media.source !== "string" || !sourcePattern.test(media.source) ||
-          typeof media.field !== "string" || !fieldPattern.test(media.field) ||
-          typeof media.alt !== "string" || !media.alt.trim() || media.alt !== media.alt.trim() ||
-          media.alt.length > 160) {
-        throw new Error(`Invalid add-on seed media at listing ${listingIndex}, item ${mediaIndex}`);
+    for (const declaration of listingMediaDeclarations(listing, listingIndex)) {
+      if (sources.has(declaration.source)) {
+        throw new Error(`Duplicate add-on seed media source: ${declaration.source}`);
       }
-      if (sources.has(media.source)) throw new Error(`Duplicate add-on seed media source: ${media.source}`);
-      sources.add(media.source);
-      declarations.push({ listingIndex, mediaIndex, source: media.source,
-        field: media.field, alt: media.alt });
+      sources.add(declaration.source);
+      declarations.push(declaration);
     }
   }
   return declarations;

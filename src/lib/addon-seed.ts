@@ -252,9 +252,109 @@ function priorSeedRun(addon: LockAddon, seedDigest: string): number | null {
   return same.record_count;
 }
 
-export async function seedInstalledAddon(rootInput: string, addonId: string): Promise<{
-  inserted: number; existing: number;
-}> {
+type SeedResult = { inserted: number; existing: number };
+
+function seedStatements() {
+  return {
+    insertCategory: database.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)"),
+    insertListing: database.prepare(`INSERT INTO listings
+      (slug, name, summary, description, category, url, destination_key, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`),
+    insertAsset: database.prepare(`INSERT INTO media_assets
+      (id, target_kind, target_slug, uploaded_by, alt, width, height, created_at)
+      VALUES (?, 'listing', ?, 'addon-seed', ?, ?, ?, ?)`),
+    assignMedia: database.prepare(`INSERT INTO directory_profile_media
+      (asset_id, listing_slug, field_key, item_id, state, uploaded_by, created_at)
+      VALUES (?, ?, ?, ?, 'public', 'addon-seed', ?)`),
+    clearCleanup: database.prepare("DELETE FROM media_cleanup_queue WHERE asset_id = ?"),
+  };
+}
+
+type SeedStatements = ReturnType<typeof seedStatements>;
+
+function queuePreparedMedia(prepared: Map<string, PreparedSeedMedia[]>): void {
+  const queuedAt = new Date().toISOString();
+  const queue = database.prepare(`INSERT OR IGNORE INTO media_cleanup_queue
+    (asset_id, queued_at) VALUES (?, ?)`);
+  for (const images of prepared.values()) for (const image of images) {
+    queue.run(image.id, queuedAt);
+  }
+}
+
+function writePreparedMedia(prepared: Map<string, PreparedSeedMedia[]>): void {
+  for (const images of prepared.values()) for (const image of images) {
+    mkdirSync(dirname(image.file), { recursive: true });
+    writeFileSync(image.file, image.output, { flag: "wx" });
+  }
+}
+
+function insertSeedListing(record: ValidatedSeedListing, images: PreparedSeedMedia[],
+  profiles: ActiveProfileSet, statements: SeedStatements, now: string): void {
+  const { listing, destination } = record;
+  statements.insertCategory.run(listing.category);
+  statements.insertListing.run(listing.slug, listing.name, listing.summary, listing.description,
+    listing.category, listing.url, destination, listing.status);
+  const rawValues = { ...record.rawValues };
+  for (const image of images) {
+    statements.insertAsset.run(image.id, listing.slug, image.alt, image.width, image.height, now);
+    statements.assignMedia.run(image.id, listing.slug, image.field, image.itemId, now);
+    const values = rawValues[image.field] as { id: string; value: string }[] | undefined;
+    rawValues[image.field] = [...(values ?? []), { id: image.itemId, value: image.id }];
+    statements.clearCleanup.run(image.id);
+  }
+  const values = validateProfileValues(rawValues, { profiles, authority: "system",
+    listingSlug: listing.slug, actorUserId: "addon-seed", requireComplete: true });
+  replaceListingProfileValues({ listingSlug: listing.slug, values, profiles });
+}
+
+type SeedCommitContext = {
+  seed: AddonSeed;
+  addon: LockAddon;
+  profile: LockProfile;
+  expectedProfiles: ActiveProfileSet;
+  records: ValidatedSeedListing[];
+  prepared: Map<string, PreparedSeedMedia[]>;
+  digest: string;
+};
+
+function commitSeed({ seed, addon, profile, expectedProfiles, records, prepared,
+  digest }: SeedCommitContext): SeedResult {
+  return database.transaction(() => {
+    const profiles = matchingActiveProfiles(seed.profile, profile.digest);
+    if (profiles.state.revision !== expectedProfiles.state.revision) {
+      throw new Error("Directory profile changed before the seed transaction");
+    }
+    const repeated = priorSeedRun(addon, digest);
+    if (repeated !== null) return { inserted: 0, existing: repeated };
+    requireNoCatalogConflicts(records);
+    const now = new Date().toISOString();
+    const statements = seedStatements();
+    for (const record of records) {
+      insertSeedListing(record, prepared.get(record.listing.slug) ?? [], profiles, statements, now);
+    }
+    database.prepare(`INSERT INTO directory_profile_seed_runs
+      (addon_id, addon_version, seed_digest, profile_id, profile_version, record_count, applied_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run(addon.id, addon.version, digest, profile.id, profile.version, records.length, now);
+    return { inserted: records.length, existing: 0 };
+  }).immediate();
+}
+
+function persistPreparedSeed(context: SeedCommitContext): SeedResult {
+  drainMediaCleanupQueue();
+  queuePreparedMedia(context.prepared);
+  try {
+    writePreparedMedia(context.prepared);
+    const result = commitSeed(context);
+    drainMediaCleanupQueue();
+    return result;
+  } catch (error) {
+    drainMediaCleanupQueue();
+    throw error;
+  }
+}
+
+export async function seedInstalledAddon(rootInput: string, addonId: string): Promise<SeedResult> {
   const root = resolve(rootInput);
   const lock = readAddonLock(root) as AddonLock;
   const addon = lock.addons.find(({ id }) => id === addonId);
@@ -273,68 +373,6 @@ export async function seedInstalledAddon(rootInput: string, addonId: string): Pr
   if (previous !== null) return { inserted: 0, existing: previous };
   requireNoCatalogConflicts(records);
   const preparedMedia = await prepareSeedMedia(root, addon, records);
-  drainMediaCleanupQueue();
-  const cleanupAt = new Date().toISOString();
-  const queueCleanup = database.prepare(`INSERT OR IGNORE INTO media_cleanup_queue
-    (asset_id, queued_at) VALUES (?, ?)`);
-  for (const media of preparedMedia.values()) for (const image of media) {
-    queueCleanup.run(image.id, cleanupAt);
-  }
-
-  try {
-    for (const media of preparedMedia.values()) for (const image of media) {
-      mkdirSync(dirname(image.file), { recursive: true });
-      writeFileSync(image.file, image.output, { flag: "wx" });
-    }
-    const result = database.transaction(() => {
-      const active = matchingActiveProfiles(seed.profile, profile.digest);
-      if (active.state.revision !== profiles.state.revision) {
-        throw new Error("Directory profile changed before the seed transaction");
-      }
-      const repeated = priorSeedRun(addon, digest);
-      if (repeated !== null) return { inserted: 0, existing: repeated };
-      requireNoCatalogConflicts(records);
-      const now = new Date().toISOString();
-      const insertCategory = database.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)");
-      const insertListing = database.prepare(`INSERT INTO listings
-        (slug, name, summary, description, category, url, destination_key, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
-      const insertAsset = database.prepare(`INSERT INTO media_assets
-        (id, target_kind, target_slug, uploaded_by, alt, width, height, created_at)
-        VALUES (?, 'listing', ?, 'addon-seed', ?, ?, ?, ?)`);
-      const assignMedia = database.prepare(`INSERT INTO directory_profile_media
-        (asset_id, listing_slug, field_key, item_id, state, uploaded_by, created_at)
-        VALUES (?, ?, ?, ?, 'public', 'addon-seed', ?)`);
-      const clearCleanup = database.prepare("DELETE FROM media_cleanup_queue WHERE asset_id = ?");
-      for (const record of records) {
-        const { listing, destination } = record;
-        insertCategory.run(listing.category);
-        insertListing.run(listing.slug, listing.name, listing.summary, listing.description,
-          listing.category, listing.url, destination, listing.status);
-        const rawValues = { ...record.rawValues };
-        for (const image of preparedMedia.get(listing.slug) ?? []) {
-          insertAsset.run(image.id, listing.slug, image.alt, image.width, image.height, now);
-          assignMedia.run(image.id, listing.slug, image.field, image.itemId, now);
-          const values = rawValues[image.field] as { id: string; value: string }[] | undefined;
-          rawValues[image.field] = [...(values ?? []), { id: image.itemId, value: image.id }];
-          clearCleanup.run(image.id);
-        }
-        const values = validateProfileValues(rawValues, { profiles: active,
-          authority: "system", listingSlug: listing.slug, actorUserId: "addon-seed",
-          requireComplete: true });
-        replaceListingProfileValues({ listingSlug: listing.slug, values, profiles: active });
-      }
-      database.prepare(`INSERT INTO directory_profile_seed_runs
-        (addon_id, addon_version, seed_digest, profile_id, profile_version, record_count, applied_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)`)
-        .run(addon.id, addon.version, digest, profile.id, profile.version,
-          records.length, now);
-      return { inserted: records.length, existing: 0 };
-    }).immediate();
-    drainMediaCleanupQueue();
-    return result;
-  } catch (error) {
-    drainMediaCleanupQueue();
-    throw error;
-  }
+  return persistPreparedSeed({ seed, addon, profile, expectedProfiles: profiles, records,
+    prepared: preparedMedia, digest });
 }
