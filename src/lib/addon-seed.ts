@@ -10,7 +10,8 @@ import { parseListing } from "@/lib/catalog-input";
 import { database } from "@/lib/database";
 import { activeDirectoryProfiles } from "@/lib/directory-profiles";
 import { normalizeListingDestination } from "@/lib/listing-destinations";
-import { drainMediaCleanupQueue, mediaFilePath, normalizeMediaImage } from "@/lib/media";
+import { discardReservedMediaFile, drainMediaCleanupQueue, mediaFilePath, normalizeMediaImage,
+  reserveMediaFileCleanup } from "@/lib/media";
 import { encodeProfileValue, replaceListingProfileValues,
   validateProfileValues } from "@/lib/profile-values";
 import type { ActiveProfileSet, ValidatedProfileValues } from "@/lib/directory-profile-types";
@@ -272,20 +273,26 @@ function seedStatements() {
 
 type SeedStatements = ReturnType<typeof seedStatements>;
 
-function queuePreparedMedia(prepared: Map<string, PreparedSeedMedia[]>): void {
-  const queuedAt = new Date().toISOString();
-  const queue = database.prepare(`INSERT OR IGNORE INTO media_cleanup_queue
-    (asset_id, queued_at) VALUES (?, ?)`);
+function visitPreparedMedia(prepared: Map<string, PreparedSeedMedia[]>,
+  visit: (image: PreparedSeedMedia) => void): void {
   for (const images of prepared.values()) for (const image of images) {
-    queue.run(image.id, queuedAt);
+    visit(image);
   }
 }
 
+function updatePreparedMediaReservations(prepared: Map<string, PreparedSeedMedia[]>,
+  action: "reserve" | "discard"): void {
+  visitPreparedMedia(prepared, (image) => {
+    if (action === "reserve") reserveMediaFileCleanup(image.id);
+    else discardReservedMediaFile(image.id);
+  });
+}
+
 function writePreparedMedia(prepared: Map<string, PreparedSeedMedia[]>): void {
-  for (const images of prepared.values()) for (const image of images) {
+  visitPreparedMedia(prepared, (image) => {
     mkdirSync(dirname(image.file), { recursive: true });
     writeFileSync(image.file, image.output, { flag: "wx" });
-  }
+  });
 }
 
 function insertSeedListing(record: ValidatedSeedListing, images: PreparedSeedMedia[],
@@ -342,13 +349,14 @@ function commitSeed({ seed, addon, profile, expectedProfiles, records, prepared,
 
 function persistPreparedSeed(context: SeedCommitContext): SeedResult {
   drainMediaCleanupQueue();
-  queuePreparedMedia(context.prepared);
+  updatePreparedMediaReservations(context.prepared, "reserve");
   try {
     writePreparedMedia(context.prepared);
     const result = commitSeed(context);
     drainMediaCleanupQueue();
     return result;
   } catch (error) {
+    updatePreparedMediaReservations(context.prepared, "discard");
     drainMediaCleanupQueue();
     throw error;
   }

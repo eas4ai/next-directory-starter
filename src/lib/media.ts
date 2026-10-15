@@ -15,6 +15,7 @@ migrateCatalog();
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const PRIVATE_UPLOAD_LIMIT = 30;
 const PRIVATE_UPLOAD_WINDOW_MS = 60 * 60 * 1000;
+const MEDIA_WRITE_LEASE_MS = 60 * 60 * 1000;
 export type MediaKind = "listing" | "article";
 export type MediaAsset = { id: string; kind: MediaKind; slug: string; alt: string; width: number; height: number };
 export class MediaError extends HttpError {}
@@ -46,7 +47,8 @@ function isMissingFile(error: unknown): boolean {
 
 export function drainMediaCleanupQueue(): void {
   const queued = database.prepare(`SELECT asset_id FROM media_cleanup_queue
-    ORDER BY queued_at, asset_id LIMIT 100`).all() as { asset_id: string }[];
+    WHERE queued_at <= ? ORDER BY queued_at, asset_id LIMIT 100`)
+    .all(new Date().toISOString()) as { asset_id: string }[];
   for (const { asset_id: id } of queued) {
     try {
       unlinkSync(mediaFilePath(id));
@@ -62,6 +64,23 @@ export function drainMediaCleanupQueue(): void {
       console.error(`Media cleanup record could not be cleared for ${id}`, error);
     }
   }
+}
+
+export function reserveMediaFileCleanup(id: string): void {
+  const notBefore = new Date(Date.now() + MEDIA_WRITE_LEASE_MS).toISOString();
+  queueMediaFileCleanup.run(id, notBefore);
+}
+
+export function discardReservedMediaFile(id: string): void {
+  try {
+    unlinkSync(mediaFilePath(id));
+  } catch (error) {
+    if (!isMissingFile(error)) {
+      console.error(`Reserved media cleanup deferred for ${id}`, error);
+      return;
+    }
+  }
+  database.prepare("DELETE FROM media_cleanup_queue WHERE asset_id = ?").run(id);
 }
 
 function queueUnreferencedMediaAsset(id: string, queuedAt: string): void {
@@ -177,12 +196,12 @@ export async function uploadPrivateImage(input: {
   const id = randomUUID();
   const directory = mediaDirectory();
   const file = mediaFilePath(id);
-  const queuedAt = new Date().toISOString();
-  queueMediaFileCleanup.run(id, queuedAt);
+  reserveMediaFileCleanup(id);
   try {
     mkdirSync(directory, { recursive: true });
     writeFileSync(file, output, { flag: "wx" });
   } catch (error) {
+    discardReservedMediaFile(id);
     drainMediaCleanupQueue();
     throw error;
   }
@@ -228,6 +247,7 @@ export async function uploadPrivateImage(input: {
       database.prepare("DELETE FROM media_cleanup_queue WHERE asset_id = ?").run(id);
     }).immediate();
   } catch (error) {
+    discardReservedMediaFile(id);
     drainMediaCleanupQueue();
     throw error;
   }
@@ -280,12 +300,12 @@ export async function uploadProfileMedia(input: {
     input.bytes, input.mimeType, input.alt);
   const id = randomUUID();
   const file = mediaFilePath(id);
-  const queuedAt = new Date().toISOString();
-  queueMediaFileCleanup.run(id, queuedAt);
+  reserveMediaFileCleanup(id);
   try {
     mkdirSync(mediaDirectory(), { recursive: true });
     writeFileSync(file, output, { flag: "wx" });
   } catch (error) {
+    discardReservedMediaFile(id);
     drainMediaCleanupQueue();
     throw error;
   }
@@ -312,6 +332,7 @@ export async function uploadProfileMedia(input: {
       database.prepare("DELETE FROM media_cleanup_queue WHERE asset_id = ?").run(id);
     }).immediate();
   } catch (error) {
+    discardReservedMediaFile(id);
     drainMediaCleanupQueue();
     throw error;
   }
