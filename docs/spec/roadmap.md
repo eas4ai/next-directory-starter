@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: directory-profile-standard
+Current: vector-ai-tools-template
 
 ## public-starter-and-theme
 
@@ -442,6 +442,35 @@ sorting, pagination, canonical and noindex behavior, privacy, and 320-pixel
 layouts pass the bound mechanism; typed seed and agent-import paths enforce the
 active schema; and add-on removal, migration, backup, isolated restore, and
 upgrade preserve current and archived profile data.
+
+## vector-ai-tools-template
+
+Requirements: TPL-001, TPL-002
+
+Delivery: extend installable public templates with a typed renderer SDK for the
+public shell, home discovery, directory results, listing detail, reusable
+states, footer, and comparison while core routes retain data access,
+eligibility, authorization, metadata, and crawl behavior. Keep stylesheet-only
+add-ons compatible and validate renderer identity, imports, integrity,
+ownership, and profile compatibility before installation writes. Use that SDK
+to ship VECTOR as a complete AI-tools directory add-on with its approved dark
+and light design, versioned profile, functional two-to-four-tool comparison,
+server-rendered filters and sorts, pricing, platform, integration, open-source,
+verification, and launch facts, original namespaced assets, representative
+seed content, product documents, and a reproducible distributable archive.
+
+Done-when: invalid, forbidden-import, incompatible, corrupt, colliding, or
+identity-mismatched template modules fail without changing the workspace;
+existing stylesheet-only add-ons still install, build, select, and remove;
+core eligibility, access, metadata, canonical, crawl, structured-data, and safe
+fallback behavior remain authoritative; VECTOR's archive completes a clean
+validate-install-build-activate-seed-select-remove round trip; every advertised
+filter, sort, comparison, pricing, integration, open-source, verification, and
+launch control works on eligible server-rendered data; its original visual
+system and all public states remain accessible by keyboard, readable in light
+and dark mode, usable without client JavaScript, and free of horizontal
+scrolling at 320 pixels; and removal preserves explicitly seeded operator data
+while returning unchanged owned source to its prior state.
 
 ## cli-env-local-mismatch
 
