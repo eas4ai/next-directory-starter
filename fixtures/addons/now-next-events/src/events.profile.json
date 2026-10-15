@@ -105,7 +105,7 @@
       "group": "When and where",
       "order": 50,
       "searchable": false,
-      "facet": null,
+        "facet": { "label": "Ends after", "mode": "any" },
       "sort": null,
       "constraints": { "min": "2020-01-01T00:00:00Z", "max": "2035-12-31T23:59:59Z" }
     },

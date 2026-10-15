@@ -1220,7 +1220,7 @@ requirementTest("TPL-004 packages the complete NOW/NEXT events directory product
     const runtimeNow = Date.now();
     const runtimeDates = new Map([
       ["after-dark-sessions", new Date(runtimeNow - 172_800_000).toISOString()],
-      ["form-function-forum", new Date(runtimeNow - 3_600_000).toISOString()],
+      ["form-function-forum", new Date(runtimeNow - 129_600_000).toISOString()],
       ["signal-rooftop", new Date(runtimeNow + 86_400_000).toISOString()],
     ]);
     try {
@@ -1240,7 +1240,7 @@ requirementTest("TPL-004 packages the complete NOW/NEXT events directory product
         WHERE listing_slug = ? AND field_key = ? AND archived_at IS NULL`);
       for (const [slug, startsAt] of runtimeDates) {
         const endsAt = slug === "form-function-forum"
-          ? new Date(runtimeNow + 3_600_000).toISOString()
+          ? new Date(runtimeNow + 129_600_000).toISOString()
           : slug === "signal-rooftop" ? new Date(runtimeNow + 93_600_000).toISOString()
             : new Date(runtimeNow - 86_400_000).toISOString();
         const updatedAt = new Date().toISOString();
@@ -1322,6 +1322,15 @@ requirementTest("TPL-004 packages the complete NOW/NEXT events directory product
     assert.doesNotMatch(home, /city-systems-closing/);
     assert.ok([...home.matchAll(/data-now-next-event=/g)].length <= 7,
       "NOW/NEXT home discovery is not bounded");
+      const todayHref = [...home.matchAll(/href="([^"]+)"[^>]*>Today</g)]
+        .map((match) => match[1].replaceAll("&amp;", "&"))[0];
+      assert.ok(todayHref, "NOW/NEXT Today link is missing");
+      const todayUrl = new URL(todayHref, origin);
+      assert.ok(todayUrl.searchParams.has(`max.${key("starts-at")}`));
+      assert.ok(todayUrl.searchParams.has(`min.${key("ends-at")}`));
+      assert.ok(results(await html(`${todayUrl.pathname}${todayUrl.search}`))
+        .includes("form-function-forum"),
+      "NOW/NEXT Today omitted an in-progress event that started before the selected day");
 
     const directory = await html(`/listings?sort=${encodeURIComponent(`${key("starts-at")}:asc`)}`);
     const secondPage = await html(`/listings?sort=${encodeURIComponent(`${key("starts-at")}:asc`)}&page=2`);
