@@ -237,6 +237,23 @@ requirementTest("TPL-002 packages the complete VECTOR directory product", async 
   assert.ok(seed.listings.some(({ profileValues }) =>
     profileValues["vector-ai-tools.ai-tools.verified-launch"] === false),
   "VECTOR seed does not exercise an unverified launch");
+  const signalColor = /#74D5B1/i;
+  const decorativeAssets = [
+    "public/vector-mark.svg", "public/diagrams/stack-map.svg",
+    ...readdirSync(join(fixture, "public/marks")).map((name) => `public/marks/${name}`),
+  ];
+  for (const path of decorativeAssets) {
+    assert.doesNotMatch(readFileSync(join(fixture, path), "utf8"), signalColor,
+      `${path} uses the verified signal color without a verified data state`);
+  }
+  const themeSource = readFileSync(join(fixture, "src/theme.ts"), "utf8");
+  assert.doesNotMatch(themeSource, /social:\s*\{[^}]*muted:\s*"#74D5B1"/i,
+    "generic social-card text uses the verified signal color");
+  assert.doesNotMatch(themeSource, /"chart-2":\s*"#74D5B1"/i,
+    "a generic chart series uses the verified signal color");
+  assert.match(readFileSync(join(fixture, "src/template.css"), "utf8"),
+    /--vector-signal:\s*#74D5B1/i,
+    "the verified data state lost its approved dark-mode signal color");
 
   const temporary = mkdtempSync(join(tmpdir(), "vector-template-product-"));
   let application;
