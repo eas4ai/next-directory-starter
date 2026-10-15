@@ -1326,6 +1326,9 @@ requirementTest("TPL-004 packages the complete NOW/NEXT events directory product
     const home = await html("/");
     assert.match(home, /The calendar with a pulse\./);
     assert.match(home, /WHAT(?:&#x27;|')S/);
+      assert.match(home, /placeholder="Event, description, venue…"/);
+      assert.doesNotMatch(home, /placeholder="[^"]*(?:speaker|topic)/i,
+        "NOW/NEXT search advertises profile fields it does not index");
     assert.match(home, /\/addons\/now-next-events\/now-next-mark\.svg/,
       "NOW/NEXT does not render its installed namespaced brand mark");
     assert.match(home, />All Dates</);
