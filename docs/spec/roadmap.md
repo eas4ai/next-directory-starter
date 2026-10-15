@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: events-conferences-template
+Current: remaining-directory-templates
 
 ## public-starter-and-theme
 
@@ -826,3 +826,38 @@ Delivers backlog item markdown-head-requests: Audit 2026-10-11 (L7, reported). s
 Requirements: ING-003
 
 Delivers backlog item mcp-preview-bearer: Audit 2026-10-11 (L8, reported). MCP preview_card returns /api/agent/imports/<slug>/card, but that route authenticates only a staff session (sessionUser), not the agent key that requested it, so a bearer-only client gets 403. Accept account-checked agent keys on the route or return the image through MCP.
+
+## remaining-directory-templates
+
+Requirements: TPL-005, TPL-006, TPL-007, TPL-008, TPL-009, TPL-010, TPL-011
+
+Delivery: ship the seven remaining approved concept products as one production
+commitment. Build NORTHSTAR experts, FORM agencies, stackfile developer
+resources, Lessonpath courses, Supper restaurants, Elsewhere travel, and
+Homekind services through the public-template module SDK, versioned directory
+profiles, packaged media seeding, and the existing add-on lifecycle. Give each
+product its own namespaced theme, responsive public composition, complete
+vertical profile, original brand and media assets, representative eligible and
+ineligible catalog, and product documents. Make every advertised search,
+filter, sort, contact, enrollment, reservation, booking, quote, portfolio,
+credential, compatibility, schedule, and trust surface factual and functional.
+Use one data-driven product mechanism for the shared lifecycle and separate
+vertical assertions for each product's fields, visual contract, behavior, and
+claims.
+
+Done-when: all seven archives independently complete a clean validate-install-
+build-activate-seed-select-remove round trip; equal sources produce equal
+archives; installation and removal do not mutate operator data implicitly; and
+removal preserves explicitly seeded operator data and media while returning
+unchanged owned source to its prior state. Every public listing, profile value,
+media asset, count, search result, filter, sort, and selected query state comes
+from eligible server-rendered data and remains correct through pagination.
+Each product matches its approved visual system and public composition, ships
+every required surface, original asset, representative state, preview,
+selection, and product document, and makes only claims supported by stored
+data. Public pages remain keyboard accessible, readable in light and dark
+mode, usable without client JavaScript, and free of horizontal scrolling at
+320 pixels. Metadata, Markdown, social output, and structured data agree with
+visible records. The shared mechanism passes every TPL-005 through TPL-011
+check and no unresolved finding remains after the commitment's adversarial
+review.
