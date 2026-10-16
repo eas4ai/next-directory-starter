@@ -60,8 +60,10 @@
       "media": [
         {
           "source": "seed/media/signal-works.webp",
-          "field": "form-agencies.studios.portfolio-media",
-          "alt": "Art-directed portfolio image for Signal Works showing the Signal Field Notes project"
+          "field": "form-agencies.studios.case-studies",
+          "alt": "Art-directed portfolio image for Signal Works showing the Signal Field Notes project",
+          "groupItemId": "case-1",
+          "childKey": "media"
         }
       ]
     },
@@ -121,8 +123,10 @@
       "media": [
         {
           "source": "seed/media/common-ground.webp",
-          "field": "form-agencies.studios.portfolio-media",
-          "alt": "Art-directed portfolio image for Common Ground showing the Civic Route project"
+          "field": "form-agencies.studios.case-studies",
+          "alt": "Art-directed portfolio image for Common Ground showing the Civic Route project",
+          "groupItemId": "case-2",
+          "childKey": "media"
         }
       ]
     },
@@ -180,8 +184,10 @@
       "media": [
         {
           "source": "seed/media/field-study.webp",
-          "field": "form-agencies.studios.portfolio-media",
-          "alt": "Art-directed portfolio image for Field Study showing the Botanical Batch project"
+          "field": "form-agencies.studios.case-studies",
+          "alt": "Art-directed portfolio image for Field Study showing the Botanical Batch project",
+          "groupItemId": "case-3",
+          "childKey": "media"
         }
       ]
     },
@@ -241,8 +247,10 @@
       "media": [
         {
           "source": "seed/media/orbit-studio.webp",
-          "field": "form-agencies.studios.portfolio-media",
-          "alt": "Art-directed portfolio image for Orbit Studio showing the Common Ledger project"
+          "field": "form-agencies.studios.case-studies",
+          "alt": "Art-directed portfolio image for Orbit Studio showing the Common Ledger project",
+          "groupItemId": "case-4",
+          "childKey": "media"
         }
       ]
     },
@@ -302,8 +310,10 @@
       "media": [
         {
           "source": "seed/media/north-county.webp",
-          "field": "form-agencies.studios.portfolio-media",
-          "alt": "Art-directed portfolio image for North County showing the Field Conditions project"
+          "field": "form-agencies.studios.case-studies",
+          "alt": "Art-directed portfolio image for North County showing the Field Conditions project",
+          "groupItemId": "case-5",
+          "childKey": "media"
         }
       ]
     },
@@ -363,8 +373,10 @@
       "media": [
         {
           "source": "seed/media/primary-office.webp",
-          "field": "form-agencies.studios.portfolio-media",
-          "alt": "Art-directed portfolio image for Primary Office showing the Open Collection project"
+          "field": "form-agencies.studios.case-studies",
+          "alt": "Art-directed portfolio image for Primary Office showing the Open Collection project",
+          "groupItemId": "case-6",
+          "childKey": "media"
         }
       ]
     },
@@ -423,8 +435,10 @@
       "media": [
         {
           "source": "seed/media/morrow-partners.webp",
-          "field": "form-agencies.studios.portfolio-media",
-          "alt": "Art-directed portfolio image for Morrow Partners showing the Care Arrival project"
+          "field": "form-agencies.studios.case-studies",
+          "alt": "Art-directed portfolio image for Morrow Partners showing the Care Arrival project",
+          "groupItemId": "case-7",
+          "childKey": "media"
         }
       ]
     },
@@ -483,8 +497,10 @@
       "media": [
         {
           "source": "seed/media/still-life-labs.webp",
-          "field": "form-agencies.studios.portfolio-media",
-          "alt": "Art-directed portfolio image for Still Life Labs showing the Everyday Objects project"
+          "field": "form-agencies.studios.case-studies",
+          "alt": "Art-directed portfolio image for Still Life Labs showing the Everyday Objects project",
+          "groupItemId": "case-8",
+          "childKey": "media"
         }
       ]
     },
@@ -539,7 +555,16 @@
           }
         ],
         "form-agencies.studios.portfolio-media": []
-      }
+      },
+      "media": [
+        {
+          "source": "seed/media/plain-form.webp",
+          "alt": "Art-directed portfolio image for Plain Form showing the Quiet Control operations interface",
+          "field": "form-agencies.studios.case-studies",
+          "groupItemId": "case-9",
+          "childKey": "media"
+        }
+      ]
     },
     {
       "slug": "kindred-dept",
@@ -593,7 +618,16 @@
           }
         ],
         "form-agencies.studios.portfolio-media": []
-      }
+      },
+      "media": [
+        {
+          "source": "seed/media/kindred-dept.webp",
+          "alt": "Art-directed portfolio image for Kindred Dept showing the Human Measure healthcare identity system",
+          "field": "form-agencies.studios.case-studies",
+          "groupItemId": "case-10",
+          "childKey": "media"
+        }
+      ]
     },
     {
       "slug": "assembly-line",
@@ -647,7 +681,16 @@
           }
         ],
         "form-agencies.studios.portfolio-media": []
-      }
+      },
+      "media": [
+        {
+          "source": "seed/media/assembly-line.webp",
+          "alt": "Art-directed portfolio image for Assembly Line showing the Market Hall public environment",
+          "field": "form-agencies.studios.case-studies",
+          "groupItemId": "case-11",
+          "childKey": "media"
+        }
+      ]
     },
     {
       "slug": "parallel-practice",
@@ -702,7 +745,16 @@
           }
         ],
         "form-agencies.studios.portfolio-media": []
-      }
+      },
+      "media": [
+        {
+          "source": "seed/media/parallel-practice.webp",
+          "alt": "Art-directed portfolio image for Parallel Practice showing the Trust Signals service roadmap",
+          "field": "form-agencies.studios.case-studies",
+          "groupItemId": "case-12",
+          "childKey": "media"
+        }
+      ]
     },
     {
       "slug": "bright-index",
@@ -757,7 +809,16 @@
           }
         ],
         "form-agencies.studios.portfolio-media": []
-      }
+      },
+      "media": [
+        {
+          "source": "seed/media/bright-index.webp",
+          "alt": "Art-directed portfolio image for Bright Index showing the Night School recruitment campaign",
+          "field": "form-agencies.studios.case-studies",
+          "groupItemId": "case-13",
+          "childKey": "media"
+        }
+      ]
     },
     {
       "slug": "matter-unit",
@@ -811,7 +872,16 @@
           }
         ],
         "form-agencies.studios.portfolio-media": []
-      }
+      },
+      "media": [
+        {
+          "source": "seed/media/matter-unit.webp",
+          "alt": "Art-directed portfolio image for Matter Unit showing the Trail Supply packaging system",
+          "field": "form-agencies.studios.case-studies",
+          "groupItemId": "case-14",
+          "childKey": "media"
+        }
+      ]
     }
   ]
 }

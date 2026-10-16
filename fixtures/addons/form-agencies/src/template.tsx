@@ -15,6 +15,7 @@ const facts = (listing: PublicTemplateListing) => ({
   availability: listing.profileValues["form-agencies.studios.availability"],
   leadTime: listing.profileValues["form-agencies.studios.lead-time"],
   contactUrl: listing.profileValues["form-agencies.studios.contact-url"],
+  cases: listing.profileValues["form-agencies.studios.case-studies"],
   portfolio: listing.profileValues["form-agencies.studios.portfolio-media"],
 });
 const words = (value: unknown) => typeof value === "string"
@@ -29,6 +30,14 @@ const currency = (value: unknown) => {
     maximumFractionDigits: 0 }).format(value.amountMinor / 100)}`;
 };
 const mediaId = (listing: PublicTemplateListing) => {
+  const cases = facts(listing).cases;
+  if (Array.isArray(cases)) {
+    for (const item of cases) {
+      if (item && typeof item === "object" && "values" in item && item.values &&
+          typeof item.values === "object" && "media" in item.values &&
+          typeof item.values.media === "string") return item.values.media;
+    }
+  }
   const media = facts(listing).portfolio;
   if (!Array.isArray(media) || media.length === 0) return undefined;
   const item = media[0];
