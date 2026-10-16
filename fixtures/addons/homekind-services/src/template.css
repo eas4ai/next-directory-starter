@@ -73,8 +73,9 @@
 .homekind-card > a > div b { border-radius: 999px; background: var(--muted); padding: .3rem .48rem; font-size: .62rem; }
 .homekind-card .homekind-review { margin: .7rem .35rem .35rem; }
 .homekind-card .profile-values { display: flex; flex-wrap: wrap; gap: .3rem; padding: .2rem 1rem 1rem; }
-.homekind-card .profile-value { border: 0; border-radius: 999px; background: var(--secondary); padding: .24rem .42rem; font-size: .6rem; }
-.homekind-card .profile-value dt { display: none; }
+.homekind-card .profile-value { display: flex; align-items: baseline; gap: .2rem; border: 0; border-radius: 999px; background: var(--secondary); padding: .24rem .42rem; font-size: .6rem; }
+.homekind-card .profile-value dt { color: var(--hk-teal); font-weight: 750; }
+.homekind-card .profile-value dt::after { content: ":"; }
 .homekind-card > small { display: block; padding: 0 1rem 1rem; color: var(--hk-teal); font-weight: 750; }
 
 .homekind-directory { padding: clamp(3rem, 7vw, 6rem) 0; }
