@@ -1,0 +1,14 @@
+{
+  "command": "node mechanisms/check-payment-foundation.mjs",
+  "requirements": ["COM-004", "COM-005"],
+  "results": "per-requirement",
+  "inputs": [
+    ".env.example", "README.md", "mechanisms/payment-foundation.def.json",
+    "mechanisms/check-payment-foundation.mjs", "mechanisms/account-test-mail.mjs",
+    "package.json", "package-lock.json", "scripts", "src", "tests"
+  ],
+  "identity": {
+    "env": [],
+    "tools": { "node": "node --version", "npm": "npm --version" }
+  }
+}
