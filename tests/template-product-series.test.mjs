@@ -67,6 +67,8 @@ const products = [
       "pricing-model": "single-choice", "open-source": "boolean", "last-reviewed": "date",
       "resource-media": "media",
     },
+    narrowHomeFacts: [["strong", "type"], ["code", "version"],
+      ["em", "compatibility"], ["b", "maintenance"]],
     operatorFields: ["last-reviewed"], facet: "resource-type", sort: "last-release",
   },
   {
@@ -523,6 +525,19 @@ async function assertProduct(config) {
       await firstLink.focus();
       assert.equal(await firstLink.evaluate((element) => element === document.activeElement), true,
         `${config.name} navigation cannot receive focus`);
+      if (config.narrowHomeFacts) {
+        await page.goto(origin);
+        const firstRow = page.locator(".stackfile-table > article").first();
+        for (const [selector, expectedLabel] of config.narrowHomeFacts) {
+          const fact = firstRow.locator(`:scope > ${selector}`);
+          assert.equal(await fact.isVisible(), true,
+            `${config.name} hides ${expectedLabel} on its narrow home table`);
+          const label = await fact.evaluate((element) =>
+            getComputedStyle(element, "::before").content.replaceAll('"', ""));
+          assert.equal(label, expectedLabel,
+            `${config.name} does not label ${expectedLabel} on its narrow home table`);
+        }
+      }
       await narrow.close();
 
       const light = await browser.newContext({ viewport: { width: 1280, height: 900 },
