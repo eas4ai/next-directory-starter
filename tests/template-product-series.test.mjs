@@ -254,6 +254,14 @@ async function assertProduct(config) {
       profileValues && Object.hasOwn(profileValues, fieldKey(suffix))),
     `${config.name} seed never exercises ${suffix}`);
   }
+  if (config.id === "northstar-experts") {
+    for (const listing of seed.listings) {
+      const reviewed = listing.profileValues[fieldKey("credential-reviewed")];
+      const reviewedAt = listing.profileValues[fieldKey("credential-reviewed-at")];
+      assert.equal(Boolean(reviewedAt), reviewed === true,
+        `${listing.slug} has contradictory credential review state and date`);
+    }
+  }
 
   const imageSources = seed.listings.flatMap(({ media = [] }) => media.map(({ source }) => source));
   assert.ok(imageSources.length >= 8, `${config.name} needs a representative original media set`);

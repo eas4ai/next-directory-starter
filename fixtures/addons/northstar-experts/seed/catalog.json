@@ -240,7 +240,7 @@
             }
           }
         ],
-        "northstar-experts.experts.credential-reviewed": false,
+        "northstar-experts.experts.credential-reviewed": true,
         "northstar-experts.experts.credential-reviewed-at": "2026-07-14",
         "northstar-experts.experts.contact-url": "https://lucas-alvarez.example/contact"
       },
@@ -554,7 +554,7 @@
             }
           }
         ],
-        "northstar-experts.experts.credential-reviewed": false,
+        "northstar-experts.experts.credential-reviewed": true,
         "northstar-experts.experts.credential-reviewed-at": "2026-06-11",
         "northstar-experts.experts.contact-url": "https://nia-brooks.example/contact",
         "northstar-experts.experts.portraits": []
@@ -832,7 +832,7 @@
             }
           }
         ],
-        "northstar-experts.experts.credential-reviewed": false,
+        "northstar-experts.experts.credential-reviewed": true,
         "northstar-experts.experts.credential-reviewed-at": "2026-05-18",
         "northstar-experts.experts.contact-url": "https://miriam-cole.example/contact",
         "northstar-experts.experts.portraits": []
