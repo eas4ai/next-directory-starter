@@ -466,6 +466,16 @@
             "type": "url",
             "required": false,
             "constraints": {}
+            },
+            {
+              "key": "portrait",
+              "label": "Portrait",
+              "help": "An authentic public portrait of the instructor.",
+              "type": "media",
+              "required": true,
+              "constraints": {
+                "maxItems": 1
+              }
           }
         ]
       }

@@ -65,6 +65,13 @@
           "source": "seed/media/systems-thinking.webp",
           "field": "lessonpath-courses.courses.course-media",
           "alt": "Original subject illustration for Systems Thinking in Practice"
+        },
+        {
+          "source": "seed/media/instructor-mara-chen.webp",
+          "field": "lessonpath-courses.courses.instructors",
+          "groupItemId": "instructor-1",
+          "childKey": "portrait",
+          "alt": "Original portrait of fictional instructor Mara Chen"
         }
       ]
     },
@@ -129,6 +136,13 @@
           "source": "seed/media/data-storytelling.webp",
           "field": "lessonpath-courses.courses.course-media",
           "alt": "Original subject illustration for Data Storytelling Studio"
+        },
+        {
+          "source": "seed/media/instructor-jon-bell.webp",
+          "field": "lessonpath-courses.courses.instructors",
+          "groupItemId": "instructor-2",
+          "childKey": "portrait",
+          "alt": "Original portrait of fictional instructor Jon Bell"
         }
       ]
     },
@@ -192,6 +206,13 @@
           "source": "seed/media/climate-literacy.webp",
           "field": "lessonpath-courses.courses.course-media",
           "alt": "Original subject illustration for Climate Literacy for Teams"
+        },
+        {
+          "source": "seed/media/instructor-asha-reed.webp",
+          "field": "lessonpath-courses.courses.instructors",
+          "groupItemId": "instructor-3",
+          "childKey": "portrait",
+          "alt": "Original portrait of fictional instructor Asha Reed"
         }
       ]
     },
@@ -255,6 +276,13 @@
           "source": "seed/media/product-writing.webp",
           "field": "lessonpath-courses.courses.course-media",
           "alt": "Original subject illustration for Writing for Digital Products"
+        },
+        {
+          "source": "seed/media/instructor-nico-alvarez.webp",
+          "field": "lessonpath-courses.courses.instructors",
+          "groupItemId": "instructor-4",
+          "childKey": "portrait",
+          "alt": "Original portrait of fictional instructor Nico Alvarez"
         }
       ]
     },
@@ -319,6 +347,13 @@
           "source": "seed/media/inclusive-research.webp",
           "field": "lessonpath-courses.courses.course-media",
           "alt": "Original subject illustration for Inclusive Research Methods"
+        },
+        {
+          "source": "seed/media/instructor-imani-cole.webp",
+          "field": "lessonpath-courses.courses.instructors",
+          "groupItemId": "instructor-5",
+          "childKey": "portrait",
+          "alt": "Original portrait of fictional instructor Imani Cole"
         }
       ]
     },
@@ -384,6 +419,13 @@
           "source": "seed/media/service-blueprints.webp",
           "field": "lessonpath-courses.courses.course-media",
           "alt": "Original subject illustration for Service Blueprint Lab"
+        },
+        {
+          "source": "seed/media/instructor-elliot-park.webp",
+          "field": "lessonpath-courses.courses.instructors",
+          "groupItemId": "instructor-6",
+          "childKey": "portrait",
+          "alt": "Original portrait of fictional instructor Elliot Park"
         }
       ]
     },
@@ -448,6 +490,13 @@
           "source": "seed/media/responsible-ai.webp",
           "field": "lessonpath-courses.courses.course-media",
           "alt": "Original subject illustration for Responsible AI Foundations"
+        },
+        {
+          "source": "seed/media/instructor-priya-desai.webp",
+          "field": "lessonpath-courses.courses.instructors",
+          "groupItemId": "instructor-7",
+          "childKey": "portrait",
+          "alt": "Original portrait of fictional instructor Priya Desai"
         }
       ]
     },
@@ -511,6 +560,13 @@
           "source": "seed/media/facilitation.webp",
           "field": "lessonpath-courses.courses.course-media",
           "alt": "Original subject illustration for Facilitation for Hard Problems"
+        },
+        {
+          "source": "seed/media/instructor-sam-okoro.webp",
+          "field": "lessonpath-courses.courses.instructors",
+          "groupItemId": "instructor-8",
+          "childKey": "portrait",
+          "alt": "Original portrait of fictional instructor Sam Okoro"
         }
       ]
     },
@@ -570,7 +626,16 @@
         ],
         "lessonpath-courses.courses.enrollment-url": "https://survey-design.example/course",
         "lessonpath-courses.courses.course-media": []
-      }
+      },
+      "media": [
+        {
+          "source": "seed/media/instructor-leah-martin.webp",
+          "field": "lessonpath-courses.courses.instructors",
+          "groupItemId": "instructor-9",
+          "childKey": "portrait",
+          "alt": "Original portrait of fictional instructor Leah Martin"
+        }
+      ]
     },
     {
       "slug": "content-systems",
@@ -629,7 +694,16 @@
         ],
         "lessonpath-courses.courses.enrollment-url": "https://content-systems.example/course",
         "lessonpath-courses.courses.course-media": []
-      }
+      },
+      "media": [
+        {
+          "source": "seed/media/instructor-rina-shah.webp",
+          "field": "lessonpath-courses.courses.instructors",
+          "groupItemId": "instructor-10",
+          "childKey": "portrait",
+          "alt": "Original portrait of fictional instructor Rina Shah"
+        }
+      ]
     },
     {
       "slug": "climate-scenarios",
@@ -687,7 +761,16 @@
         ],
         "lessonpath-courses.courses.enrollment-url": "https://climate-scenarios.example/course",
         "lessonpath-courses.courses.course-media": []
-      }
+      },
+      "media": [
+        {
+          "source": "seed/media/instructor-daniel-brooks.webp",
+          "field": "lessonpath-courses.courses.instructors",
+          "groupItemId": "instructor-11",
+          "childKey": "portrait",
+          "alt": "Original portrait of fictional instructor Daniel Brooks"
+        }
+      ]
     },
     {
       "slug": "visual-evidence",
@@ -744,7 +827,16 @@
         ],
         "lessonpath-courses.courses.enrollment-url": "https://visual-evidence.example/course",
         "lessonpath-courses.courses.course-media": []
-      }
+      },
+      "media": [
+        {
+          "source": "seed/media/instructor-lucia-torres.webp",
+          "field": "lessonpath-courses.courses.instructors",
+          "groupItemId": "instructor-12",
+          "childKey": "portrait",
+          "alt": "Original portrait of fictional instructor Lucía Torres"
+        }
+      ]
     },
     {
       "slug": "journey-research",
@@ -802,7 +894,16 @@
         ],
         "lessonpath-courses.courses.enrollment-url": "https://journey-research.example/course",
         "lessonpath-courses.courses.course-media": []
-      }
+      },
+      "media": [
+        {
+          "source": "seed/media/instructor-theo-grant.webp",
+          "field": "lessonpath-courses.courses.instructors",
+          "groupItemId": "instructor-13",
+          "childKey": "portrait",
+          "alt": "Original portrait of fictional instructor Theo Grant"
+        }
+      ]
     },
     {
       "slug": "team-workshops",
@@ -859,7 +960,16 @@
         ],
         "lessonpath-courses.courses.enrollment-url": "https://team-workshops.example/course",
         "lessonpath-courses.courses.course-media": []
-      }
+      },
+      "media": [
+        {
+          "source": "seed/media/instructor-camille-moreau.webp",
+          "field": "lessonpath-courses.courses.instructors",
+          "groupItemId": "instructor-14",
+          "childKey": "portrait",
+          "alt": "Original portrait of fictional instructor Camille Moreau"
+        }
+      ]
     }
   ]
 }

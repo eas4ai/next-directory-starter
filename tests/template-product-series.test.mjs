@@ -84,6 +84,7 @@ const products = [
       prerequisites: "group", "learning-outcomes": "group", provider: "short-text",
       instructors: "group", "enrollment-url": "url", "course-media": "media",
     },
+    groupMedia: { field: "instructors", child: "portrait" },
     operatorFields: [], facet: "topics", sort: "duration",
   },
   {
