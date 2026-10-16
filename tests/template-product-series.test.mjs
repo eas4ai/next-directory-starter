@@ -33,6 +33,7 @@ const products = [
       "next-available": "date", credentials: "group", "credential-reviewed": "boolean",
       "credential-reviewed-at": "date", "contact-url": "url", portraits: "media",
     },
+    cardBadgeLabels: true,
     operatorFields: ["credential-reviewed", "credential-reviewed-at"],
     facet: "specialties", sort: "years-experience",
   },
@@ -69,6 +70,7 @@ const products = [
     },
     narrowHomeFacts: [["strong", "type"], ["code", "version"],
       ["em", "compatibility"], ["b", "maintenance"]],
+    cardBadgeLabels: true,
     operatorFields: ["last-reviewed"], facet: "resource-type", sort: "last-release",
   },
   {
@@ -85,6 +87,7 @@ const products = [
       instructors: "group", "enrollment-url": "url", "course-media": "media",
     },
     groupMedia: { field: "instructors", child: "portrait" },
+    cardBadgeLabels: true,
     operatorFields: [], facet: "topics", sort: "duration",
   },
   {
@@ -136,6 +139,7 @@ const products = [
     },
     operatorFields: ["provider-reviewed", "provider-reviewed-at", "aggregate-rating",
       "review-count", "review-source-url"],
+    cardBadgeLabels: true,
     facet: "services", sort: "aggregate-rating",
   },
 ];
@@ -526,6 +530,16 @@ async function assertProduct(config) {
       await firstLink.focus();
       assert.equal(await firstLink.evaluate((element) => element === document.activeElement), true,
         `${config.name} navigation cannot receive focus`);
+      if (config.cardBadgeLabels) {
+        const labels = page.locator('.profile-value[data-profile-placement="badge"] > dt');
+        assert.ok(await labels.count() > 0, `${config.name} does not render badge labels`);
+        for (let index = 0; index < await labels.count(); index += 1) {
+          const badgeLabel = labels.nth(index);
+          assert.equal(await badgeLabel.isVisible(), true,
+            `${config.name} hides the badge label “${await badgeLabel.textContent()}”`);
+          assert.ok((await badgeLabel.textContent())?.trim(), `${config.name} renders an empty badge label`);
+        }
+      }
       if (config.narrowHomeFacts) {
         await page.goto(origin);
         const firstRow = page.locator(".stackfile-table > article").first();

@@ -95,8 +95,9 @@
 .northstar-card-facts { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.85rem; border-top: 1px solid var(--northstar-rule); padding-top: 0.7rem; }
 .northstar-card-facts span { border-radius: 999px; background: var(--secondary); padding: 0.3rem 0.5rem; font-size: 0.66rem; }
 .northstar-card .profile-values { display: flex; min-width: 0; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.65rem; }
-.northstar-card .profile-value { border: 0; border-radius: 999px; background: var(--northstar-sage); padding: 0.25rem 0.45rem; color: var(--accent-foreground); font-size: 0.62rem; }
-.northstar-card .profile-value dt { display: none; }
+.northstar-card .profile-value { display: flex; align-items: baseline; gap: 0.2rem; border: 0; border-radius: 999px; background: var(--northstar-sage); padding: 0.25rem 0.45rem; color: var(--accent-foreground); font-size: 0.62rem; }
+.northstar-card .profile-value dt { font-weight: 750; }
+.northstar-card .profile-value dt::after { content: ":"; }
 .northstar-featured { display: block; margin-top: 0.55rem; color: var(--northstar-navy); font-weight: 750; }
 .northstar-all { display: inline-block; margin-top: 2rem; border-bottom: 1px solid currentColor; color: var(--northstar-navy); font-size: 0.82rem; font-weight: 750; }
 
