@@ -1,6 +1,6 @@
 # FORM Agencies Directory
 
-FORM is a complete agencies and studios directory for Next Directory Starter 1.2 or later. It combines a portfolio-first public composition, a versioned studio profile, an original geometric mark, and eight original art-directed project images.
+FORM is a complete agencies and studios directory for Next Directory Starter 1.2 or later. It combines a portfolio-first public composition, a versioned studio profile, an original geometric mark, and fourteen original art-directed case-study images.
 
 ## Install
 

@@ -165,40 +165,55 @@ function validateSeedListings(seed: AddonSeed, profiles: ActiveProfileSet): Vali
     }
     slugs.add(listing.slug);
     destinations.add(destination);
-    const values = validateProfileValues(record.profileValues, { profiles,
-      authority: "system", listingSlug: listing.slug, actorUserId: "addon-seed",
-      requireComplete: true });
-      const mediaCounts = new Map<string, number>();
-    for (const media of record.media) {
+    const validationValues = structuredClone(record.profileValues);
+    const mediaCounts = new Map<string, number>();
+    for (const [mediaIndex, media] of record.media.entries()) {
       const field = fields.get(media.field);
-        const nested = Boolean(media.groupItemId && media.childKey);
-        const child = field?.type === "group" && nested
-          ? (field.constraints.children as { key: string; type: string }[])
-            .find(({ key }) => key === media.childKey) : undefined;
-        if (!field || (nested ? child?.type !== "media" : field.type !== "media")) {
+      const nested = Boolean(media.groupItemId && media.childKey);
+      const child = field?.type === "group" && nested
+        ? (field.constraints.children as { key: string; type: string }[])
+          .find(({ key }) => key === media.childKey) : undefined;
+      if (!field || (nested ? child?.type !== "media" : field.type !== "media")) {
         throw new Error(`Seed media field does not accept photography: ${media.field}`);
       }
-        const groupItems = nested ? record.profileValues[media.field] : undefined;
-        const groupItem = Array.isArray(groupItems) ? groupItems.find((item) => item &&
-          typeof item === "object" && (item as { id?: unknown }).id === media.groupItemId) : undefined;
-        const groupValues = groupItem && typeof groupItem === "object"
-          ? (groupItem as { values?: Record<string, unknown> }).values : undefined;
-        if (nested && (!groupValues || Object.hasOwn(groupValues, media.childKey!))) {
-          throw new Error(`Seed media group target is missing or already supplied: ${media.field}`);
-        }
-        if (!nested && Object.hasOwn(record.profileValues, media.field)) {
+      const groupItems = nested ? record.profileValues[media.field] : undefined;
+      const groupItem = Array.isArray(groupItems) ? groupItems.find((item) => item &&
+        typeof item === "object" && (item as { id?: unknown }).id === media.groupItemId) : undefined;
+      const groupValues = groupItem && typeof groupItem === "object"
+        ? (groupItem as { values?: Record<string, unknown> }).values : undefined;
+      if (nested && (!groupValues || Object.hasOwn(groupValues, media.childKey!))) {
+        throw new Error(`Seed media group target is missing or already supplied: ${media.field}`);
+      }
+      if (!nested && Object.hasOwn(record.profileValues, media.field)) {
         throw new Error(`Seed media conflicts with a supplied profile value: ${media.field}`);
       }
-        const countKey = nested ? `${media.field}\0${media.groupItemId}\0${media.childKey}` : media.field;
-        const count = (mediaCounts.get(countKey) ?? 0) + 1;
-        if ((nested || field.cardinality === "one") && count > 1) {
+      const countKey = nested ? `${media.field}\0${media.groupItemId}\0${media.childKey}` : media.field;
+      const count = (mediaCounts.get(countKey) ?? 0) + 1;
+      if ((nested || field.cardinality === "one") && count > 1) {
         throw new Error(`Seed media field accepts only one image: ${media.field}`);
       }
-        mediaCounts.set(countKey, count);
+      mediaCounts.set(countKey, count);
+      if (nested) {
+        const validationItems = validationValues[media.field] as
+          { id: string; values: Record<string, unknown> }[];
+        const validationItem = validationItems.find(({ id }) => id === media.groupItemId)!;
+        validationItem.values[media.childKey!] = "00000000-0000-4000-8000-000000000000";
+      } else if (field.cardinality === "one") {
+        validationValues[media.field] = "00000000-0000-4000-8000-000000000000";
+      } else {
+        const current = validationValues[media.field];
+        validationValues[media.field] = [
+          ...(Array.isArray(current) ? current : []),
+          { id: `seed-photo-${mediaIndex + 1}`, value: "00000000-0000-4000-8000-000000000000" },
+        ];
+      }
       if (sources.has(media.source)) throw new Error(`Duplicate seed media source: ${media.source}`);
       sources.add(media.source);
     }
-    valueRows += normalizedRowCount(values, profiles) + record.media.length;
+    const values = validateProfileValues(validationValues, { profiles,
+      authority: "system", listingSlug: listing.slug, actorUserId: "addon-seed",
+      requireComplete: true, allowUnstoredMedia: true });
+    valueRows += normalizedRowCount(values, profiles);
     if (valueRows > PROFILE_LIMITS.migrationRows) {
       throw new Error(`Add-on seed exceeds the ${PROFILE_LIMITS.migrationRows} value row limit`);
     }

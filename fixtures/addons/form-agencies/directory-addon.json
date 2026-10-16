@@ -15,8 +15,10 @@
   "seed": "seed/catalog.json",
   "files": [
     "docs/changelog.md", "docs/license.md", "docs/readme.md", "public/form-mark.svg", "seed/catalog.json",
-    "seed/media/common-ground.webp", "seed/media/field-study.webp", "seed/media/morrow-partners.webp",
-    "seed/media/north-county.webp", "seed/media/orbit-studio.webp", "seed/media/primary-office.webp",
+    "seed/media/assembly-line.webp", "seed/media/bright-index.webp", "seed/media/common-ground.webp",
+    "seed/media/field-study.webp", "seed/media/kindred-dept.webp", "seed/media/matter-unit.webp",
+    "seed/media/morrow-partners.webp", "seed/media/north-county.webp", "seed/media/orbit-studio.webp",
+    "seed/media/parallel-practice.webp", "seed/media/plain-form.webp", "seed/media/primary-office.webp",
     "seed/media/signal-works.webp", "seed/media/still-life-labs.webp", "src/studios.profile.json",
     "src/template.css", "src/template.tsx", "src/theme.ts"
   ]

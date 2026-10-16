@@ -443,6 +443,7 @@ export function validateProfileValues(input: unknown, options: {
   actorUserId?: string;
   requireComplete: boolean;
   applyDefaults?: boolean;
+  allowUnstoredMedia?: boolean;
 }): ValidatedProfileValues {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     throw new ProfileValueError("_profile", "Profile values must be an object");
@@ -463,8 +464,8 @@ export function validateProfileValues(input: unknown, options: {
     }
     try {
       const value = validateProfileFieldValue(field, raw, {
-        isMediaAllowed: (id) => mediaAllowed(field, options.listingSlug,
-          options.actorUserId, options.authority, id),
+        isMediaAllowed: options.allowUnstoredMedia ? () => true : (id) =>
+          mediaAllowed(field, options.listingSlug, options.actorUserId, options.authority, id),
       });
       if (value !== undefined) result[field.key] = value;
     } catch (error) {

@@ -49,6 +49,7 @@ const products = [
       availability: "single-choice", "lead-time": "duration", "contact-url": "url",
       "case-studies": "group", "portfolio-media": "media",
     },
+    groupMedia: { field: "case-studies", child: "media" },
     operatorFields: [], facet: "services", sort: "minimum-budget",
   },
   {
@@ -260,6 +261,24 @@ async function assertProduct(config) {
       const reviewedAt = listing.profileValues[fieldKey("credential-reviewed-at")];
       assert.equal(Boolean(reviewedAt), reviewed === true,
         `${listing.slug} has contradictory credential review state and date`);
+    }
+  }
+  if (config.groupMedia) {
+    const groupKey = fieldKey(config.groupMedia.field);
+    const group = fieldBySuffix.get(config.groupMedia.field);
+    const mediaChild = group?.constraints.children.find(({ key }) => key === config.groupMedia.child);
+    assert.equal(mediaChild?.type, "media",
+      `${config.name} ${config.groupMedia.field} is missing its media child`);
+    assert.equal(mediaChild?.required, true,
+      `${config.name} ${config.groupMedia.child} must be required for every group item`);
+    for (const listing of seed.listings) {
+      const items = listing.profileValues[groupKey];
+      assert.ok(Array.isArray(items), `${listing.slug} is missing ${config.groupMedia.field}`);
+      for (const item of items) {
+        assert.ok((listing.media ?? []).some((media) => media.field === groupKey &&
+          media.groupItemId === item.id && media.childKey === config.groupMedia.child),
+        `${listing.slug}/${item.id} is missing associated ${config.groupMedia.child} media`);
+      }
     }
   }
 
