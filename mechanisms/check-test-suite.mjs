@@ -23,7 +23,9 @@ try {
   });
   if (!tapRunPassed(result.status, result.stdout ?? '')) {
     const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
-    throw new Error(`npm test failed: ${output.slice(-4000) || result.error?.message}`);
+    const stopped = result.error?.code === 'ETIMEDOUT' ? 'stopped at the time limit, ' : '';
+    throw new Error(`npm test failed (${stopped}status ${result.status}, signal ${result.signal}): ` +
+      `${output.slice(-4000)}`);
   }
   passed = true;
 } catch (error) {
