@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title description">
-  <title id="title">BOROUGH city block mark</title>
-  <desc id="description">A brick arch and sage street line forming a compact city block.</desc>
-  <rect width="64" height="64" rx="2" fill="#F5EDE0"/>
-  <path d="M12 50V25C12 16.716 18.716 10 27 10h9c8.837 0 16 7.163 16 16v24H42V27c0-4.418-3.582-8-8-8h-5c-3.866 0-7 3.134-7 7v24H12Z" fill="#A54A30"/>
-  <path d="M22 38h20v12H22z" fill="#FFF8EC"/>
-  <path d="M8 50h48v4H8z" fill="#839179"/>
-  <circle cx="32" cy="29" r="4" fill="#302C25"/>
-</svg>
