@@ -80,7 +80,7 @@ async function checkFoundation() {
   const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
   const config = JSON.parse(readFileSync('components.json', 'utf8'));
   const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-  const currentAtStart = atLeast(deps.next, [16, 4, 0]) &&
+  const currentAtStart = atLeast(deps.next, [16, 4, 2]) &&
     atLeast(deps.react, [19, 3, 0]) &&
     atLeast(deps['react-dom'], [19, 3, 0]) &&
     atLeast(deps.shadcn, [4, 21, 4]);
