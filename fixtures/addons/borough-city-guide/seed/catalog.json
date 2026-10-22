@@ -1,0 +1,233 @@
+{
+  "profile": {
+    "id": "borough-city-guide.places",
+    "version": "1.0.0"
+  },
+  "listings": [
+    {
+      "slug": "marrow-and-mint",
+      "title": "Marrow & Mint",
+      "category": "Food & drink",
+      "url": "https://marrowandmint.example",
+      "summary": "A dawn bakery where the neighborhood starts with cardamom buns and strong coffee.",
+      "description": "Marrow & Mint is a small corner bakery with a short counter, an open bread room, and a sunny pavement bench. The daily menu follows the seasons and usually sells through before lunch.",
+      "status": "published",
+      "profileValues": {
+        "borough-city-guide.places.neighborhood": "river-ward",
+        "borough-city-guide.places.place-type": "food-drink",
+        "borough-city-guide.places.address": "18 Ferry Street",
+        "borough-city-guide.places.location": { "countryCode": "US", "region": "PA", "locality": "Bellwether", "latitude": 40.1121, "longitude": -75.1432 },
+        "borough-city-guide.places.price-level": "budget",
+        "borough-city-guide.places.accessibility": ["step-free", "accessible-restroom", "outdoor-seating"],
+        "borough-city-guide.places.best-for": ["slow-mornings", "solo-wandering"],
+        "borough-city-guide.places.visit-duration": 2700,
+        "borough-city-guide.places.curator-note": "Go before nine, take the window stool, and ask what just came out of the oven. The **cardamom bun** is the move when it appears.",
+        "borough-city-guide.places.editorial-pick": true,
+        "borough-city-guide.places.trails": ["slow-saturday", "river-reset"]
+      },
+      "media": [
+        { "source": "seed/media/marrow-and-mint.webp", "field": "borough-city-guide.places.photography", "alt": "Marrow & Mint bakery glowing in early morning light on a neighborhood corner" }
+      ]
+    },
+    {
+      "slug": "atlas-books",
+      "title": "Atlas Books",
+      "category": "Independent shop",
+      "url": "https://atlasbooks.example",
+      "summary": "A thoughtful bookshop for small presses, city histories, and letterpress finds.",
+      "description": "Atlas Books fills two old shop rooms with new fiction, field guides, art books, and shelves chosen by working writers. Hand-printed broadsides from the basement press change every month.",
+      "status": "published",
+      "profileValues": {
+        "borough-city-guide.places.neighborhood": "old-quarter",
+        "borough-city-guide.places.place-type": "shop",
+        "borough-city-guide.places.address": "42 Ledger Lane",
+        "borough-city-guide.places.location": { "countryCode": "US", "region": "PA", "locality": "Bellwether", "latitude": 40.1094, "longitude": -75.1511 },
+        "borough-city-guide.places.price-level": "moderate",
+        "borough-city-guide.places.accessibility": ["step-free", "quiet-hours"],
+        "borough-city-guide.places.best-for": ["rainy-days", "solo-wandering", "local-gifts"],
+        "borough-city-guide.places.visit-duration": 3600,
+        "borough-city-guide.places.curator-note": "The staff shelf is consistently sharp. Look past the front table for local histories and the letterpress drawer beside the reading chair.",
+        "borough-city-guide.places.editorial-pick": true,
+        "borough-city-guide.places.trails": ["slow-saturday", "made-here"]
+      },
+      "media": [
+        { "source": "seed/media/atlas-books.webp", "field": "borough-city-guide.places.photography", "alt": "Warm independent bookshop lined with books, prints, and houseplants" }
+      ]
+    },
+    {
+      "slug": "northline-gallery",
+      "title": "Northline Gallery",
+      "category": "Arts & culture",
+      "url": "https://northlinegallery.example",
+      "summary": "A compact contemporary gallery that gives emerging regional artists room to breathe.",
+      "description": "Northline Gallery presents six focused exhibitions a year in a former repair shop. Openings are lively, while weekday afternoons are quiet enough to spend time with the work.",
+      "status": "published",
+      "profileValues": {
+        "borough-city-guide.places.neighborhood": "northline",
+        "borough-city-guide.places.place-type": "arts-culture",
+        "borough-city-guide.places.address": "7 Foundry Walk",
+        "borough-city-guide.places.location": { "countryCode": "US", "region": "PA", "locality": "Bellwether", "latitude": 40.1222, "longitude": -75.1475 },
+        "borough-city-guide.places.price-level": "free",
+        "borough-city-guide.places.accessibility": ["step-free", "accessible-restroom", "quiet-hours"],
+        "borough-city-guide.places.best-for": ["rainy-days", "solo-wandering"],
+        "borough-city-guide.places.visit-duration": 5400,
+        "borough-city-guide.places.curator-note": "Read the single-page exhibition note before walking the room. The gallery keeps it brief and it usually opens up the show without overexplaining it.",
+        "borough-city-guide.places.editorial-pick": false,
+        "borough-city-guide.places.trails": ["made-here"]
+      },
+      "media": [
+        { "source": "seed/media/northline-gallery.webp", "field": "borough-city-guide.places.photography", "alt": "Quiet contemporary gallery with paintings, a wooden bench, and a single visitor" }
+      ]
+    },
+    {
+      "slug": "common-thread-studio",
+      "title": "Common Thread Studio",
+      "category": "Arts & culture",
+      "url": "https://commonthreadstudio.example",
+      "summary": "A working ceramics studio with open shelves, small classes, and local clay.",
+      "description": "Common Thread is equal parts neighborhood workshop and tiny showroom. Visitors can browse finished tableware, watch weekday production, or book a calm two-hour introductory class.",
+      "status": "published",
+      "profileValues": {
+        "borough-city-guide.places.neighborhood": "garden-district",
+        "borough-city-guide.places.place-type": "arts-culture",
+        "borough-city-guide.places.address": "93 Linden Court",
+        "borough-city-guide.places.location": { "countryCode": "US", "region": "PA", "locality": "Bellwether", "latitude": 40.1058, "longitude": -75.1327 },
+        "borough-city-guide.places.price-level": "moderate",
+        "borough-city-guide.places.accessibility": ["step-free", "accessible-restroom"],
+        "borough-city-guide.places.best-for": ["rainy-days", "local-gifts"],
+        "borough-city-guide.places.visit-duration": 7200,
+        "borough-city-guide.places.curator-note": "Drop-in browsing is welcome, but reserve the Saturday wheel session ahead. The seconds shelf near the kiln holds the best useful souvenirs.",
+        "borough-city-guide.places.editorial-pick": true,
+        "borough-city-guide.places.trails": ["made-here", "slow-saturday"]
+      },
+      "media": [
+        { "source": "seed/media/common-thread-studio.webp", "field": "borough-city-guide.places.photography", "alt": "Ceramic artist shaping clay at the wheel inside a plant-filled neighborhood studio" }
+      ]
+    },
+    {
+      "slug": "ember-house",
+      "title": "Ember House",
+      "category": "Food & drink",
+      "url": "https://emberhouse.example",
+      "summary": "A candlelit neighborhood dining room built around a wood oven and shared plates.",
+      "description": "Ember House serves a compact evening menu from a brick corner room. Vegetables, flatbreads, and a few larger plates come from the open hearth, with unfussy bottles chosen for the table.",
+      "status": "published",
+      "profileValues": {
+        "borough-city-guide.places.neighborhood": "old-quarter",
+        "borough-city-guide.places.place-type": "food-drink",
+        "borough-city-guide.places.address": "11 Ash Passage",
+        "borough-city-guide.places.location": { "countryCode": "US", "region": "PA", "locality": "Bellwether", "latitude": 40.1087, "longitude": -75.1542 },
+        "borough-city-guide.places.price-level": "special",
+        "borough-city-guide.places.accessibility": ["step-free", "accessible-restroom", "outdoor-seating"],
+        "borough-city-guide.places.best-for": ["date-night"],
+        "borough-city-guide.places.visit-duration": 6300,
+        "borough-city-guide.places.curator-note": "Ask for the small back table if you want a quieter dinner. Two people can make a meal from three shared plates and whatever is coming from the oven.",
+        "borough-city-guide.places.editorial-pick": true,
+        "borough-city-guide.places.trails": ["after-five"]
+      },
+      "media": [
+        { "source": "seed/media/ember-house.webp", "field": "borough-city-guide.places.photography", "alt": "Warm restaurant exterior with diners gathered beneath trees at dusk" }
+      ]
+    },
+    {
+      "slug": "riverlight-baths",
+      "title": "Riverlight Baths",
+      "category": "Wellness",
+      "url": "https://riverlightbaths.example",
+      "summary": "A cedar sauna and open-air river bath for unhurried resets near the water.",
+      "description": "Riverlight pairs two cedar saunas with a sheltered river deck and cool-water steps. Timed sessions keep the space calm, and sunset bookings follow the skyline into evening.",
+      "status": "published",
+      "profileValues": {
+        "borough-city-guide.places.neighborhood": "river-ward",
+        "borough-city-guide.places.place-type": "wellness",
+        "borough-city-guide.places.address": "2 Towpath Landing",
+        "borough-city-guide.places.location": { "countryCode": "US", "region": "PA", "locality": "Bellwether", "latitude": 40.1164, "longitude": -75.1388 },
+        "borough-city-guide.places.price-level": "special",
+        "borough-city-guide.places.accessibility": ["step-free", "accessible-restroom", "quiet-hours"],
+        "borough-city-guide.places.best-for": ["solo-wandering", "date-night"],
+        "borough-city-guide.places.visit-duration": 9000,
+        "borough-city-guide.places.curator-note": "Book the last daylight session and bring sandals with grip. The middle sauna runs gentler and is a good first stop before the river steps.",
+        "borough-city-guide.places.editorial-pick": true,
+        "borough-city-guide.places.trails": ["river-reset", "after-five"]
+      },
+      "media": [
+        { "source": "seed/media/riverlight-baths.webp", "field": "borough-city-guide.places.photography", "alt": "Cedar river bathhouse and swimming steps beside the city skyline at sunset" }
+      ]
+    },
+    {
+      "slug": "songbird-records",
+      "title": "Songbird Records",
+      "category": "Independent shop",
+      "url": "https://songbirdrecords.example",
+      "summary": "A friendly record shop with deep local bins and listening stations that invite a pause.",
+      "description": "Songbird keeps new releases near the door and a carefully labeled used collection along the long wall. Weekend selectors play short sets without turning the shop into an event venue.",
+      "status": "published",
+      "profileValues": {
+        "borough-city-guide.places.neighborhood": "northline",
+        "borough-city-guide.places.place-type": "shop",
+        "borough-city-guide.places.address": "56 Signal Avenue",
+        "borough-city-guide.places.location": { "countryCode": "US", "region": "PA", "locality": "Bellwether", "latitude": 40.1241, "longitude": -75.1451 },
+        "borough-city-guide.places.price-level": "moderate",
+        "borough-city-guide.places.accessibility": ["step-free"],
+        "borough-city-guide.places.best-for": ["rainy-days", "local-gifts", "solo-wandering"],
+        "borough-city-guide.places.visit-duration": 3000,
+        "borough-city-guide.places.curator-note": "Start with the staff's five-record listening shelf. The local section is filed by year, which makes an unexpectedly good map of the city's music.",
+        "borough-city-guide.places.editorial-pick": false,
+        "borough-city-guide.places.trails": ["made-here", "after-five"]
+      },
+      "media": [
+        { "source": "seed/media/songbird-records.webp", "field": "borough-city-guide.places.photography", "alt": "Listener browsing vinyl records in a small independent music shop" }
+      ]
+    },
+    {
+      "slug": "courtyard-cinema",
+      "title": "Courtyard Cinema",
+      "category": "Arts & culture",
+      "url": "https://courtyardcinema.example",
+      "summary": "A repertory cinema that moves outdoors beneath string lights when the weather cooperates.",
+      "description": "Courtyard Cinema screens restorations, documentaries, and regional work in a converted hall. Summer programs move into the brick courtyard with folding chairs and a compact projection booth.",
+      "status": "published",
+      "profileValues": {
+        "borough-city-guide.places.neighborhood": "garden-district",
+        "borough-city-guide.places.place-type": "arts-culture",
+        "borough-city-guide.places.address": "31 Arbor Row",
+        "borough-city-guide.places.location": { "countryCode": "US", "region": "PA", "locality": "Bellwether", "latitude": 40.1039, "longitude": -75.1354 },
+        "borough-city-guide.places.price-level": "budget",
+        "borough-city-guide.places.accessibility": ["step-free", "accessible-restroom", "hearing-loop"],
+        "borough-city-guide.places.best-for": ["date-night", "rainy-days"],
+        "borough-city-guide.places.visit-duration": 7500,
+        "borough-city-guide.places.curator-note": "For courtyard screenings, arrive twenty minutes early and choose a chair along the ivy wall. Indoor matinees are the calmest way to see the same program.",
+        "borough-city-guide.places.editorial-pick": true,
+        "borough-city-guide.places.trails": ["after-five", "slow-saturday"]
+      },
+      "media": [
+        { "source": "seed/media/courtyard-cinema.webp", "field": "borough-city-guide.places.photography", "alt": "Audience watching a black-and-white film in a brick courtyard under string lights" }
+      ]
+    },
+    {
+      "slug": "hidden-draft",
+      "title": "Borough Market Hall",
+      "category": "Market",
+      "url": "https://boroughmarkethall.example",
+      "summary": "A leafy public market being prepared for a future guide update.",
+      "description": "This representative draft keeps an unpublished place and its photography available to operators without exposing either on public BOROUGH surfaces.",
+      "status": "draft",
+      "profileValues": {
+        "borough-city-guide.places.neighborhood": "garden-district",
+        "borough-city-guide.places.place-type": "market",
+        "borough-city-guide.places.address": "80 Commons Square",
+        "borough-city-guide.places.location": { "countryCode": "US", "region": "PA", "locality": "Bellwether", "latitude": 40.1022, "longitude": -75.1309 },
+        "borough-city-guide.places.price-level": "free",
+        "borough-city-guide.places.accessibility": ["step-free", "accessible-restroom", "outdoor-seating"],
+        "borough-city-guide.places.best-for": ["families", "local-gifts"],
+        "borough-city-guide.places.visit-duration": 4200,
+        "borough-city-guide.places.curator-note": "This note is intentionally private while the operator verifies market hours and access details before publication.",
+        "borough-city-guide.places.editorial-pick": false,
+        "borough-city-guide.places.trails": ["made-here"]
+      },
+      "media": [
+        { "source": "seed/media/borough-market.webp", "field": "borough-city-guide.places.photography", "alt": "Tree-lined public market plaza with flower stalls and neighborhood shoppers" }
+      ]
+    }
+  ]
+}
