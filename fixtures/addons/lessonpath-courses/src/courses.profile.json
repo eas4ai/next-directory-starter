@@ -1,0 +1,520 @@
+{
+  "schemaVersion": 1,
+  "id": "lessonpath-courses.courses",
+  "version": "1.0.0",
+  "name": "Lessonpath courses",
+  "description": "Public topic, level, format, duration, price, pace, schedule, language, certificate, prerequisite, outcome, provider, instructor, enrollment, and media facts for a learning directory.",
+  "fields": [
+    {
+      "key": "lessonpath-courses.courses.topics",
+      "label": "Topics",
+      "help": "Subject areas covered by the course.",
+      "type": "multiple-choice",
+      "cardinality": "many",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "badge",
+      "group": "Course",
+      "order": 10,
+      "searchable": false,
+      "facet": {
+        "label": "Topic",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "systems",
+            "label": "Systems"
+          },
+          {
+            "value": "data",
+            "label": "Data"
+          },
+          {
+            "value": "climate",
+            "label": "Climate"
+          },
+          {
+            "value": "writing",
+            "label": "Writing"
+          },
+          {
+            "value": "research",
+            "label": "Research"
+          },
+          {
+            "value": "service-design",
+            "label": "Service design"
+          },
+          {
+            "value": "responsible-ai",
+            "label": "Responsible AI"
+          },
+          {
+            "value": "facilitation",
+            "label": "Facilitation"
+          }
+        ]
+      }
+    },
+    {
+      "key": "lessonpath-courses.courses.level",
+      "label": "Level",
+      "help": "The provider-stated learner level.",
+      "type": "single-choice",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "badge",
+      "group": "Course",
+      "order": 20,
+      "searchable": false,
+      "facet": {
+        "label": "Level",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "introductory",
+            "label": "Introductory"
+          },
+          {
+            "value": "intermediate",
+            "label": "Intermediate"
+          },
+          {
+            "value": "advanced",
+            "label": "Advanced"
+          }
+        ]
+      }
+    },
+    {
+      "key": "lessonpath-courses.courses.format",
+      "label": "Format",
+      "help": "Ways the course is currently delivered.",
+      "type": "multiple-choice",
+      "cardinality": "many",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "card",
+      "group": "Course",
+      "order": 30,
+      "searchable": false,
+      "facet": {
+        "label": "Format",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "self-paced",
+            "label": "Self paced"
+          },
+          {
+            "value": "live-online",
+            "label": "Live online"
+          },
+          {
+            "value": "in-person",
+            "label": "In person"
+          },
+          {
+            "value": "cohort",
+            "label": "Cohort"
+          }
+        ]
+      }
+    },
+    {
+      "key": "lessonpath-courses.courses.duration",
+      "label": "Duration",
+      "help": "The provider-stated total learning time.",
+      "type": "duration",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "card",
+      "group": "Course",
+      "order": 40,
+      "searchable": false,
+      "facet": {
+        "label": "Duration",
+        "mode": "any"
+      },
+      "sort": {
+        "label": "Duration",
+        "directions": [
+          "asc",
+          "desc"
+        ]
+      },
+      "constraints": {
+        "minSeconds": 1800,
+        "maxSeconds": 31536000
+      }
+    },
+    {
+      "key": "lessonpath-courses.courses.price",
+      "label": "Price",
+      "help": "The published standard course price.",
+      "type": "money",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "card",
+      "group": "Course",
+      "order": 50,
+      "searchable": false,
+      "facet": {
+        "label": "Price",
+        "mode": "any"
+      },
+      "sort": {
+        "label": "Price",
+        "directions": [
+          "asc",
+          "desc"
+        ]
+      },
+      "constraints": {
+        "minMinor": 0,
+        "maxMinor": 1000000,
+        "currencies": [
+          "USD"
+        ]
+      }
+    },
+    {
+      "key": "lessonpath-courses.courses.pace",
+      "label": "Pace",
+      "help": "The learner pace for the course.",
+      "type": "single-choice",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Course",
+      "order": 60,
+      "searchable": false,
+      "facet": {
+        "label": "Pace",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "flexible",
+            "label": "Flexible"
+          },
+          {
+            "value": "scheduled",
+            "label": "Scheduled"
+          },
+          {
+            "value": "intensive",
+            "label": "Intensive"
+          }
+        ]
+      }
+    },
+    {
+      "key": "lessonpath-courses.courses.schedule-model",
+      "label": "Schedule model",
+      "help": "How course sessions or access are scheduled.",
+      "type": "single-choice",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Course",
+      "order": 70,
+      "searchable": false,
+      "facet": {
+        "label": "Schedule",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "on-demand",
+            "label": "On demand"
+          },
+          {
+            "value": "weekly",
+            "label": "Weekly"
+          },
+          {
+            "value": "weekend",
+            "label": "Weekend"
+          },
+          {
+            "value": "full-time",
+            "label": "Full time"
+          }
+        ]
+      }
+    },
+    {
+      "key": "lessonpath-courses.courses.language",
+      "label": "Language",
+      "help": "The primary teaching language.",
+      "type": "single-choice",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Course",
+      "order": 80,
+      "searchable": false,
+      "facet": {
+        "label": "Language",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "en",
+            "label": "English"
+          },
+          {
+            "value": "es",
+            "label": "Spanish"
+          },
+          {
+            "value": "fr",
+            "label": "French"
+          }
+        ]
+      }
+    },
+    {
+      "key": "lessonpath-courses.courses.certificate",
+      "label": "Certificate",
+      "help": "Whether the provider states that completion includes a certificate.",
+      "type": "boolean",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "badge",
+      "group": "Course",
+      "order": 90,
+      "searchable": false,
+      "facet": {
+        "label": "Certificate",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {}
+    },
+    {
+      "key": "lessonpath-courses.courses.prerequisites",
+      "label": "Prerequisites",
+      "help": "A bounded set of provider-stated prerequisites.",
+      "type": "group",
+      "cardinality": "many",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Learning plan",
+      "order": 100,
+      "searchable": false,
+      "facet": null,
+      "sort": null,
+      "constraints": {
+        "minItems": 1,
+        "maxItems": 6,
+        "children": [
+          {
+            "key": "requirement",
+            "label": "Requirement",
+            "help": "A prerequisite stated by the provider.",
+            "type": "short-text",
+            "required": true,
+            "constraints": {
+              "minLength": 2,
+              "maxLength": 240
+            }
+          },
+          {
+            "key": "required",
+            "label": "Required",
+            "help": "Whether the prerequisite is mandatory.",
+            "type": "boolean",
+            "required": true,
+            "constraints": {}
+          }
+        ]
+      }
+    },
+    {
+      "key": "lessonpath-courses.courses.learning-outcomes",
+      "label": "Learning outcomes",
+      "help": "A bounded set of provider-stated course outcomes.",
+      "type": "group",
+      "cardinality": "many",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Learning plan",
+      "order": 110,
+      "searchable": false,
+      "facet": null,
+      "sort": null,
+      "constraints": {
+        "minItems": 1,
+        "maxItems": 8,
+        "children": [
+          {
+            "key": "outcome",
+            "label": "Outcome",
+            "help": "A concise provider-stated learning outcome.",
+            "type": "short-text",
+            "required": true,
+            "constraints": {
+              "minLength": 5,
+              "maxLength": 300
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "lessonpath-courses.courses.provider",
+      "label": "Provider",
+      "help": "The public course provider name.",
+      "type": "short-text",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "card",
+      "group": "Course",
+      "order": 120,
+      "searchable": true,
+      "facet": null,
+      "sort": null,
+      "constraints": {
+        "minLength": 2,
+        "maxLength": 160
+      }
+    },
+    {
+      "key": "lessonpath-courses.courses.instructors",
+      "label": "Instructors",
+      "help": "A bounded public roster of course instructors.",
+      "type": "group",
+      "cardinality": "many",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "People",
+      "order": 130,
+      "searchable": false,
+      "facet": null,
+      "sort": null,
+      "constraints": {
+        "minItems": 1,
+        "maxItems": 8,
+        "children": [
+          {
+            "key": "name",
+            "label": "Name",
+            "help": "The instructor’s public name.",
+            "type": "short-text",
+            "required": true,
+            "constraints": {
+              "minLength": 2,
+              "maxLength": 120
+            }
+          },
+          {
+            "key": "role",
+            "label": "Role",
+            "help": "The instructor’s role or practice.",
+            "type": "short-text",
+            "required": true,
+            "constraints": {
+              "minLength": 2,
+              "maxLength": 160
+            }
+          },
+          {
+            "key": "public-url",
+            "label": "Public URL",
+            "help": "An optional public instructor page.",
+            "type": "url",
+            "required": false,
+            "constraints": {}
+            },
+            {
+              "key": "portrait",
+              "label": "Portrait",
+              "help": "An authentic public portrait of the instructor.",
+              "type": "media",
+              "required": true,
+              "constraints": {
+                "maxItems": 1
+              }
+          }
+        ]
+      }
+    },
+    {
+      "key": "lessonpath-courses.courses.enrollment-url",
+      "label": "Enrollment URL",
+      "help": "The provider’s public enrollment or course information page.",
+      "type": "url",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "card",
+      "group": "Course",
+      "order": 140,
+      "searchable": false,
+      "facet": null,
+      "sort": null,
+      "constraints": {}
+    },
+    {
+      "key": "lessonpath-courses.courses.course-media",
+      "label": "Course media",
+      "help": "Original subject illustrations and course imagery.",
+      "type": "media",
+      "cardinality": "many",
+      "required": false,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "card",
+      "group": "Course",
+      "order": 150,
+      "searchable": false,
+      "facet": null,
+      "sort": null,
+      "constraints": {
+        "maxItems": 5
+      }
+    }
+  ]
+}
