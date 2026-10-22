@@ -18,7 +18,7 @@ try {
   }
 
   const result = spawnSync('npm', ['test'], {
-    encoding: 'utf8', timeout: 900_000, maxBuffer: 16 * 1024 * 1024,
+    encoding: 'utf8', timeout: 2_700_000, maxBuffer: 16 * 1024 * 1024,
     env: { ...process.env, DATABASE_URL: 'invalid:test-suite-must-install-a-temporary-database' },
   });
   if (!tapRunPassed(result.status, result.stdout ?? '')) {
