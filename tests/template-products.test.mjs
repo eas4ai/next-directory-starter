@@ -184,7 +184,8 @@ requirementTest("TPL-001 installs constrained public-template renderer modules",
          const definitions = value.addonTemplateDefinitions ?? value.default?.addonTemplateDefinitions;
          if (definitions?.[0]?.id !== "renderer-addon" ||
              typeof definitions[0].renderers.home !== "function") process.exit(1);`],
-      { cwd: starter, encoding: "utf8", env: { ...process.env, CI: "1" } });
+      { cwd: starter, encoding: "utf8",
+        env: { ...process.env, CI: "1", DATABASE_URL: `file:${join(temporary, "renderer-import.db")}` } });
     expectSuccess(imported, "import generated renderer registry");
     const buildEnvironment = { ...process.env, CI: "1", DIRECTORY_EXPLICIT_MIGRATIONS: "1",
       DATABASE_URL: `file:${join(temporary, "renderer-build.db")}`,
