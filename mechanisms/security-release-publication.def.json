@@ -1,0 +1,20 @@
+{
+  "command": "node mechanisms/check-security-release-publication.mjs",
+  "cwd": null,
+  "documents": [],
+  "identity": {
+    "env": [],
+    "image": null,
+    "tools": {
+      "gh": "gh --version",
+      "git": "git --version",
+      "node": "node --version"
+    }
+  },
+  "inputs": [
+    "mechanisms/check-security-release-publication.mjs",
+    "mechanisms/security-release-publication.def.json"
+  ],
+  "requirements": ["FOUND-009"],
+  "results": "per-requirement"
+}
