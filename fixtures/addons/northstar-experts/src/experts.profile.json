@@ -1,0 +1,530 @@
+{
+  "schemaVersion": 1,
+  "id": "northstar-experts.experts",
+  "version": "1.0.0",
+  "name": "NORTHSTAR experts",
+  "description": "Public expertise, sector, engagement, location, rate, availability, qualification, operator-review, contact, and portrait facts for an experts directory.",
+  "fields": [
+    {
+      "key": "northstar-experts.experts.specialties",
+      "label": "Specialties",
+      "help": "The expert services and disciplines offered publicly.",
+      "type": "multiple-choice",
+      "cardinality": "many",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "badge",
+      "group": "Expertise",
+      "order": 10,
+      "searchable": false,
+      "facet": {
+        "label": "Specialty",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "climate-strategy",
+            "label": "Climate strategy"
+          },
+          {
+            "value": "operations",
+            "label": "Operations"
+          },
+          {
+            "value": "public-sector",
+            "label": "Public sector"
+          },
+          {
+            "value": "service-design",
+            "label": "Service design"
+          },
+          {
+            "value": "responsible-ai",
+            "label": "Responsible AI"
+          },
+          {
+            "value": "organizational-design",
+            "label": "Organizational design"
+          },
+          {
+            "value": "accessibility",
+            "label": "Accessibility"
+          },
+          {
+            "value": "market-expansion",
+            "label": "Market expansion"
+          }
+        ]
+      }
+    },
+    {
+      "key": "northstar-experts.experts.sectors",
+      "label": "Sectors",
+      "help": "Industries and institutions where the expert has relevant experience.",
+      "type": "multiple-choice",
+      "cardinality": "many",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "card",
+      "group": "Expertise",
+      "order": 20,
+      "searchable": false,
+      "facet": {
+        "label": "Sector",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "energy",
+            "label": "Energy"
+          },
+          {
+            "value": "technology",
+            "label": "Technology"
+          },
+          {
+            "value": "government",
+            "label": "Government"
+          },
+          {
+            "value": "healthcare",
+            "label": "Healthcare"
+          },
+          {
+            "value": "finance",
+            "label": "Finance"
+          },
+          {
+            "value": "consumer",
+            "label": "Consumer"
+          },
+          {
+            "value": "nonprofit",
+            "label": "Nonprofit"
+          },
+          {
+            "value": "education",
+            "label": "Education"
+          }
+        ]
+      }
+    },
+    {
+      "key": "northstar-experts.experts.engagement-modes",
+      "label": "Engagement modes",
+      "help": "Ways this expert currently works with clients.",
+      "type": "multiple-choice",
+      "cardinality": "many",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "card",
+      "group": "Expertise",
+      "order": 30,
+      "searchable": false,
+      "facet": {
+        "label": "Engagement",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "advisory",
+            "label": "Advisory"
+          },
+          {
+            "value": "fractional",
+            "label": "Fractional leadership"
+          },
+          {
+            "value": "workshop",
+            "label": "Workshop"
+          },
+          {
+            "value": "project",
+            "label": "Project"
+          },
+          {
+            "value": "research",
+            "label": "Research"
+          }
+        ]
+      }
+    },
+    {
+      "key": "northstar-experts.experts.service-location",
+      "label": "Service location",
+      "help": "The expert base used to understand regional service coverage.",
+      "type": "location",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Working together",
+      "order": 40,
+      "searchable": false,
+      "facet": {
+        "label": "Location",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {
+        "countries": [
+          "CA",
+          "GB",
+          "US"
+        ]
+      }
+    },
+    {
+      "key": "northstar-experts.experts.time-zone",
+      "label": "Time zone",
+      "help": "The expert’s current IANA time zone.",
+      "type": "short-text",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Working together",
+      "order": 50,
+      "searchable": false,
+      "facet": null,
+      "sort": null,
+      "constraints": {
+        "minLength": 3,
+        "maxLength": 120,
+        "format": "iana-time-zone"
+      }
+    },
+    {
+      "key": "northstar-experts.experts.languages",
+      "label": "Languages",
+      "help": "Languages in which the expert can lead an engagement.",
+      "type": "multiple-choice",
+      "cardinality": "many",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Working together",
+      "order": 60,
+      "searchable": false,
+      "facet": {
+        "label": "Language",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "en",
+            "label": "English"
+          },
+          {
+            "value": "es",
+            "label": "Spanish"
+          },
+          {
+            "value": "fr",
+            "label": "French"
+          },
+          {
+            "value": "ar",
+            "label": "Arabic"
+          },
+          {
+            "value": "hi",
+            "label": "Hindi"
+          },
+          {
+            "value": "uk",
+            "label": "Ukrainian"
+          },
+          {
+            "value": "ja",
+            "label": "Japanese"
+          }
+        ]
+      }
+    },
+    {
+      "key": "northstar-experts.experts.years-experience",
+      "label": "Years of experience",
+      "help": "Completed years of relevant professional experience.",
+      "type": "integer",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "badge",
+      "group": "Expertise",
+      "order": 70,
+      "searchable": false,
+      "facet": {
+        "label": "Experience",
+        "mode": "any"
+      },
+      "sort": {
+        "label": "Years of experience",
+        "directions": [
+          "asc",
+          "desc"
+        ]
+      },
+      "constraints": {
+        "min": 1,
+        "max": 60
+      }
+    },
+    {
+      "key": "northstar-experts.experts.rate",
+      "label": "Advisory rate",
+      "help": "A published starting hourly rate; scope and final terms remain between the parties.",
+      "type": "money",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "card",
+      "group": "Working together",
+      "order": 80,
+      "searchable": false,
+      "facet": {
+        "label": "Rate",
+        "mode": "any"
+      },
+      "sort": {
+        "label": "Starting rate",
+        "directions": [
+          "asc",
+          "desc"
+        ]
+      },
+      "constraints": {
+        "minMinor": 5000,
+        "maxMinor": 1000000,
+        "currencies": [
+          "CAD",
+          "GBP",
+          "USD"
+        ]
+      }
+    },
+    {
+      "key": "northstar-experts.experts.availability",
+      "label": "Availability",
+      "help": "The expert’s current stated availability.",
+      "type": "single-choice",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "badge",
+      "group": "Working together",
+      "order": 90,
+      "searchable": false,
+      "facet": {
+        "label": "Availability",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "available-now",
+            "label": "Available now"
+          },
+          {
+            "value": "this-month",
+            "label": "Available this month"
+          },
+          {
+            "value": "waitlist",
+            "label": "Waitlist"
+          },
+          {
+            "value": "unavailable",
+            "label": "Not accepting work"
+          }
+        ]
+      }
+    },
+    {
+      "key": "northstar-experts.experts.next-available",
+      "label": "Next available",
+      "help": "The next date the expert has stated they can begin new work.",
+      "type": "date",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Working together",
+      "order": 100,
+      "searchable": false,
+      "facet": {
+        "label": "Next available",
+        "mode": "any"
+      },
+      "sort": {
+        "label": "Next available",
+        "directions": [
+          "asc",
+          "desc"
+        ]
+      },
+      "constraints": {
+        "min": "2025-01-01",
+        "max": "2032-12-31"
+      }
+    },
+    {
+      "key": "northstar-experts.experts.credentials",
+      "label": "Credentials",
+      "help": "A bounded set of public qualifications supplied for the expert profile.",
+      "type": "group",
+      "cardinality": "many",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Qualifications",
+      "order": 110,
+      "searchable": false,
+      "facet": null,
+      "sort": null,
+      "constraints": {
+        "minItems": 1,
+        "maxItems": 6,
+        "children": [
+          {
+            "key": "name",
+            "label": "Credential",
+            "help": "The public name of the qualification.",
+            "type": "short-text",
+            "required": true,
+            "constraints": {
+              "minLength": 2,
+              "maxLength": 160
+            }
+          },
+          {
+            "key": "issuer",
+            "label": "Issuer",
+            "help": "The organization that issued the qualification.",
+            "type": "short-text",
+            "required": true,
+            "constraints": {
+              "minLength": 2,
+              "maxLength": 160
+            }
+          },
+          {
+            "key": "year",
+            "label": "Year",
+            "help": "The year the qualification was issued.",
+            "type": "integer",
+            "required": true,
+            "constraints": {
+              "min": 1970,
+              "max": 2032
+            }
+          },
+          {
+            "key": "public-url",
+            "label": "Public URL",
+            "help": "An optional public page supplied for the qualification.",
+            "type": "url",
+            "required": false,
+            "constraints": {}
+          }
+        ]
+      }
+    },
+    {
+      "key": "northstar-experts.experts.credential-reviewed",
+      "label": "Credential review",
+      "help": "Whether the directory operator reviewed the supplied qualification evidence.",
+      "type": "boolean",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "operator",
+      "visibility": "public",
+      "placement": "badge",
+      "group": "Qualifications",
+      "order": 120,
+      "searchable": false,
+      "facet": {
+        "label": "Credential reviewed",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {}
+    },
+    {
+      "key": "northstar-experts.experts.credential-reviewed-at",
+      "label": "Credential reviewed at",
+      "help": "The date of the directory operator’s latest credential evidence review.",
+      "type": "date",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "operator",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Qualifications",
+      "order": 130,
+      "searchable": false,
+      "facet": null,
+      "sort": null,
+      "constraints": {
+        "min": "2025-01-01",
+        "max": "2032-12-31"
+      }
+    },
+    {
+      "key": "northstar-experts.experts.contact-url",
+      "label": "Contact URL",
+      "help": "The expert’s public inquiry page. Opening it does not promise booking or response.",
+      "type": "url",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "card",
+      "group": "Working together",
+      "order": 140,
+      "searchable": false,
+      "facet": null,
+      "sort": null,
+      "constraints": {}
+    },
+    {
+      "key": "northstar-experts.experts.portraits",
+      "label": "Portraits",
+      "help": "Original public portraits that identify the expert.",
+      "type": "media",
+      "cardinality": "many",
+      "required": false,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "card",
+      "group": "Profile",
+      "order": 150,
+      "searchable": false,
+      "facet": null,
+      "sort": null,
+      "constraints": {
+        "maxItems": 3
+      }
+    }
+  ]
+}

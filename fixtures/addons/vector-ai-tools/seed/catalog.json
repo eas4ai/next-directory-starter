@@ -1,0 +1,292 @@
+{
+  "profile": {
+    "id": "vector-ai-tools.ai-tools",
+    "version": "1.0.0"
+  },
+  "listings": [
+    {
+      "slug": "arc-forge",
+      "title": "Arc Forge",
+      "category": "AI Agents",
+      "url": "https://arcforge.example",
+      "summary": "A collaborative agent workspace for research, drafting, and review.",
+      "description": "Arc Forge coordinates source-backed research, structured writing, and human approvals in one shared workspace. Teams can trace every output to its inputs and hand work between people and agents.",
+      "status": "published",
+      "profileValues": {
+        "vector-ai-tools.ai-tools.tagline": "Research, write, and review with a coordinated agent team.",
+        "vector-ai-tools.ai-tools.best-for": "Editorial and research teams that need visible human checkpoints.",
+        "vector-ai-tools.ai-tools.pricing-model": "freemium",
+        "vector-ai-tools.ai-tools.starting-price": {
+          "amountMinor": 1200,
+          "currency": "USD"
+        },
+        "vector-ai-tools.ai-tools.free-tier": true,
+        "vector-ai-tools.ai-tools.platforms": [
+          "web",
+          "api"
+        ],
+        "vector-ai-tools.ai-tools.integrations": [
+          "slack",
+          "notion",
+          "drive"
+        ],
+        "vector-ai-tools.ai-tools.open-source": false,
+        "vector-ai-tools.ai-tools.verified-launch": true,
+        "vector-ai-tools.ai-tools.launch-status": "new",
+        "vector-ai-tools.ai-tools.launch-date": "2026-10-13",
+        "vector-ai-tools.ai-tools.last-verified": "2026-10-15"
+      }
+    },
+    {
+      "slug": "pixel-flow",
+      "title": "PixelFlow",
+      "category": "Image Generation",
+      "url": "https://pixelflow.example",
+      "summary": "A visual workflow builder for repeatable image production.",
+      "description": "PixelFlow turns art direction into reusable image pipelines with review stages, variations, and export presets for brand teams.",
+      "status": "published",
+      "profileValues": {
+        "vector-ai-tools.ai-tools.tagline": "Build repeatable visual AI workflows without losing art direction.",
+        "vector-ai-tools.ai-tools.best-for": "Creative teams producing campaign systems and product imagery.",
+        "vector-ai-tools.ai-tools.pricing-model": "paid",
+        "vector-ai-tools.ai-tools.starting-price": {
+          "amountMinor": 1900,
+          "currency": "USD"
+        },
+        "vector-ai-tools.ai-tools.free-tier": false,
+        "vector-ai-tools.ai-tools.platforms": [
+          "web",
+          "mac"
+        ],
+        "vector-ai-tools.ai-tools.integrations": [
+          "figma",
+          "drive"
+        ],
+        "vector-ai-tools.ai-tools.open-source": false,
+        "vector-ai-tools.ai-tools.verified-launch": true,
+        "vector-ai-tools.ai-tools.launch-status": "new",
+        "vector-ai-tools.ai-tools.launch-date": "2026-10-11",
+        "vector-ai-tools.ai-tools.last-verified": "2026-10-15"
+      }
+    },
+    {
+      "slug": "signal-lab",
+      "title": "Signal Lab",
+      "category": "Model Evaluation",
+      "url": "https://signallab.example",
+      "summary": "Evaluation, routing, and quality gates for production model stacks.",
+      "description": "Signal Lab runs repeatable evaluations across hosted and local models, then routes each request using cost, latency, and quality policies.",
+      "status": "published",
+      "profileValues": {
+        "vector-ai-tools.ai-tools.tagline": "Evaluate and route models with production-grade evidence.",
+        "vector-ai-tools.ai-tools.best-for": "Platform teams operating multiple models behind one product.",
+        "vector-ai-tools.ai-tools.pricing-model": "usage",
+        "vector-ai-tools.ai-tools.starting-price": {
+          "amountMinor": 100,
+          "currency": "USD"
+        },
+        "vector-ai-tools.ai-tools.free-tier": true,
+        "vector-ai-tools.ai-tools.platforms": [
+          "web",
+          "api",
+          "linux"
+        ],
+        "vector-ai-tools.ai-tools.integrations": [
+          "github",
+          "slack"
+        ],
+        "vector-ai-tools.ai-tools.open-source": true,
+        "vector-ai-tools.ai-tools.verified-launch": true,
+        "vector-ai-tools.ai-tools.launch-status": "stable",
+        "vector-ai-tools.ai-tools.launch-date": "2026-07-22",
+        "vector-ai-tools.ai-tools.last-verified": "2026-10-14"
+      }
+    },
+    {
+      "slug": "codepilot-local",
+      "title": "CodePilot Local",
+      "category": "Developer Tools",
+      "url": "https://codepilotlocal.example",
+      "summary": "A local-first coding assistant that runs against private repositories.",
+      "description": "CodePilot Local indexes code on device, connects to local or hosted models, and exposes reviewable edits through editor and command-line workflows.",
+      "status": "published",
+      "profileValues": {
+        "vector-ai-tools.ai-tools.tagline": "Private repository assistance with local-first model execution.",
+        "vector-ai-tools.ai-tools.best-for": "Engineering teams with strict data residency requirements.",
+        "vector-ai-tools.ai-tools.pricing-model": "free",
+        "vector-ai-tools.ai-tools.starting-price": {
+          "amountMinor": 0,
+          "currency": "USD"
+        },
+        "vector-ai-tools.ai-tools.free-tier": true,
+        "vector-ai-tools.ai-tools.platforms": [
+          "mac",
+          "windows",
+          "linux"
+        ],
+        "vector-ai-tools.ai-tools.integrations": [
+          "github",
+          "vscode"
+        ],
+        "vector-ai-tools.ai-tools.open-source": true,
+        "vector-ai-tools.ai-tools.verified-launch": true,
+        "vector-ai-tools.ai-tools.launch-status": "stable",
+        "vector-ai-tools.ai-tools.launch-date": "2026-04-09",
+        "vector-ai-tools.ai-tools.last-verified": "2026-10-12"
+      }
+    },
+    {
+      "slug": "briefly",
+      "title": "Briefly",
+      "category": "Writing",
+      "url": "https://briefly.example",
+      "summary": "A focused brief generator for product and marketing teams.",
+      "description": "Briefly turns interviews, notes, and constraints into concise creative briefs with explicit assumptions and approval checkpoints.",
+      "status": "published",
+      "profileValues": {
+        "vector-ai-tools.ai-tools.tagline": "Turn scattered inputs into an actionable, reviewable brief.",
+        "vector-ai-tools.ai-tools.best-for": "Small product and marketing teams starting new campaigns.",
+        "vector-ai-tools.ai-tools.pricing-model": "free",
+        "vector-ai-tools.ai-tools.starting-price": {
+          "amountMinor": 0,
+          "currency": "USD"
+        },
+        "vector-ai-tools.ai-tools.free-tier": true,
+        "vector-ai-tools.ai-tools.platforms": [
+          "web"
+        ],
+        "vector-ai-tools.ai-tools.integrations": [
+          "notion",
+          "drive"
+        ],
+        "vector-ai-tools.ai-tools.open-source": false,
+        "vector-ai-tools.ai-tools.verified-launch": false,
+        "vector-ai-tools.ai-tools.launch-status": "beta",
+        "vector-ai-tools.ai-tools.launch-date": "2026-10-08",
+        "vector-ai-tools.ai-tools.last-verified": "2026-10-10"
+      }
+    },
+    {
+      "slug": "voice-mesh",
+      "title": "VoiceMesh",
+      "category": "Audio",
+      "url": "https://voicemesh.example",
+      "summary": "A multilingual voice production workspace with consent controls.",
+      "description": "VoiceMesh manages scripts, approved voices, pronunciation, version history, and localized exports for product and media teams.",
+      "status": "published",
+      "profileValues": {
+        "vector-ai-tools.ai-tools.tagline": "Produce localized voice with approvals and provenance built in.",
+        "vector-ai-tools.ai-tools.best-for": "Media teams shipping narrated content across many locales.",
+        "vector-ai-tools.ai-tools.pricing-model": "paid",
+        "vector-ai-tools.ai-tools.starting-price": {
+          "amountMinor": 2900,
+          "currency": "USD"
+        },
+        "vector-ai-tools.ai-tools.free-tier": false,
+        "vector-ai-tools.ai-tools.platforms": [
+          "web",
+          "api"
+        ],
+        "vector-ai-tools.ai-tools.integrations": [
+          "drive",
+          "zapier"
+        ],
+        "vector-ai-tools.ai-tools.open-source": false,
+        "vector-ai-tools.ai-tools.verified-launch": true,
+        "vector-ai-tools.ai-tools.launch-status": "stable",
+        "vector-ai-tools.ai-tools.launch-date": "2026-02-18",
+        "vector-ai-tools.ai-tools.last-verified": "2026-10-09"
+      }
+    },
+    {
+      "slug": "data-lens",
+      "title": "DataLens",
+      "category": "Analytics",
+      "url": "https://datalens.example",
+      "summary": "A governed question-and-answer layer for operational data.",
+      "description": "DataLens connects approved metrics to a conversational analysis surface with citations, access rules, and shareable decision records.",
+      "status": "published",
+      "profileValues": {
+        "vector-ai-tools.ai-tools.tagline": "Ask operational questions without losing metric definitions.",
+        "vector-ai-tools.ai-tools.best-for": "Larger teams with governed metrics and multiple data owners.",
+        "vector-ai-tools.ai-tools.pricing-model": "enterprise",
+        "vector-ai-tools.ai-tools.free-tier": false,
+        "vector-ai-tools.ai-tools.platforms": [
+          "web"
+        ],
+        "vector-ai-tools.ai-tools.integrations": [
+          "slack",
+          "salesforce"
+        ],
+        "vector-ai-tools.ai-tools.open-source": false,
+        "vector-ai-tools.ai-tools.verified-launch": true,
+        "vector-ai-tools.ai-tools.launch-status": "stable",
+        "vector-ai-tools.ai-tools.launch-date": "2025-11-05",
+        "vector-ai-tools.ai-tools.last-verified": "2026-10-13"
+      }
+    },
+    {
+      "slug": "agent-relay",
+      "title": "Agent Relay",
+      "category": "Automation",
+      "url": "https://agentrelay.example",
+      "summary": "A durable orchestration layer for long-running agent workflows.",
+      "description": "Agent Relay connects queues, tools, approvals, and retry policies so operational agents can run for hours without losing state.",
+      "status": "published",
+      "profileValues": {
+        "vector-ai-tools.ai-tools.tagline": "Run durable agent workflows across tools, queues, and people.",
+        "vector-ai-tools.ai-tools.best-for": "Operations teams automating multi-step processes with approvals.",
+        "vector-ai-tools.ai-tools.pricing-model": "usage",
+        "vector-ai-tools.ai-tools.starting-price": {
+          "amountMinor": 500,
+          "currency": "USD"
+        },
+        "vector-ai-tools.ai-tools.free-tier": true,
+        "vector-ai-tools.ai-tools.platforms": [
+          "web",
+          "api"
+        ],
+        "vector-ai-tools.ai-tools.integrations": [
+          "slack",
+          "github",
+          "zapier"
+        ],
+        "vector-ai-tools.ai-tools.open-source": true,
+        "vector-ai-tools.ai-tools.verified-launch": false,
+        "vector-ai-tools.ai-tools.launch-status": "new",
+        "vector-ai-tools.ai-tools.launch-date": "2026-10-14",
+        "vector-ai-tools.ai-tools.last-verified": "2026-10-15"
+      }
+    },
+    {
+      "slug": "shadow-preview",
+      "title": "Shadow Preview",
+      "category": "Video",
+      "url": "https://shadowpreview.example",
+      "summary": "A private prerelease record used to verify public eligibility boundaries.",
+      "description": "Shadow Preview is intentionally seeded as a draft so directory and comparison routes can prove that unpublished records remain private.",
+      "status": "draft",
+      "profileValues": {
+        "vector-ai-tools.ai-tools.tagline": "A prerelease video workflow that must stay out of public results.",
+        "vector-ai-tools.ai-tools.best-for": "Eligibility verification in the VECTOR sample catalog.",
+        "vector-ai-tools.ai-tools.pricing-model": "freemium",
+        "vector-ai-tools.ai-tools.starting-price": {
+          "amountMinor": 900,
+          "currency": "USD"
+        },
+        "vector-ai-tools.ai-tools.free-tier": true,
+        "vector-ai-tools.ai-tools.platforms": [
+          "web"
+        ],
+        "vector-ai-tools.ai-tools.integrations": [
+          "figma"
+        ],
+        "vector-ai-tools.ai-tools.open-source": false,
+        "vector-ai-tools.ai-tools.verified-launch": false,
+        "vector-ai-tools.ai-tools.launch-status": "beta",
+        "vector-ai-tools.ai-tools.launch-date": "2026-10-15",
+        "vector-ai-tools.ai-tools.last-verified": "2026-10-15"
+      }
+    }
+  ]
+}

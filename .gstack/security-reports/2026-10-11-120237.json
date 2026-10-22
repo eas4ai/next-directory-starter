@@ -1,0 +1,369 @@
+{
+  "version": "2.0.0",
+  "date": "2026-10-11T16:10:09Z",
+  "mode": "comprehensive",
+  "scope": "full",
+  "diff_mode": false,
+  "repository_commit": "461cc39d65af9855c3a380400efaefd4904179ef",
+  "application_commit": "8d70b9dcaaecfc8f65cfcb12d9c57fc5d6d489af",
+  "review_outcome": "DONE_WITH_CONCERNS",
+  "production_readiness": "blocked",
+  "production_readiness_reason": "The existing H1 legacy Stripe chargeback path and H2 stale catalog edit race remain open. Either can preserve or restore public placement contrary to paid or moderation state.",
+  "phases_run": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14
+  ],
+  "attack_surface": {
+    "code": {
+      "public_endpoints": 12,
+      "authenticated": 16,
+      "admin": 33,
+      "api": 54,
+      "uploads": 4,
+      "integrations": 5,
+      "background_jobs": 2,
+      "websockets": 0
+    },
+    "infrastructure": {
+      "ci_workflows": 0,
+      "webhook_receivers": 3,
+      "container_configs": 2,
+      "iac_configs": 0,
+      "deploy_targets": 1,
+      "secret_management": "Runtime environment variables plus encrypted provider profiles; no deployment secret manager is specified."
+    }
+  },
+  "attack_surface_notes": {
+    "route_handlers_total": 62,
+    "api_route_handlers": 54,
+    "public_non_api_handlers": 8,
+    "api_breakdown": {
+      "mixed_or_public": 4,
+      "session_authenticated": 16,
+      "admin_or_capability": 33,
+      "bearer_mcp": 1
+    },
+    "external_network_flows": [
+      "Stripe",
+      "Paddle",
+      "NOWPayments",
+      "Resend",
+      "remote social-card image fetch"
+    ]
+  },
+  "findings": [],
+  "formal_findings_note": "No new finding survived the CSO v2 hard exclusions. The two newly verified paths below are availability findings, which CSO hard exclusions 1 and 3 require the formal findings array to omit. Existing vulnerabilities remain in docs/audit.md and are summarized separately.",
+  "baseline": {
+    "path": "docs/audit.md",
+    "date": "2026-10-11",
+    "commit": "8d70b9d",
+    "counts": {
+      "critical": 0,
+      "high": 2,
+      "medium": 27,
+      "low": 9
+    },
+    "production_blockers": [
+      {
+        "id": "H1",
+        "title": "Legacy Stripe checkout keeps paid placement after a chargeback",
+        "status": "Verified",
+        "location": "src/lib/payment-events.ts:88; src/app/api/owner/listings/[slug]/checkout/route.ts"
+      },
+      {
+        "id": "H2",
+        "title": "A catalog edit can undo a moderator's suspension",
+        "status": "Verified",
+        "location": "src/app/api/admin/listings/[slug]/route.ts:13; src/lib/listings.ts:124"
+      }
+    ]
+  },
+  "baseline_scope_expansions": [
+    {
+      "baseline_id": "M9",
+      "title": "Webhook bodies are buffered before their size checks",
+      "severity": "Medium",
+      "confidence": 9,
+      "status": "VERIFIED",
+      "affected_routes": [
+        "POST /api/webhooks/stripe",
+        "POST /api/webhooks/paddle/{test,live}",
+        "POST /api/webhooks/nowpayments/{test,live}"
+      ],
+      "evidence": "Each route accepts an arbitrary nonempty signature header and calls request.text() before enforcing its 1,000,000-character limit or verifying the signature. Next 16.4's default proxyClientMaxBodySize truncates proxy clones near 10 MiB; it does not reject the request early.",
+      "recommendation": "Set a hard byte limit and request controls at the operator reverse proxy, avoid global proxy body cloning for API paths that do not need it, and read webhook raw bytes through a streaming cap before signature verification.",
+      "formal_exclusion": "Denial of service and resource exhaustion are excluded from the CSO findings count."
+    }
+  ],
+  "availability_findings": [
+    {
+      "id": "SUP-1",
+      "title": "Multi-frame WebP screenshots cause large Sharp CPU amplification",
+      "severity": "Medium",
+      "confidence": 9,
+      "status": "VERIFIED",
+      "phase": 9,
+      "category": "OWASP A04 Insecure Design",
+      "file": "src/lib/agent-imports.ts",
+      "line": 155,
+      "attack_prerequisite": "A current catalog-capable staff session or agent key and a private import slug.",
+      "exploit_scenario": "Submit a valid WebP under the existing byte and dimension limits with a very large frame count. The exact metadata and conversion path processes the container for about 21 seconds while emitting a one-pixel PNG.",
+      "safe_proof": "A 5,005,614-byte WebP containing 100,000 1x1 frames took 7,279.66 ms for metadata and 14,120.41 ms for conversion on this host. The output was one 90-byte PNG.",
+      "impact": "Parallel accepted requests can consume image worker and CPU capacity and delay unrelated application work.",
+      "recommendation": "Reject metadata.pages values other than 1 before conversion and add per-key request and decode concurrency limits.",
+      "verification": "independently verified",
+      "formal_exclusion": "CSO hard exclusions 1 and 3 cover denial of service and CPU exhaustion."
+    },
+    {
+      "id": "SUP-2",
+      "title": "Anonymous missing-content requests force synchronous SQLite writes",
+      "severity": "Medium",
+      "confidence": 9,
+      "status": "VERIFIED",
+      "phase": 9,
+      "category": "OWASP A04 Insecure Design",
+      "file": "src/proxy.ts",
+      "line": 53,
+      "secondary_file": "src/lib/seo-redirects.ts:103",
+      "attack_prerequisite": "None; arbitrary remote requests to nonexistent clean listing or article paths reach the path.",
+      "exploit_scenario": "Send unique missing listing or article paths. Each miss opens an immediate transaction; after 500 paths each new request also evicts a row, keeping synchronous write pressure constant.",
+      "safe_proof": "Ten thousand direct calls with unique paths executed ten thousand immediate transactions in 392.89 ms against an in-memory database and retained exactly 500 rows.",
+      "impact": "A cheap 404 flood becomes serialized database writes and disk churn on the same SQLite service used by catalog, auth, audit, notification, and payment state.",
+      "recommendation": "Remove immediate writes from the request path. Aggregate or sample misses in memory, flush them in bounded batches, and apply edge rate limits to missing-content paths.",
+      "verification": "independently verified",
+      "formal_exclusion": "CSO hard exclusions 1 and 3 cover denial of service and resource exhaustion."
+    }
+  ],
+  "hardening_gaps": [
+    {
+      "priority": 1,
+      "title": "No repository-owned global browser security-header policy",
+      "condition": "Relevant only when the external reverse proxy does not add equivalent CSP, frame, HSTS, referrer, permissions, and content-type policies.",
+      "recommendation": "Define one tested policy in next.config.ts or document and test the exact reverse-proxy policy; disable X-Powered-By."
+    },
+    {
+      "priority": 2,
+      "title": "Weak BETTER_AUTH_SECRET values warn but do not fail closed",
+      "condition": "The manual requests a strong secret, but runtime configuration accepts weak nonempty values.",
+      "recommendation": "Reject production secrets shorter than 32 random bytes or below the documented strength before creating the auth instance."
+    },
+    {
+      "priority": 3,
+      "title": "Backups verify integrity but not provenance",
+      "condition": "An attacker who can modify backup storage can replace data, the bundled billing key, and the unhashed manifest together.",
+      "recommendation": "Authenticate backup manifests with an independently stored key or immutable storage control."
+    },
+    {
+      "priority": 4,
+      "title": "Container confinement stops at non-root and loopback binding",
+      "condition": "This raises post-compromise and resource-exhaustion impact but does not create the initial compromise.",
+      "recommendation": "Drop capabilities, set no-new-privileges, use a read-only root with explicit writable mounts, and add PID, memory, and CPU limits."
+    },
+    {
+      "priority": 5,
+      "title": "Docker base and APT inputs are mutable",
+      "condition": "A later build of the same source commit can consume different upstream binaries.",
+      "recommendation": "Pin the base image by digest, define the Node and npm toolchain, and adopt an update process for pinned OS inputs."
+    },
+    {
+      "priority": 6,
+      "title": "Secret scanning is not enforced",
+      "condition": "No CI workflow, .gitleaks.toml, or secretlint configuration is tracked; current history scans found no high-signal secret.",
+      "recommendation": "Add a small tracked secret-scanning policy and run it in protected CI."
+    },
+    {
+      "priority": 7,
+      "title": "Privileged accounts have no required second factor",
+      "condition": "No administrator MFA mechanism was found; password, magic-link, session, and suspension behavior otherwise use Better Auth's protected paths.",
+      "recommendation": "Require phishing-resistant MFA for administrator accounts before production use."
+    }
+  ],
+  "checked_and_sound": [
+    "No stored XSS sink survived tracing; Markdown skips raw HTML, JSON-LD escapes less-than characters, and external links use safe rel values.",
+    "No SQL injection path survived tracing; dynamic queries use bounded allowlisted identifiers or parameter binding.",
+    "No SSRF bypass survived verification; remote social-card images validate all DNS answers, pin the selected address, reject redirects, and enforce time and byte limits.",
+    "No webhook signature bypass was found across Stripe, Paddle, or NOWPayments.",
+    "No cross-owner media or listing access path survived authorization review.",
+    "No committed production credential or high-signal secret was found in current files or reviewed history.",
+    "No runtime eval, shell-enabled child process, unauthenticated remote code execution, or container breakout path was found.",
+    "No production dependency advisory was present at review time."
+  ],
+  "supply_chain_summary": {
+    "direct_deps": 27,
+    "transitive_deps": 317,
+    "critical_cves": 0,
+    "high_cves": 0,
+    "install_scripts": 2,
+    "lockfile_present": true,
+    "lockfile_tracked": true,
+    "tools_skipped": [
+      "gitleaks: not installed",
+      "trufflehog: not installed",
+      "semgrep: installed entry point has a broken interpreter",
+      "global AI skill scan: not authorized"
+    ],
+    "development_advisories": {
+      "high": 9,
+      "runtime_reachable": false,
+      "summary": "The current graph reaches braces <=3.0.3 through micromatch and fast-glob in eslint-config-next and shadcn. The affected graph is development-only and its advisory impact is stack-exhaustion denial of service."
+    },
+    "registry_signatures": {
+      "packages_verified": 961,
+      "provenance_attestations_verified": 348
+    }
+  },
+  "filter_stats": {
+    "candidates_scanned": 10,
+    "hard_exclusion_filtered": 7,
+    "confidence_gate_filtered": 0,
+    "verification_filtered": 3,
+    "reported": 0
+  },
+  "filter_notes": [
+    "The three verified availability candidates are preserved in baseline_scope_expansions or availability_findings but excluded from the formal total by CSO policy.",
+    "Global security headers, weak-secret fail-closed behavior, backup authentication, container confinement, and build reproducibility are retained as hardening gaps rather than formal vulnerabilities.",
+    "Host-header redirect injection, animated-image full-frame expansion, and account-mail disclosure candidates did not survive direct verification."
+  ],
+  "totals": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "tentative": 0
+  },
+  "trend": {
+    "prior_report_date": null,
+    "resolved": 0,
+    "persistent": 0,
+    "new": 0,
+    "direction": "first_run"
+  },
+  "stride": {
+    "authentication": {
+      "spoofing": "Better Auth sessions and agent keys are revalidated, but proxy-owned client IP sanitation is required for reliable rate limits.",
+      "elevation_of_privilege": "No new vertical escalation path survived review; the existing H2 stale-write race can undo moderation state."
+    },
+    "payments": {
+      "tampering": "Provider signatures and immutable hosted purchase terms are checked.",
+      "repudiation": "Provider evidence and audit events are retained, but the legacy Stripe path remains outside the complete lifecycle and dispute model."
+    },
+    "content_and_media": {
+      "information_disclosure": "Private media authorization and publication eligibility are rechecked on reads.",
+      "denial_of_service": "Multi-frame screenshot decoding and synchronous 404 telemetry writes add verified amplification paths."
+    },
+    "operations": {
+      "tampering": "Backup hashes detect corruption but do not authenticate the writer or storage provenance.",
+      "information_disclosure": "Runtime secrets and operator data are excluded from the image and build context."
+    }
+  },
+  "data_classification": {
+    "restricted": [
+      "Password hashes and session material stored by Better Auth in SQLite",
+      "Email addresses and account status in SQLite",
+      "Payment identifiers, purchase state, and webhook evidence in SQLite"
+    ],
+    "confidential": [
+      "Provider API and webhook secrets encrypted in SQLite under BILLING_SETTINGS_KEY",
+      "BETTER_AUTH_SECRET and Resend credentials supplied at runtime",
+      "Private draft media and unpublished content on the persistent data volume"
+    ],
+    "internal": [
+      "Administrative audit history, delivery failures, SEO missing-path telemetry, and deployment configuration"
+    ],
+    "public": [
+      "Published listings, published articles, public media, feeds, Markdown twins, metadata, and social cards"
+    ]
+  },
+  "verification": [
+    {
+      "command": "npm test",
+      "result": "PASS",
+      "evidence": "36 tests passed, 0 failed, 0 skipped; 119239.806035 ms. Loopback access was required for HTTP tests."
+    },
+    {
+      "command": "npx tsc --noEmit",
+      "result": "PASS",
+      "evidence": "Exit 0 with no diagnostics."
+    },
+    {
+      "command": "npm run lint",
+      "result": "FAIL",
+      "evidence": "Three no-require-imports errors in ignored .gitnexus/run.cjs plus two tracked-code warnings; this matches the baseline audit."
+    },
+    {
+      "command": "npx eslint . --ignore-pattern .gitnexus",
+      "result": "PASS_WITH_WARNINGS",
+      "evidence": "Exit 0 with the same two tracked-code warnings and no errors."
+    },
+    {
+      "command": "npm audit --omit=dev --json",
+      "result": "PASS",
+      "evidence": "0 production advisories across 344 production dependencies."
+    },
+    {
+      "command": "npm audit --json",
+      "result": "CONCERN",
+      "evidence": "9 High development-only advisory entries through the braces stack-exhaustion chain."
+    },
+    {
+      "command": "npm audit signatures",
+      "result": "PASS",
+      "evidence": "961 installed packages had valid registry signatures; 348 had verified provenance attestations."
+    },
+    {
+      "command": "production HTTP header and redirect probes on 127.0.0.1",
+      "result": "PASS_WITH_HARDENING_GAPS",
+      "evidence": "Owner sign-in redirects remained relative under an injected Host header. No repository-owned global CSP, HSTS, frame, referrer, or permissions policy appeared in tested responses."
+    },
+    {
+      "command": "safe Sharp multi-frame experiment",
+      "result": "CONFIRMED_SUPPLEMENTAL",
+      "evidence": "A valid 100,000-frame WebP stayed within byte and dimension limits and consumed about 21.4 seconds in the exact screenshot processing sequence."
+    },
+    {
+      "command": "safe seo_not_found write-path experiment",
+      "result": "CONFIRMED_SUPPLEMENTAL",
+      "evidence": "10,000 unique misses executed 10,000 immediate transactions and left the intended 500-row bound."
+    },
+    {
+      "command": "Ripwire focused maps, sink census, and verifier scans",
+      "result": "PASS_WITH_LIMITS",
+      "evidence": "No unsafe-C, weak-crypto, eval, or runtime shell path survived source tracing. Ripwire counts are floors and its graph is structural triage rather than a taint proof."
+    },
+    {
+      "command": "ripwire . --quality-delta",
+      "result": "PASS",
+      "evidence": "0 regressions, 0 minor regressions, 0 gating findings against git HEAD."
+    },
+    {
+      "command": "ripwire . --test-gate",
+      "result": "PASS_WITH_LIMITS",
+      "evidence": "0 changed code symbols, 0 impacted symbols, and 0 untested symbols; resolver gauges remain ambiguous=251, unresolved=872, unindexed=6 and all counts are floors."
+    }
+  ],
+  "limitations": [
+    "The supplied external reverse proxy configuration was unavailable, so forwarded-IP and security-header conclusions distinguish repository behavior from deployed behavior.",
+    "No Docker daemon was available for a fresh image build or live capability inspection.",
+    "No public deployment existed for live payment-provider, social-crawler, TLS, or edge-limit checks.",
+    "Semgrep could not run because its local entry point has a broken interpreter; gitleaks and trufflehog were not installed.",
+    "The global AI skill inventory was not scanned because the workflow requires explicit permission for files outside the repository.",
+    "This review used source tracing and bounded safe experiments. It did not send destructive requests, contact production services, or test live credentials."
+  ],
+  "artifact_locality": {
+    "gstack_ignored": false,
+    "note": ".gstack is not ignored by this repository. Keep this report local unless intentionally adding audit artifacts to version control."
+  },
+  "disclaimer": "This AI-assisted review reduces risk but is not a substitute for a qualified independent penetration test. It can miss subtle vulnerabilities and deployment-specific failures, especially in authentication, payments, proxy behavior, and third-party integrations."
+}
