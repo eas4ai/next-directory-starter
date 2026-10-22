@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "id": "reference-addon",
+  "name": "Reference Add-on",
+  "version": "1.0.0",
+  "compatibility": {
+    "starter": ">=1.2.0 <2.0.0",
+    "addonApi": 1
+  },
+  "themes": [
+    {
+      "id": "reference-addon",
+      "name": "Reference Add-on",
+      "entry": "src/theme.ts"
+    }
+  ],
+  "templates": [
+    {
+      "id": "reference-addon",
+      "name": "Reference Grid",
+      "stylesheet": "src/template.css",
+      "supportedProfiles": [
+        {
+          "id": "reference-addon.ai-tools",
+          "range": "^1.0.0"
+        }
+      ]
+    }
+  ],
+  "assets": [
+    "public/reference-mark.svg"
+  ],
+  "seed": "seed/catalog.json",
+  "files": [
+    "public/reference-mark.svg",
+    "seed/catalog.json",
+    "src/ai-tools.profile.json",
+    "src/template.css",
+    "src/theme.ts"
+  ],
+  "profiles": [
+    {
+      "id": "reference-addon.ai-tools",
+      "version": "1.0.0",
+      "schema": "src/ai-tools.profile.json"
+    }
+  ]
+}

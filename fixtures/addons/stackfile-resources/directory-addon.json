@@ -1,0 +1,9 @@
+{
+  "schemaVersion":1,"id":"stackfile-resources","name":"stackfile Developer Resources","version":"1.0.0",
+  "compatibility":{"starter":">=1.2.0 <2.0.0","addonApi":1},
+  "themes":[{"id":"stackfile-resources","name":"stackfile","entry":"src/theme.ts"}],
+  "templates":[{"id":"stackfile-resources","name":"stackfile Developer Resources","renderer":"src/template.tsx","templateApi":1,"stylesheet":"src/template.css","supportedProfiles":[{"id":"stackfile-resources.resources","range":"^1.0.0"}]}],
+  "profiles":[{"id":"stackfile-resources.resources","version":"1.0.0","schema":"src/resources.profile.json"}],
+  "assets":["public/stackfile-mark.svg"],"seed":"seed/catalog.json",
+  "files":["docs/changelog.md","docs/license.md","docs/readme.md","public/stackfile-mark.svg","seed/catalog.json","seed/media/cedar-auth.webp","seed/media/drift-observe.webp","seed/media/field-kit.webp","seed/media/forge-ui.webp","seed/media/northwind-cli.webp","seed/media/orbit-runtime.webp","seed/media/quarry-db.webp","seed/media/relay-queue.webp","src/resources.profile.json","src/template.css","src/template.tsx","src/theme.ts"]
+}

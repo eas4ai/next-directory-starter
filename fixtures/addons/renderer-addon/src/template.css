@@ -1,0 +1,17 @@
+[data-template="renderer-addon"] .template-hero {
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 1.5);
+  background: var(--card);
+  padding: clamp(1.5rem, 4vw, 3.5rem);
+}
+
+[data-template="renderer-addon"] .template-listing-grid,
+[data-template="renderer-addon"] .template-article-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+}
+
+.selection-preview[data-template="renderer-addon"] .theme-preview-body {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--theme-space-card);
+}
