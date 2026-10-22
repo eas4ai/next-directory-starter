@@ -1,0 +1,887 @@
+{
+  "profile": {
+    "id": "form-agencies.studios",
+    "version": "1.0.0"
+  },
+  "listings": [
+    {
+      "slug": "signal-works",
+      "title": "Signal Works",
+      "summary": "Signal Works pairs brand systems and campaigns with direct senior collaboration.",
+      "description": "Signal Works is an independent studio working across technology, culture. Its profile presents current capability, budget, timing, and studio-attributed case-study evidence so teams can assess fit before making an inquiry.",
+      "category": "Brand systems",
+      "url": "https://signal-works.example",
+      "status": "published",
+      "profileValues": {
+        "form-agencies.studios.services": [
+          "brand-systems",
+          "campaigns"
+        ],
+        "form-agencies.studios.industries": [
+          "technology",
+          "culture"
+        ],
+        "form-agencies.studios.headquarters": {
+          "countryCode": "US",
+          "region": "NY",
+          "locality": "Brooklyn",
+          "latitude": 40.6782,
+          "longitude": -73.9442
+        },
+        "form-agencies.studios.service-regions": [
+          "north-america",
+          "europe"
+        ],
+        "form-agencies.studios.team-size": "medium",
+        "form-agencies.studios.minimum-budget": {
+          "amountMinor": 2500000,
+          "currency": "USD"
+        },
+        "form-agencies.studios.engagement-models": [
+          "project",
+          "retainer"
+        ],
+        "form-agencies.studios.availability": "limited",
+        "form-agencies.studios.lead-time": 3628800,
+        "form-agencies.studios.contact-url": "https://signal-works.example/inquire",
+        "form-agencies.studios.case-studies": [
+          {
+            "id": "case-1",
+            "values": {
+              "title": "Signal Field Notes",
+              "service": "brand-systems",
+              "client-sector": "technology",
+              "outcome": "Unified a fragmented product family under one flexible visual system.",
+              "public-url": "https://signal-works.example/work/signal-field-notes"
+            }
+          }
+        ]
+      },
+      "media": [
+        {
+          "source": "seed/media/signal-works.webp",
+          "field": "form-agencies.studios.case-studies",
+          "alt": "Art-directed portfolio image for Signal Works showing the Signal Field Notes project",
+          "groupItemId": "case-1",
+          "childKey": "media"
+        }
+      ]
+    },
+    {
+      "slug": "common-ground",
+      "title": "Common Ground",
+      "summary": "Common Ground pairs environments and brand systems with direct senior collaboration.",
+      "description": "Common Ground is an independent studio working across public-sector, culture. Its profile presents current capability, budget, timing, and studio-attributed case-study evidence so teams can assess fit before making an inquiry.",
+      "category": "Environments",
+      "url": "https://common-ground.example",
+      "status": "published",
+      "profileValues": {
+        "form-agencies.studios.services": [
+          "environments",
+          "brand-systems"
+        ],
+        "form-agencies.studios.industries": [
+          "public-sector",
+          "culture"
+        ],
+        "form-agencies.studios.headquarters": {
+          "countryCode": "GB",
+          "region": "ENG",
+          "locality": "London",
+          "latitude": 51.5072,
+          "longitude": -0.1276
+        },
+        "form-agencies.studios.service-regions": [
+          "europe",
+          "global-remote"
+        ],
+        "form-agencies.studios.team-size": "small",
+        "form-agencies.studios.minimum-budget": {
+          "amountMinor": 1800000,
+          "currency": "USD"
+        },
+        "form-agencies.studios.engagement-models": [
+          "project",
+          "workshop"
+        ],
+        "form-agencies.studios.availability": "accepting",
+        "form-agencies.studios.lead-time": 2419200,
+        "form-agencies.studios.contact-url": "https://common-ground.example/inquire",
+        "form-agencies.studios.case-studies": [
+          {
+            "id": "case-2",
+            "values": {
+              "title": "Civic Route",
+              "service": "environments",
+              "client-sector": "public-sector",
+              "outcome": "Created a legible wayfinding family for a multi-site civic program.",
+              "public-url": "https://common-ground.example/work/civic-route"
+            }
+          }
+        ]
+      },
+      "media": [
+        {
+          "source": "seed/media/common-ground.webp",
+          "field": "form-agencies.studios.case-studies",
+          "alt": "Art-directed portfolio image for Common Ground showing the Civic Route project",
+          "groupItemId": "case-2",
+          "childKey": "media"
+        }
+      ]
+    },
+    {
+      "slug": "field-study",
+      "title": "Field Study",
+      "summary": "Field Study pairs packaging and brand systems with direct senior collaboration.",
+      "description": "Field Study is an independent studio working across consumer. Its profile presents current capability, budget, timing, and studio-attributed case-study evidence so teams can assess fit before making an inquiry.",
+      "category": "Packaging",
+      "url": "https://field-study.example",
+      "status": "published",
+      "profileValues": {
+        "form-agencies.studios.services": [
+          "packaging",
+          "brand-systems"
+        ],
+        "form-agencies.studios.industries": [
+          "consumer"
+        ],
+        "form-agencies.studios.headquarters": {
+          "countryCode": "US",
+          "region": "CA",
+          "locality": "Los Angeles",
+          "latitude": 34.0522,
+          "longitude": -118.2437
+        },
+        "form-agencies.studios.service-regions": [
+          "north-america",
+          "asia-pacific"
+        ],
+        "form-agencies.studios.team-size": "small",
+        "form-agencies.studios.minimum-budget": {
+          "amountMinor": 1200000,
+          "currency": "USD"
+        },
+        "form-agencies.studios.engagement-models": [
+          "project"
+        ],
+        "form-agencies.studios.availability": "accepting",
+        "form-agencies.studios.lead-time": 1814400,
+        "form-agencies.studios.contact-url": "https://field-study.example/inquire",
+        "form-agencies.studios.case-studies": [
+          {
+            "id": "case-3",
+            "values": {
+              "title": "Botanical Batch",
+              "service": "packaging",
+              "client-sector": "consumer",
+              "outcome": "Built a tactile packaging system designed to scale across seasonal releases.",
+              "public-url": "https://field-study.example/work/botanical-batch"
+            }
+          }
+        ]
+      },
+      "media": [
+        {
+          "source": "seed/media/field-study.webp",
+          "field": "form-agencies.studios.case-studies",
+          "alt": "Art-directed portfolio image for Field Study showing the Botanical Batch project",
+          "groupItemId": "case-3",
+          "childKey": "media"
+        }
+      ]
+    },
+    {
+      "slug": "orbit-studio",
+      "title": "Orbit Studio",
+      "summary": "Orbit Studio pairs digital products and service design with direct senior collaboration.",
+      "description": "Orbit Studio is an independent studio working across technology, finance. Its profile presents current capability, budget, timing, and studio-attributed case-study evidence so teams can assess fit before making an inquiry.",
+      "category": "Digital products",
+      "url": "https://orbit-studio.example",
+      "status": "published",
+      "profileValues": {
+        "form-agencies.studios.services": [
+          "digital-products",
+          "service-design"
+        ],
+        "form-agencies.studios.industries": [
+          "technology",
+          "finance"
+        ],
+        "form-agencies.studios.headquarters": {
+          "countryCode": "CA",
+          "region": "ON",
+          "locality": "Toronto",
+          "latitude": 43.6532,
+          "longitude": -79.3832
+        },
+        "form-agencies.studios.service-regions": [
+          "north-america",
+          "global-remote"
+        ],
+        "form-agencies.studios.team-size": "medium",
+        "form-agencies.studios.minimum-budget": {
+          "amountMinor": 3200000,
+          "currency": "USD"
+        },
+        "form-agencies.studios.engagement-models": [
+          "embedded",
+          "research-sprint"
+        ],
+        "form-agencies.studios.availability": "limited",
+        "form-agencies.studios.lead-time": 4838400,
+        "form-agencies.studios.contact-url": "https://orbit-studio.example/inquire",
+        "form-agencies.studios.case-studies": [
+          {
+            "id": "case-4",
+            "values": {
+              "title": "Common Ledger",
+              "service": "digital-products",
+              "client-sector": "finance",
+              "outcome": "Reduced product complexity through one coherent navigation and component model.",
+              "public-url": "https://orbit-studio.example/work/common-ledger"
+            }
+          }
+        ]
+      },
+      "media": [
+        {
+          "source": "seed/media/orbit-studio.webp",
+          "field": "form-agencies.studios.case-studies",
+          "alt": "Art-directed portfolio image for Orbit Studio showing the Common Ledger project",
+          "groupItemId": "case-4",
+          "childKey": "media"
+        }
+      ]
+    },
+    {
+      "slug": "north-county",
+      "title": "North County",
+      "summary": "North County pairs campaigns and brand systems with direct senior collaboration.",
+      "description": "North County is an independent studio working across outdoors, consumer. Its profile presents current capability, budget, timing, and studio-attributed case-study evidence so teams can assess fit before making an inquiry.",
+      "category": "Campaigns",
+      "url": "https://north-county.example",
+      "status": "published",
+      "profileValues": {
+        "form-agencies.studios.services": [
+          "campaigns",
+          "brand-systems"
+        ],
+        "form-agencies.studios.industries": [
+          "outdoors",
+          "consumer"
+        ],
+        "form-agencies.studios.headquarters": {
+          "countryCode": "US",
+          "region": "CO",
+          "locality": "Boulder",
+          "latitude": 40.015,
+          "longitude": -105.2705
+        },
+        "form-agencies.studios.service-regions": [
+          "north-america",
+          "europe"
+        ],
+        "form-agencies.studios.team-size": "small",
+        "form-agencies.studios.minimum-budget": {
+          "amountMinor": 2100000,
+          "currency": "USD"
+        },
+        "form-agencies.studios.engagement-models": [
+          "project",
+          "retainer"
+        ],
+        "form-agencies.studios.availability": "waitlist",
+        "form-agencies.studios.lead-time": 6048000,
+        "form-agencies.studios.contact-url": "https://north-county.example/inquire",
+        "form-agencies.studios.case-studies": [
+          {
+            "id": "case-5",
+            "values": {
+              "title": "Field Conditions",
+              "service": "campaigns",
+              "client-sector": "outdoors",
+              "outcome": "Developed a modular seasonal campaign grounded in real field environments.",
+              "public-url": "https://north-county.example/work/field-conditions"
+            }
+          }
+        ]
+      },
+      "media": [
+        {
+          "source": "seed/media/north-county.webp",
+          "field": "form-agencies.studios.case-studies",
+          "alt": "Art-directed portfolio image for North County showing the Field Conditions project",
+          "groupItemId": "case-5",
+          "childKey": "media"
+        }
+      ]
+    },
+    {
+      "slug": "primary-office",
+      "title": "Primary Office",
+      "summary": "Primary Office pairs brand systems and environments with direct senior collaboration.",
+      "description": "Primary Office is an independent studio working across culture, public-sector. Its profile presents current capability, budget, timing, and studio-attributed case-study evidence so teams can assess fit before making an inquiry.",
+      "category": "Culture",
+      "url": "https://primary-office.example",
+      "status": "published",
+      "profileValues": {
+        "form-agencies.studios.services": [
+          "brand-systems",
+          "environments"
+        ],
+        "form-agencies.studios.industries": [
+          "culture",
+          "public-sector"
+        ],
+        "form-agencies.studios.headquarters": {
+          "countryCode": "GB",
+          "region": "SCT",
+          "locality": "Glasgow",
+          "latitude": 55.8642,
+          "longitude": -4.2518
+        },
+        "form-agencies.studios.service-regions": [
+          "europe",
+          "global-remote"
+        ],
+        "form-agencies.studios.team-size": "micro",
+        "form-agencies.studios.minimum-budget": {
+          "amountMinor": 900000,
+          "currency": "USD"
+        },
+        "form-agencies.studios.engagement-models": [
+          "project",
+          "workshop"
+        ],
+        "form-agencies.studios.availability": "accepting",
+        "form-agencies.studios.lead-time": 1209600,
+        "form-agencies.studios.contact-url": "https://primary-office.example/inquire",
+        "form-agencies.studios.case-studies": [
+          {
+            "id": "case-6",
+            "values": {
+              "title": "Open Collection",
+              "service": "brand-systems",
+              "client-sector": "culture",
+              "outcome": "Connected exhibition, signage, and publication work through one public identity.",
+              "public-url": "https://primary-office.example/work/open-collection"
+            }
+          }
+        ]
+      },
+      "media": [
+        {
+          "source": "seed/media/primary-office.webp",
+          "field": "form-agencies.studios.case-studies",
+          "alt": "Art-directed portfolio image for Primary Office showing the Open Collection project",
+          "groupItemId": "case-6",
+          "childKey": "media"
+        }
+      ]
+    },
+    {
+      "slug": "morrow-partners",
+      "title": "Morrow Partners",
+      "summary": "Morrow Partners pairs service design and digital products with direct senior collaboration.",
+      "description": "Morrow Partners is an independent studio working across healthcare, public-sector. Its profile presents current capability, budget, timing, and studio-attributed case-study evidence so teams can assess fit before making an inquiry.",
+      "category": "Service design",
+      "url": "https://morrow-partners.example",
+      "status": "published",
+      "profileValues": {
+        "form-agencies.studios.services": [
+          "service-design",
+          "digital-products"
+        ],
+        "form-agencies.studios.industries": [
+          "healthcare",
+          "public-sector"
+        ],
+        "form-agencies.studios.headquarters": {
+          "countryCode": "US",
+          "region": "MA",
+          "locality": "Boston",
+          "latitude": 42.3601,
+          "longitude": -71.0589
+        },
+        "form-agencies.studios.service-regions": [
+          "north-america"
+        ],
+        "form-agencies.studios.team-size": "medium",
+        "form-agencies.studios.minimum-budget": {
+          "amountMinor": 4000000,
+          "currency": "USD"
+        },
+        "form-agencies.studios.engagement-models": [
+          "embedded",
+          "research-sprint"
+        ],
+        "form-agencies.studios.availability": "limited",
+        "form-agencies.studios.lead-time": 5443200,
+        "form-agencies.studios.contact-url": "https://morrow-partners.example/inquire",
+        "form-agencies.studios.case-studies": [
+          {
+            "id": "case-7",
+            "values": {
+              "title": "Care Arrival",
+              "service": "service-design",
+              "client-sector": "healthcare",
+              "outcome": "Mapped and redesigned the arrival experience across physical and digital touchpoints.",
+              "public-url": "https://morrow-partners.example/work/care-arrival"
+            }
+          }
+        ]
+      },
+      "media": [
+        {
+          "source": "seed/media/morrow-partners.webp",
+          "field": "form-agencies.studios.case-studies",
+          "alt": "Art-directed portfolio image for Morrow Partners showing the Care Arrival project",
+          "groupItemId": "case-7",
+          "childKey": "media"
+        }
+      ]
+    },
+    {
+      "slug": "still-life-labs",
+      "title": "Still Life Labs",
+      "summary": "Still Life Labs pairs packaging and campaigns with direct senior collaboration.",
+      "description": "Still Life Labs is an independent studio working across consumer, culture. Its profile presents current capability, budget, timing, and studio-attributed case-study evidence so teams can assess fit before making an inquiry.",
+      "category": "Product identity",
+      "url": "https://still-life-labs.example",
+      "status": "published",
+      "profileValues": {
+        "form-agencies.studios.services": [
+          "packaging",
+          "campaigns"
+        ],
+        "form-agencies.studios.industries": [
+          "consumer",
+          "culture"
+        ],
+        "form-agencies.studios.headquarters": {
+          "countryCode": "US",
+          "region": "IL",
+          "locality": "Chicago",
+          "latitude": 41.8781,
+          "longitude": -87.6298
+        },
+        "form-agencies.studios.service-regions": [
+          "north-america",
+          "global-remote"
+        ],
+        "form-agencies.studios.team-size": "micro",
+        "form-agencies.studios.minimum-budget": {
+          "amountMinor": 700000,
+          "currency": "USD"
+        },
+        "form-agencies.studios.engagement-models": [
+          "project"
+        ],
+        "form-agencies.studios.availability": "accepting",
+        "form-agencies.studios.lead-time": 604800,
+        "form-agencies.studios.contact-url": "https://still-life-labs.example/inquire",
+        "form-agencies.studios.case-studies": [
+          {
+            "id": "case-8",
+            "values": {
+              "title": "Everyday Objects",
+              "service": "packaging",
+              "client-sector": "consumer",
+              "outcome": "Created a distinctive launch world for a modular household collection.",
+              "public-url": "https://still-life-labs.example/work/everyday-objects"
+            }
+          }
+        ]
+      },
+      "media": [
+        {
+          "source": "seed/media/still-life-labs.webp",
+          "field": "form-agencies.studios.case-studies",
+          "alt": "Art-directed portfolio image for Still Life Labs showing the Everyday Objects project",
+          "groupItemId": "case-8",
+          "childKey": "media"
+        }
+      ]
+    },
+    {
+      "slug": "plain-form",
+      "title": "Plain Form",
+      "summary": "Plain Form pairs digital products with direct senior collaboration.",
+      "description": "Plain Form is an independent studio working across technology. Its profile presents current capability, budget, timing, and studio-attributed case-study evidence so teams can assess fit before making an inquiry.",
+      "category": "Digital products",
+      "url": "https://plain-form.example",
+      "status": "published",
+      "profileValues": {
+        "form-agencies.studios.services": [
+          "digital-products"
+        ],
+        "form-agencies.studios.industries": [
+          "technology"
+        ],
+        "form-agencies.studios.headquarters": {
+          "countryCode": "US",
+          "region": "OR",
+          "locality": "Portland",
+          "latitude": 45.5152,
+          "longitude": -122.6784
+        },
+        "form-agencies.studios.service-regions": [
+          "north-america",
+          "global-remote"
+        ],
+        "form-agencies.studios.team-size": "small",
+        "form-agencies.studios.minimum-budget": {
+          "amountMinor": 1500000,
+          "currency": "USD"
+        },
+        "form-agencies.studios.engagement-models": [
+          "project",
+          "embedded"
+        ],
+        "form-agencies.studios.availability": "accepting",
+        "form-agencies.studios.lead-time": 3024000,
+        "form-agencies.studios.contact-url": "https://plain-form.example/inquire",
+        "form-agencies.studios.case-studies": [
+          {
+            "id": "case-9",
+            "values": {
+              "title": "Quiet Control",
+              "service": "digital-products",
+              "client-sector": "technology",
+              "outcome": "Consolidated core workflows into a focused operations interface.",
+              "public-url": "https://plain-form.example/work/quiet-control"
+            }
+          }
+        ],
+        "form-agencies.studios.portfolio-media": []
+      },
+      "media": [
+        {
+          "source": "seed/media/plain-form.webp",
+          "alt": "Art-directed portfolio image for Plain Form showing the Quiet Control operations interface",
+          "field": "form-agencies.studios.case-studies",
+          "groupItemId": "case-9",
+          "childKey": "media"
+        }
+      ]
+    },
+    {
+      "slug": "kindred-dept",
+      "title": "Kindred Department",
+      "summary": "Kindred Department pairs brand systems and campaigns with direct senior collaboration.",
+      "description": "Kindred Department is an independent studio working across healthcare, consumer. Its profile presents current capability, budget, timing, and studio-attributed case-study evidence so teams can assess fit before making an inquiry.",
+      "category": "Brand systems",
+      "url": "https://kindred-dept.example",
+      "status": "published",
+      "profileValues": {
+        "form-agencies.studios.services": [
+          "brand-systems",
+          "campaigns"
+        ],
+        "form-agencies.studios.industries": [
+          "healthcare",
+          "consumer"
+        ],
+        "form-agencies.studios.headquarters": {
+          "countryCode": "CA",
+          "region": "BC",
+          "locality": "Vancouver",
+          "latitude": 49.2827,
+          "longitude": -123.1207
+        },
+        "form-agencies.studios.service-regions": [
+          "north-america"
+        ],
+        "form-agencies.studios.team-size": "small",
+        "form-agencies.studios.minimum-budget": {
+          "amountMinor": 2800000,
+          "currency": "USD"
+        },
+        "form-agencies.studios.engagement-models": [
+          "project",
+          "retainer"
+        ],
+        "form-agencies.studios.availability": "waitlist",
+        "form-agencies.studios.lead-time": 7257600,
+        "form-agencies.studios.contact-url": "https://kindred-dept.example/inquire",
+        "form-agencies.studios.case-studies": [
+          {
+            "id": "case-10",
+            "values": {
+              "title": "Human Measure",
+              "service": "brand-systems",
+              "client-sector": "healthcare",
+              "outcome": "Established a warm, accessible identity across care communications.",
+              "public-url": "https://kindred-dept.example/work/human-measure"
+            }
+          }
+        ],
+        "form-agencies.studios.portfolio-media": []
+      },
+      "media": [
+        {
+          "source": "seed/media/kindred-dept.webp",
+          "alt": "Art-directed portfolio image for Kindred Dept showing the Human Measure healthcare identity system",
+          "field": "form-agencies.studios.case-studies",
+          "groupItemId": "case-10",
+          "childKey": "media"
+        }
+      ]
+    },
+    {
+      "slug": "assembly-line",
+      "title": "Assembly Line",
+      "summary": "Assembly Line pairs environments and service design with direct senior collaboration.",
+      "description": "Assembly Line is an independent studio working across culture, consumer. Its profile presents current capability, budget, timing, and studio-attributed case-study evidence so teams can assess fit before making an inquiry.",
+      "category": "Environments",
+      "url": "https://assembly-line.example",
+      "status": "published",
+      "profileValues": {
+        "form-agencies.studios.services": [
+          "environments",
+          "service-design"
+        ],
+        "form-agencies.studios.industries": [
+          "culture",
+          "consumer"
+        ],
+        "form-agencies.studios.headquarters": {
+          "countryCode": "US",
+          "region": "MI",
+          "locality": "Detroit",
+          "latitude": 42.3314,
+          "longitude": -83.0458
+        },
+        "form-agencies.studios.service-regions": [
+          "north-america"
+        ],
+        "form-agencies.studios.team-size": "medium",
+        "form-agencies.studios.minimum-budget": {
+          "amountMinor": 3600000,
+          "currency": "USD"
+        },
+        "form-agencies.studios.engagement-models": [
+          "project",
+          "workshop"
+        ],
+        "form-agencies.studios.availability": "limited",
+        "form-agencies.studios.lead-time": 6652800,
+        "form-agencies.studios.contact-url": "https://assembly-line.example/inquire",
+        "form-agencies.studios.case-studies": [
+          {
+            "id": "case-11",
+            "values": {
+              "title": "Market Hall",
+              "service": "environments",
+              "client-sector": "consumer",
+              "outcome": "Designed a flexible public environment for independent makers and food vendors.",
+              "public-url": "https://assembly-line.example/work/market-hall"
+            }
+          }
+        ],
+        "form-agencies.studios.portfolio-media": []
+      },
+      "media": [
+        {
+          "source": "seed/media/assembly-line.webp",
+          "alt": "Art-directed portfolio image for Assembly Line showing the Market Hall public environment",
+          "field": "form-agencies.studios.case-studies",
+          "groupItemId": "case-11",
+          "childKey": "media"
+        }
+      ]
+    },
+    {
+      "slug": "parallel-practice",
+      "title": "Parallel Practice",
+      "summary": "Parallel Practice pairs service design and digital products with direct senior collaboration.",
+      "description": "Parallel Practice is an independent studio working across finance, technology. Its profile presents current capability, budget, timing, and studio-attributed case-study evidence so teams can assess fit before making an inquiry.",
+      "category": "Research",
+      "url": "https://parallel-practice.example",
+      "status": "published",
+      "profileValues": {
+        "form-agencies.studios.services": [
+          "service-design",
+          "digital-products"
+        ],
+        "form-agencies.studios.industries": [
+          "finance",
+          "technology"
+        ],
+        "form-agencies.studios.headquarters": {
+          "countryCode": "GB",
+          "region": "ENG",
+          "locality": "Manchester",
+          "latitude": 53.4808,
+          "longitude": -2.2426
+        },
+        "form-agencies.studios.service-regions": [
+          "europe",
+          "global-remote"
+        ],
+        "form-agencies.studios.team-size": "small",
+        "form-agencies.studios.minimum-budget": {
+          "amountMinor": 1950000,
+          "currency": "USD"
+        },
+        "form-agencies.studios.engagement-models": [
+          "research-sprint",
+          "workshop"
+        ],
+        "form-agencies.studios.availability": "accepting",
+        "form-agencies.studios.lead-time": 4233600,
+        "form-agencies.studios.contact-url": "https://parallel-practice.example/inquire",
+        "form-agencies.studios.case-studies": [
+          {
+            "id": "case-12",
+            "values": {
+              "title": "Trust Signals",
+              "service": "service-design",
+              "client-sector": "finance",
+              "outcome": "Translated customer evidence into a practical service roadmap.",
+              "public-url": "https://parallel-practice.example/work/trust-signals"
+            }
+          }
+        ],
+        "form-agencies.studios.portfolio-media": []
+      },
+      "media": [
+        {
+          "source": "seed/media/parallel-practice.webp",
+          "alt": "Art-directed portfolio image for Parallel Practice showing the Trust Signals service roadmap",
+          "field": "form-agencies.studios.case-studies",
+          "groupItemId": "case-12",
+          "childKey": "media"
+        }
+      ]
+    },
+    {
+      "slug": "bright-index",
+      "title": "Bright Index",
+      "summary": "Bright Index pairs campaigns and digital products with direct senior collaboration.",
+      "description": "Bright Index is an independent studio working across education, culture. Its profile presents current capability, budget, timing, and studio-attributed case-study evidence so teams can assess fit before making an inquiry.",
+      "category": "Campaigns",
+      "url": "https://bright-index.example",
+      "status": "published",
+      "profileValues": {
+        "form-agencies.studios.services": [
+          "campaigns",
+          "digital-products"
+        ],
+        "form-agencies.studios.industries": [
+          "culture",
+          "technology"
+        ],
+        "form-agencies.studios.headquarters": {
+          "countryCode": "US",
+          "region": "PA",
+          "locality": "Philadelphia",
+          "latitude": 39.9526,
+          "longitude": -75.1652
+        },
+        "form-agencies.studios.service-regions": [
+          "north-america",
+          "global-remote"
+        ],
+        "form-agencies.studios.team-size": "micro",
+        "form-agencies.studios.minimum-budget": {
+          "amountMinor": 1100000,
+          "currency": "USD"
+        },
+        "form-agencies.studios.engagement-models": [
+          "project",
+          "retainer"
+        ],
+        "form-agencies.studios.availability": "accepting",
+        "form-agencies.studios.lead-time": 7862400,
+        "form-agencies.studios.contact-url": "https://bright-index.example/inquire",
+        "form-agencies.studios.case-studies": [
+          {
+            "id": "case-13",
+            "values": {
+              "title": "Night School",
+              "service": "campaigns",
+              "client-sector": "culture",
+              "outcome": "Built a flexible recruitment campaign around real learner stories.",
+              "public-url": "https://bright-index.example/work/night-school"
+            }
+          }
+        ],
+        "form-agencies.studios.portfolio-media": []
+      },
+      "media": [
+        {
+          "source": "seed/media/bright-index.webp",
+          "alt": "Art-directed portfolio image for Bright Index showing the Night School recruitment campaign",
+          "field": "form-agencies.studios.case-studies",
+          "groupItemId": "case-13",
+          "childKey": "media"
+        }
+      ]
+    },
+    {
+      "slug": "matter-unit",
+      "title": "Matter Unit",
+      "summary": "Matter Unit pairs packaging and brand systems with direct senior collaboration.",
+      "description": "Matter Unit is an independent studio working across consumer, outdoors. Its profile presents current capability, budget, timing, and studio-attributed case-study evidence so teams can assess fit before making an inquiry.",
+      "category": "Packaging",
+      "url": "https://matter-unit.example",
+      "status": "draft",
+      "profileValues": {
+        "form-agencies.studios.services": [
+          "packaging",
+          "brand-systems"
+        ],
+        "form-agencies.studios.industries": [
+          "consumer",
+          "outdoors"
+        ],
+        "form-agencies.studios.headquarters": {
+          "countryCode": "US",
+          "region": "WA",
+          "locality": "Seattle",
+          "latitude": 47.6062,
+          "longitude": -122.3321
+        },
+        "form-agencies.studios.service-regions": [
+          "north-america",
+          "asia-pacific"
+        ],
+        "form-agencies.studios.team-size": "small",
+        "form-agencies.studios.minimum-budget": {
+          "amountMinor": 2300000,
+          "currency": "USD"
+        },
+        "form-agencies.studios.engagement-models": [
+          "project"
+        ],
+        "form-agencies.studios.availability": "unavailable",
+        "form-agencies.studios.lead-time": 10368000,
+        "form-agencies.studios.contact-url": "https://matter-unit.example/inquire",
+        "form-agencies.studios.case-studies": [
+          {
+            "id": "case-14",
+            "values": {
+              "title": "Trail Supply",
+              "service": "packaging",
+              "client-sector": "outdoors",
+              "outcome": "Developed a durable family of packs and field-ready product labels.",
+              "public-url": "https://matter-unit.example/work/trail-supply"
+            }
+          }
+        ],
+        "form-agencies.studios.portfolio-media": []
+      },
+      "media": [
+        {
+          "source": "seed/media/matter-unit.webp",
+          "alt": "Art-directed portfolio image for Matter Unit showing the Trail Supply packaging system",
+          "field": "form-agencies.studios.case-studies",
+          "groupItemId": "case-14",
+          "childKey": "media"
+        }
+      ]
+    }
+  ]
+}

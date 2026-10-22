@@ -1,0 +1,831 @@
+{
+  "profile": {
+    "id": "elsewhere-travel.experiences",
+    "version": "1.0.0"
+  },
+  "listings": [
+    {
+      "slug": "tideglass-kayak",
+      "title": "Tideglass Kayak",
+      "summary": "A moderate coastal experience in Lagos, Portugal with a published route, price, and group size.",
+      "description": "Tideglass Kayak is a provider-described coastal experience in Lagos, Portugal. Elsewhere presents the published season, activities, duration, price, group size, difficulty, access notes, inclusions, meeting place, and itinerary. Booking information links to the provider without asserting live availability, reservation status, transportation, or payment.",
+      "category": "Coastal",
+      "url": "https://tideglass-kayak.example",
+      "status": "published",
+      "profileValues": {
+        "elsewhere-travel.experiences.destination": "Lagos, Portugal",
+        "elsewhere-travel.experiences.meeting-location": {
+          "countryCode": "PT",
+          "region": "Faro",
+          "locality": "Lagos",
+          "latitude": 37.1028,
+          "longitude": -8.6742
+        },
+        "elsewhere-travel.experiences.experience-type": "coastal",
+        "elsewhere-travel.experiences.seasons": [
+          "spring",
+          "summer"
+        ],
+        "elsewhere-travel.experiences.activities": [
+          "kayaking",
+          "wildlife"
+        ],
+        "elsewhere-travel.experiences.duration": 10800,
+        "elsewhere-travel.experiences.price": {
+          "amountMinor": 14500,
+          "currency": "USD"
+        },
+        "elsewhere-travel.experiences.group-size": 8,
+        "elsewhere-travel.experiences.difficulty": "moderate",
+        "elsewhere-travel.experiences.accessibility": [
+          "adaptive-equipment",
+          "low-impact"
+        ],
+        "elsewhere-travel.experiences.inclusions": [
+          "local-guide",
+          "equipment",
+          "safety-gear",
+          "refreshments"
+        ],
+        "elsewhere-travel.experiences.booking-url": "https://tideglass-kayak.example/trip-details",
+        "elsewhere-travel.experiences.itinerary": [
+          {
+            "id": "stage-1",
+            "values": {
+              "stop": "Cliffside coves by kayak",
+              "note": "Paddle through calm coves and sea arches with a local guide."
+            }
+          }
+        ],
+        "elsewhere-travel.experiences.destination-region": "lagos-portugal"
+      },
+      "media": [
+        {
+          "source": "seed/media/tideglass-kayak.webp",
+          "field": "elsewhere-travel.experiences.travel-media",
+          "alt": "Original travel photograph for Tideglass Kayak"
+        }
+      ]
+    },
+    {
+      "slug": "alpine-wildflower-walk",
+      "title": "Alpine Wildflower Walk",
+      "summary": "A moderate mountain experience in North Cascades, USA with a published route, price, and group size.",
+      "description": "Alpine Wildflower Walk is a provider-described mountain experience in North Cascades, USA. Elsewhere presents the published season, activities, duration, price, group size, difficulty, access notes, inclusions, meeting place, and itinerary. Booking information links to the provider without asserting live availability, reservation status, transportation, or payment.",
+      "category": "Mountain",
+      "url": "https://alpine-wildflower-walk.example",
+      "status": "published",
+      "profileValues": {
+        "elsewhere-travel.experiences.destination": "North Cascades, USA",
+        "elsewhere-travel.experiences.meeting-location": {
+          "countryCode": "US",
+          "region": "WA",
+          "locality": "Marblemount",
+          "latitude": 48.5356,
+          "longitude": -121.4362
+        },
+        "elsewhere-travel.experiences.experience-type": "mountain",
+        "elsewhere-travel.experiences.seasons": [
+          "summer"
+        ],
+        "elsewhere-travel.experiences.activities": [
+          "hiking",
+          "photography"
+        ],
+        "elsewhere-travel.experiences.duration": 18000,
+        "elsewhere-travel.experiences.price": {
+          "amountMinor": 9800,
+          "currency": "USD"
+        },
+        "elsewhere-travel.experiences.group-size": 10,
+        "elsewhere-travel.experiences.difficulty": "moderate",
+        "elsewhere-travel.experiences.accessibility": [
+          "low-impact",
+          "hearing-support"
+        ],
+        "elsewhere-travel.experiences.inclusions": [
+          "local-guide",
+          "permits",
+          "refreshments"
+        ],
+        "elsewhere-travel.experiences.booking-url": "https://alpine-wildflower-walk.example/trip-details",
+        "elsewhere-travel.experiences.itinerary": [
+          {
+            "id": "stage-2",
+            "values": {
+              "stop": "Meadows above the tree line",
+              "note": "Follow a measured ridge route through peak wildflower season."
+            }
+          }
+        ],
+        "elsewhere-travel.experiences.destination-region": "north-cascades-usa"
+      },
+      "media": [
+        {
+          "source": "seed/media/alpine-wildflower-walk.webp",
+          "field": "elsewhere-travel.experiences.travel-media",
+          "alt": "Original travel photograph for Alpine Wildflower Walk"
+        }
+      ]
+    },
+    {
+      "slug": "copper-canyon-evening",
+      "title": "Copper Canyon Evening",
+      "summary": "A challenging desert experience in Moab, USA with a published route, price, and group size.",
+      "description": "Copper Canyon Evening is a provider-described desert experience in Moab, USA. Elsewhere presents the published season, activities, duration, price, group size, difficulty, access notes, inclusions, meeting place, and itinerary. Booking information links to the provider without asserting live availability, reservation status, transportation, or payment.",
+      "category": "Desert",
+      "url": "https://copper-canyon-evening.example",
+      "status": "published",
+      "profileValues": {
+        "elsewhere-travel.experiences.destination": "Moab, USA",
+        "elsewhere-travel.experiences.meeting-location": {
+          "countryCode": "US",
+          "region": "UT",
+          "locality": "Moab",
+          "latitude": 38.5733,
+          "longitude": -109.5498
+        },
+        "elsewhere-travel.experiences.experience-type": "desert",
+        "elsewhere-travel.experiences.seasons": [
+          "spring",
+          "autumn"
+        ],
+        "elsewhere-travel.experiences.activities": [
+          "hiking",
+          "photography"
+        ],
+        "elsewhere-travel.experiences.duration": 14400,
+        "elsewhere-travel.experiences.price": {
+          "amountMinor": 13200,
+          "currency": "USD"
+        },
+        "elsewhere-travel.experiences.group-size": 9,
+        "elsewhere-travel.experiences.difficulty": "challenging",
+        "elsewhere-travel.experiences.accessibility": [
+          "hearing-support"
+        ],
+        "elsewhere-travel.experiences.inclusions": [
+          "local-guide",
+          "permits",
+          "refreshments"
+        ],
+        "elsewhere-travel.experiences.booking-url": "https://copper-canyon-evening.example/trip-details",
+        "elsewhere-travel.experiences.itinerary": [
+          {
+            "id": "stage-3",
+            "values": {
+              "stop": "Sandstone at sunset",
+              "note": "Walk a sculpted canyon as late light moves across the walls."
+            }
+          }
+        ],
+        "elsewhere-travel.experiences.destination-region": "moab-usa"
+      },
+      "media": [
+        {
+          "source": "seed/media/copper-canyon-evening.webp",
+          "field": "elsewhere-travel.experiences.travel-media",
+          "alt": "Original travel photograph for Copper Canyon Evening"
+        }
+      ]
+    },
+    {
+      "slug": "cypress-water-trail",
+      "title": "Cypress Water Trail",
+      "summary": "A easy wetland experience in Atchafalaya, USA with a published route, price, and group size.",
+      "description": "Cypress Water Trail is a provider-described wetland experience in Atchafalaya, USA. Elsewhere presents the published season, activities, duration, price, group size, difficulty, access notes, inclusions, meeting place, and itinerary. Booking information links to the provider without asserting live availability, reservation status, transportation, or payment.",
+      "category": "Wetland",
+      "url": "https://cypress-water-trail.example",
+      "status": "published",
+      "profileValues": {
+        "elsewhere-travel.experiences.destination": "Atchafalaya, USA",
+        "elsewhere-travel.experiences.meeting-location": {
+          "countryCode": "US",
+          "region": "LA",
+          "locality": "Henderson",
+          "latitude": 30.3138,
+          "longitude": -91.7904
+        },
+        "elsewhere-travel.experiences.experience-type": "wetland",
+        "elsewhere-travel.experiences.seasons": [
+          "spring",
+          "autumn"
+        ],
+        "elsewhere-travel.experiences.activities": [
+          "canoeing",
+          "wildlife"
+        ],
+        "elsewhere-travel.experiences.duration": 12600,
+        "elsewhere-travel.experiences.price": {
+          "amountMinor": 11800,
+          "currency": "USD"
+        },
+        "elsewhere-travel.experiences.group-size": 6,
+        "elsewhere-travel.experiences.difficulty": "easy",
+        "elsewhere-travel.experiences.accessibility": [
+          "adaptive-equipment",
+          "low-impact"
+        ],
+        "elsewhere-travel.experiences.inclusions": [
+          "local-guide",
+          "equipment",
+          "safety-gear"
+        ],
+        "elsewhere-travel.experiences.booking-url": "https://cypress-water-trail.example/trip-details",
+        "elsewhere-travel.experiences.itinerary": [
+          {
+            "id": "stage-4",
+            "values": {
+              "stop": "Quiet water beneath cypress",
+              "note": "Canoe a sheltered wetland route with natural history interpretation."
+            }
+          }
+        ],
+        "elsewhere-travel.experiences.destination-region": "atchafalaya-usa"
+      },
+      "media": [
+        {
+          "source": "seed/media/cypress-water-trail.webp",
+          "field": "elsewhere-travel.experiences.travel-media",
+          "alt": "Original travel photograph for Cypress Water Trail"
+        }
+      ]
+    },
+    {
+      "slug": "atlas-night-sky",
+      "title": "Atlas Night Sky",
+      "summary": "A easy night sky experience in Imlil, Morocco with a published route, price, and group size.",
+      "description": "Atlas Night Sky is a provider-described night sky experience in Imlil, Morocco. Elsewhere presents the published season, activities, duration, price, group size, difficulty, access notes, inclusions, meeting place, and itinerary. Booking information links to the provider without asserting live availability, reservation status, transportation, or payment.",
+      "category": "Night Sky",
+      "url": "https://atlas-night-sky.example",
+      "status": "published",
+      "profileValues": {
+        "elsewhere-travel.experiences.destination": "Imlil, Morocco",
+        "elsewhere-travel.experiences.meeting-location": {
+          "countryCode": "MA",
+          "region": "Marrakesh-Safi",
+          "locality": "Imlil",
+          "latitude": 31.1373,
+          "longitude": -7.9197
+        },
+        "elsewhere-travel.experiences.experience-type": "night-sky",
+        "elsewhere-travel.experiences.seasons": [
+          "spring",
+          "summer",
+          "autumn"
+        ],
+        "elsewhere-travel.experiences.activities": [
+          "stargazing",
+          "photography"
+        ],
+        "elsewhere-travel.experiences.duration": 21600,
+        "elsewhere-travel.experiences.price": {
+          "amountMinor": 18900,
+          "currency": "USD"
+        },
+        "elsewhere-travel.experiences.group-size": 12,
+        "elsewhere-travel.experiences.difficulty": "easy",
+        "elsewhere-travel.experiences.accessibility": [
+          "low-impact",
+          "visual-guide"
+        ],
+        "elsewhere-travel.experiences.inclusions": [
+          "local-guide",
+          "meal",
+          "instruction"
+        ],
+        "elsewhere-travel.experiences.booking-url": "https://atlas-night-sky.example/trip-details",
+        "elsewhere-travel.experiences.itinerary": [
+          {
+            "id": "stage-5",
+            "values": {
+              "stop": "Stars above the Atlas",
+              "note": "Share a mountain meal and read the night sky with a local astronomy guide."
+            }
+          }
+        ],
+        "elsewhere-travel.experiences.destination-region": "imlil-morocco"
+      },
+      "media": [
+        {
+          "source": "seed/media/atlas-night-sky.webp",
+          "field": "elsewhere-travel.experiences.travel-media",
+          "alt": "Original travel photograph for Atlas Night Sky"
+        }
+      ]
+    },
+    {
+      "slug": "outer-coast-forage",
+      "title": "Outer Coast Forage",
+      "summary": "A moderate coastal experience in Astoria, USA with a published route, price, and group size.",
+      "description": "Outer Coast Forage is a provider-described coastal experience in Astoria, USA. Elsewhere presents the published season, activities, duration, price, group size, difficulty, access notes, inclusions, meeting place, and itinerary. Booking information links to the provider without asserting live availability, reservation status, transportation, or payment.",
+      "category": "Coastal",
+      "url": "https://outer-coast-forage.example",
+      "status": "published",
+      "profileValues": {
+        "elsewhere-travel.experiences.destination": "Astoria, USA",
+        "elsewhere-travel.experiences.meeting-location": {
+          "countryCode": "US",
+          "region": "OR",
+          "locality": "Astoria",
+          "latitude": 46.1879,
+          "longitude": -123.8313
+        },
+        "elsewhere-travel.experiences.experience-type": "coastal",
+        "elsewhere-travel.experiences.seasons": [
+          "spring",
+          "summer",
+          "autumn"
+        ],
+        "elsewhere-travel.experiences.activities": [
+          "foraging",
+          "walking"
+        ],
+        "elsewhere-travel.experiences.duration": 16200,
+        "elsewhere-travel.experiences.price": {
+          "amountMinor": 15600,
+          "currency": "USD"
+        },
+        "elsewhere-travel.experiences.group-size": 8,
+        "elsewhere-travel.experiences.difficulty": "moderate",
+        "elsewhere-travel.experiences.accessibility": [
+          "low-impact",
+          "hearing-support"
+        ],
+        "elsewhere-travel.experiences.inclusions": [
+          "local-guide",
+          "equipment",
+          "meal"
+        ],
+        "elsewhere-travel.experiences.booking-url": "https://outer-coast-forage.example/trip-details",
+        "elsewhere-travel.experiences.itinerary": [
+          {
+            "id": "stage-6",
+            "values": {
+              "stop": "Edible edges of the Pacific",
+              "note": "Read tide pools and coastal plants before a guide-prepared tasting."
+            }
+          }
+        ],
+        "elsewhere-travel.experiences.destination-region": "astoria-usa"
+      },
+      "media": [
+        {
+          "source": "seed/media/outer-coast-forage.webp",
+          "field": "elsewhere-travel.experiences.travel-media",
+          "alt": "Original travel photograph for Outer Coast Forage"
+        }
+      ]
+    },
+    {
+      "slug": "blue-island-cycle",
+      "title": "Blue Island Cycle",
+      "summary": "A challenging island experience in Naxos, Greece with a published route, price, and group size.",
+      "description": "Blue Island Cycle is a provider-described island experience in Naxos, Greece. Elsewhere presents the published season, activities, duration, price, group size, difficulty, access notes, inclusions, meeting place, and itinerary. Booking information links to the provider without asserting live availability, reservation status, transportation, or payment.",
+      "category": "Island",
+      "url": "https://blue-island-cycle.example",
+      "status": "published",
+      "profileValues": {
+        "elsewhere-travel.experiences.destination": "Naxos, Greece",
+        "elsewhere-travel.experiences.meeting-location": {
+          "countryCode": "GR",
+          "region": "South Aegean",
+          "locality": "Naxos",
+          "latitude": 37.1036,
+          "longitude": 25.3764
+        },
+        "elsewhere-travel.experiences.experience-type": "island",
+        "elsewhere-travel.experiences.seasons": [
+          "spring",
+          "summer",
+          "autumn"
+        ],
+        "elsewhere-travel.experiences.activities": [
+          "cycling",
+          "photography"
+        ],
+        "elsewhere-travel.experiences.duration": 19800,
+        "elsewhere-travel.experiences.price": {
+          "amountMinor": 21200,
+          "currency": "USD"
+        },
+        "elsewhere-travel.experiences.group-size": 7,
+        "elsewhere-travel.experiences.difficulty": "challenging",
+        "elsewhere-travel.experiences.accessibility": [
+          "adaptive-equipment"
+        ],
+        "elsewhere-travel.experiences.inclusions": [
+          "local-guide",
+          "equipment",
+          "safety-gear",
+          "refreshments"
+        ],
+        "elsewhere-travel.experiences.booking-url": "https://blue-island-cycle.example/trip-details",
+        "elsewhere-travel.experiences.itinerary": [
+          {
+            "id": "stage-7",
+            "values": {
+              "stop": "Village roads to the sea",
+              "note": "Ride quiet interior roads from mountain villages to the coast."
+            }
+          }
+        ],
+        "elsewhere-travel.experiences.destination-region": "naxos-greece"
+      },
+      "media": [
+        {
+          "source": "seed/media/blue-island-cycle.webp",
+          "field": "elsewhere-travel.experiences.travel-media",
+          "alt": "Original travel photograph for Blue Island Cycle"
+        }
+      ]
+    },
+    {
+      "slug": "cedar-rain-walk",
+      "title": "Cedar Rain Walk",
+      "summary": "A moderate forest experience in Yakushima, Japan with a published route, price, and group size.",
+      "description": "Cedar Rain Walk is a provider-described forest experience in Yakushima, Japan. Elsewhere presents the published season, activities, duration, price, group size, difficulty, access notes, inclusions, meeting place, and itinerary. Booking information links to the provider without asserting live availability, reservation status, transportation, or payment.",
+      "category": "Forest",
+      "url": "https://cedar-rain-walk.example",
+      "status": "published",
+      "profileValues": {
+        "elsewhere-travel.experiences.destination": "Yakushima, Japan",
+        "elsewhere-travel.experiences.meeting-location": {
+          "countryCode": "JP",
+          "region": "Kagoshima",
+          "locality": "Yakushima",
+          "latitude": 30.3584,
+          "longitude": 130.528
+        },
+        "elsewhere-travel.experiences.experience-type": "forest",
+        "elsewhere-travel.experiences.seasons": [
+          "spring",
+          "summer",
+          "autumn",
+          "winter"
+        ],
+        "elsewhere-travel.experiences.activities": [
+          "walking",
+          "photography"
+        ],
+        "elsewhere-travel.experiences.duration": 17100,
+        "elsewhere-travel.experiences.price": {
+          "amountMinor": 17600,
+          "currency": "USD"
+        },
+        "elsewhere-travel.experiences.group-size": 8,
+        "elsewhere-travel.experiences.difficulty": "moderate",
+        "elsewhere-travel.experiences.accessibility": [
+          "low-impact",
+          "visual-guide"
+        ],
+        "elsewhere-travel.experiences.inclusions": [
+          "local-guide",
+          "permits",
+          "refreshments"
+        ],
+        "elsewhere-travel.experiences.booking-url": "https://cedar-rain-walk.example/trip-details",
+        "elsewhere-travel.experiences.itinerary": [
+          {
+            "id": "stage-8",
+            "values": {
+              "stop": "Ancient cedar in soft rain",
+              "note": "Move slowly through moss, cedar, and mist with a forest guide."
+            }
+          }
+        ],
+        "elsewhere-travel.experiences.destination-region": "yakushima-japan"
+      },
+      "media": [
+        {
+          "source": "seed/media/cedar-rain-walk.webp",
+          "field": "elsewhere-travel.experiences.travel-media",
+          "alt": "Original travel photograph for Cedar Rain Walk"
+        }
+      ]
+    },
+    {
+      "slug": "volcanic-spring-path",
+      "title": "Volcanic Spring Path",
+      "summary": "A moderate mountain experience in Hveragerði, Iceland with a published route, price, and group size.",
+      "description": "Volcanic Spring Path is a provider-described mountain experience in Hveragerði, Iceland. Elsewhere presents the published season, activities, duration, price, group size, difficulty, access notes, inclusions, meeting place, and itinerary. Booking information links to the provider without asserting live availability, reservation status, transportation, or payment.",
+      "category": "Mountain",
+      "url": "https://volcanic-spring-path.example",
+      "status": "published",
+      "profileValues": {
+        "elsewhere-travel.experiences.destination": "Hveragerði, Iceland",
+        "elsewhere-travel.experiences.meeting-location": {
+          "countryCode": "IS",
+          "region": "South",
+          "locality": "Hveragerði",
+          "latitude": 63.9984,
+          "longitude": -21.1887
+        },
+        "elsewhere-travel.experiences.experience-type": "mountain",
+        "elsewhere-travel.experiences.seasons": [
+          "summer",
+          "autumn"
+        ],
+        "elsewhere-travel.experiences.activities": [
+          "hiking"
+        ],
+        "elsewhere-travel.experiences.duration": 15000,
+        "elsewhere-travel.experiences.price": {
+          "amountMinor": 16400,
+          "currency": "USD"
+        },
+        "elsewhere-travel.experiences.group-size": 10,
+        "elsewhere-travel.experiences.difficulty": "moderate",
+        "elsewhere-travel.experiences.accessibility": [
+          "hearing-support"
+        ],
+        "elsewhere-travel.experiences.inclusions": [
+          "local-guide",
+          "safety-gear",
+          "refreshments"
+        ],
+        "elsewhere-travel.experiences.booking-url": "https://volcanic-spring-path.example/trip-details",
+        "elsewhere-travel.experiences.itinerary": [
+          {
+            "id": "stage-9",
+            "values": {
+              "stop": "Steam valleys on foot",
+              "note": "Follow a marked geothermal path with a trained local guide."
+            }
+          }
+        ],
+        "elsewhere-travel.experiences.travel-media": [],
+        "elsewhere-travel.experiences.destination-region": "hveragerdi-iceland"
+      }
+    },
+    {
+      "slug": "cloud-forest-dawn",
+      "title": "Cloud Forest Dawn",
+      "summary": "A easy forest experience in Monteverde, Costa Rica with a published route, price, and group size.",
+      "description": "Cloud Forest Dawn is a provider-described forest experience in Monteverde, Costa Rica. Elsewhere presents the published season, activities, duration, price, group size, difficulty, access notes, inclusions, meeting place, and itinerary. Booking information links to the provider without asserting live availability, reservation status, transportation, or payment.",
+      "category": "Forest",
+      "url": "https://cloud-forest-dawn.example",
+      "status": "published",
+      "profileValues": {
+        "elsewhere-travel.experiences.destination": "Monteverde, Costa Rica",
+        "elsewhere-travel.experiences.meeting-location": {
+          "countryCode": "CR",
+          "region": "Puntarenas",
+          "locality": "Monteverde",
+          "latitude": 10.3009,
+          "longitude": -84.8255
+        },
+        "elsewhere-travel.experiences.experience-type": "forest",
+        "elsewhere-travel.experiences.seasons": [
+          "year-round"
+        ],
+        "elsewhere-travel.experiences.activities": [
+          "wildlife",
+          "walking"
+        ],
+        "elsewhere-travel.experiences.duration": 13500,
+        "elsewhere-travel.experiences.price": {
+          "amountMinor": 12400,
+          "currency": "USD"
+        },
+        "elsewhere-travel.experiences.group-size": 9,
+        "elsewhere-travel.experiences.difficulty": "easy",
+        "elsewhere-travel.experiences.accessibility": [
+          "low-impact",
+          "hearing-support"
+        ],
+        "elsewhere-travel.experiences.inclusions": [
+          "local-guide",
+          "equipment",
+          "refreshments"
+        ],
+        "elsewhere-travel.experiences.booking-url": "https://cloud-forest-dawn.example/trip-details",
+        "elsewhere-travel.experiences.itinerary": [
+          {
+            "id": "stage-10",
+            "values": {
+              "stop": "First light in the canopy",
+              "note": "Listen and look for forest birds along an early guided trail."
+            }
+          }
+        ],
+        "elsewhere-travel.experiences.destination-region": "monteverde-costa-rica"
+      }
+    },
+    {
+      "slug": "fjord-edge-hike",
+      "title": "Fjord Edge Hike",
+      "summary": "A challenging mountain experience in Aurland, Norway with a published route, price, and group size.",
+      "description": "Fjord Edge Hike is a provider-described mountain experience in Aurland, Norway. Elsewhere presents the published season, activities, duration, price, group size, difficulty, access notes, inclusions, meeting place, and itinerary. Booking information links to the provider without asserting live availability, reservation status, transportation, or payment.",
+      "category": "Mountain",
+      "url": "https://fjord-edge-hike.example",
+      "status": "published",
+      "profileValues": {
+        "elsewhere-travel.experiences.destination": "Aurland, Norway",
+        "elsewhere-travel.experiences.meeting-location": {
+          "countryCode": "NO",
+          "region": "Vestland",
+          "locality": "Aurland",
+          "latitude": 60.9059,
+          "longitude": 7.1871
+        },
+        "elsewhere-travel.experiences.experience-type": "mountain",
+        "elsewhere-travel.experiences.seasons": [
+          "summer",
+          "autumn"
+        ],
+        "elsewhere-travel.experiences.activities": [
+          "hiking",
+          "photography"
+        ],
+        "elsewhere-travel.experiences.duration": 23400,
+        "elsewhere-travel.experiences.price": {
+          "amountMinor": 22800,
+          "currency": "USD"
+        },
+        "elsewhere-travel.experiences.group-size": 8,
+        "elsewhere-travel.experiences.difficulty": "challenging",
+        "elsewhere-travel.experiences.accessibility": [
+          "visual-guide"
+        ],
+        "elsewhere-travel.experiences.inclusions": [
+          "local-guide",
+          "permits",
+          "safety-gear"
+        ],
+        "elsewhere-travel.experiences.booking-url": "https://fjord-edge-hike.example/trip-details",
+        "elsewhere-travel.experiences.itinerary": [
+          {
+            "id": "stage-11",
+            "values": {
+              "stop": "High paths above the fjord",
+              "note": "Climb from orchard slopes to an open viewpoint above the water."
+            }
+          }
+        ],
+        "elsewhere-travel.experiences.destination-region": "aurland-norway"
+      }
+    },
+    {
+      "slug": "madeira-levada-morning",
+      "title": "Madeira Levada Morning",
+      "summary": "A easy forest experience in Madeira, Portugal with a published route, price, and group size.",
+      "description": "Madeira Levada Morning is a provider-described forest experience in Madeira, Portugal. Elsewhere presents the published season, activities, duration, price, group size, difficulty, access notes, inclusions, meeting place, and itinerary. Booking information links to the provider without asserting live availability, reservation status, transportation, or payment.",
+      "category": "Forest",
+      "url": "https://madeira-levada-morning.example",
+      "status": "published",
+      "profileValues": {
+        "elsewhere-travel.experiences.destination": "Madeira, Portugal",
+        "elsewhere-travel.experiences.meeting-location": {
+          "countryCode": "PT",
+          "region": "Madeira",
+          "locality": "Funchal",
+          "latitude": 32.6669,
+          "longitude": -16.9241
+        },
+        "elsewhere-travel.experiences.experience-type": "forest",
+        "elsewhere-travel.experiences.seasons": [
+          "year-round"
+        ],
+        "elsewhere-travel.experiences.activities": [
+          "walking",
+          "photography"
+        ],
+        "elsewhere-travel.experiences.duration": 11700,
+        "elsewhere-travel.experiences.price": {
+          "amountMinor": 8700,
+          "currency": "USD"
+        },
+        "elsewhere-travel.experiences.group-size": 12,
+        "elsewhere-travel.experiences.difficulty": "easy",
+        "elsewhere-travel.experiences.accessibility": [
+          "low-impact",
+          "hearing-support"
+        ],
+        "elsewhere-travel.experiences.inclusions": [
+          "local-guide",
+          "refreshments"
+        ],
+        "elsewhere-travel.experiences.booking-url": "https://madeira-levada-morning.example/trip-details",
+        "elsewhere-travel.experiences.itinerary": [
+          {
+            "id": "stage-12",
+            "values": {
+              "stop": "Water paths through laurel forest",
+              "note": "Walk a gentle levada route through shaded native woodland."
+            }
+          }
+        ],
+        "elsewhere-travel.experiences.destination-region": "madeira-portugal"
+      }
+    },
+    {
+      "slug": "desert-botany-table",
+      "title": "Desert Botany Table",
+      "summary": "A easy desert experience in Tucson, USA with a published route, price, and group size.",
+      "description": "Desert Botany Table is a provider-described desert experience in Tucson, USA. Elsewhere presents the published season, activities, duration, price, group size, difficulty, access notes, inclusions, meeting place, and itinerary. Booking information links to the provider without asserting live availability, reservation status, transportation, or payment.",
+      "category": "Desert",
+      "url": "https://desert-botany-table.example",
+      "status": "published",
+      "profileValues": {
+        "elsewhere-travel.experiences.destination": "Tucson, USA",
+        "elsewhere-travel.experiences.meeting-location": {
+          "countryCode": "US",
+          "region": "AZ",
+          "locality": "Tucson",
+          "latitude": 32.2226,
+          "longitude": -110.9747
+        },
+        "elsewhere-travel.experiences.experience-type": "desert",
+        "elsewhere-travel.experiences.seasons": [
+          "winter",
+          "spring"
+        ],
+        "elsewhere-travel.experiences.activities": [
+          "walking",
+          "foraging"
+        ],
+        "elsewhere-travel.experiences.duration": 9000,
+        "elsewhere-travel.experiences.price": {
+          "amountMinor": 10300,
+          "currency": "USD"
+        },
+        "elsewhere-travel.experiences.group-size": 10,
+        "elsewhere-travel.experiences.difficulty": "easy",
+        "elsewhere-travel.experiences.accessibility": [
+          "step-free",
+          "low-impact"
+        ],
+        "elsewhere-travel.experiences.inclusions": [
+          "local-guide",
+          "meal",
+          "instruction"
+        ],
+        "elsewhere-travel.experiences.booking-url": "https://desert-botany-table.example/trip-details",
+        "elsewhere-travel.experiences.itinerary": [
+          {
+            "id": "stage-13",
+            "values": {
+              "stop": "Plants, place, and a shared table",
+              "note": "Learn desert plant stories before a seated guide-led tasting."
+            }
+          }
+        ],
+        "elsewhere-travel.experiences.destination-region": "tucson-usa"
+      }
+    },
+    {
+      "slug": "quiet-harbor-paddle",
+      "title": "Quiet Harbor Paddle",
+      "summary": "A easy coastal experience in Bar Harbor, USA with a published route, price, and group size.",
+      "description": "Quiet Harbor Paddle is a provider-described coastal experience in Bar Harbor, USA. Elsewhere presents the published season, activities, duration, price, group size, difficulty, access notes, inclusions, meeting place, and itinerary. Booking information links to the provider without asserting live availability, reservation status, transportation, or payment.",
+      "category": "Coastal",
+      "url": "https://quiet-harbor-paddle.example",
+      "status": "draft",
+      "profileValues": {
+        "elsewhere-travel.experiences.destination": "Bar Harbor, USA",
+        "elsewhere-travel.experiences.meeting-location": {
+          "countryCode": "US",
+          "region": "ME",
+          "locality": "Bar Harbor",
+          "latitude": 44.3876,
+          "longitude": -68.2039
+        },
+        "elsewhere-travel.experiences.experience-type": "coastal",
+        "elsewhere-travel.experiences.seasons": [
+          "summer"
+        ],
+        "elsewhere-travel.experiences.activities": [
+          "kayaking"
+        ],
+        "elsewhere-travel.experiences.duration": 7200,
+        "elsewhere-travel.experiences.price": {
+          "amountMinor": 7600,
+          "currency": "USD"
+        },
+        "elsewhere-travel.experiences.group-size": 6,
+        "elsewhere-travel.experiences.difficulty": "easy",
+        "elsewhere-travel.experiences.accessibility": [
+          "adaptive-equipment",
+          "low-impact"
+        ],
+        "elsewhere-travel.experiences.inclusions": [
+          "local-guide",
+          "equipment",
+          "safety-gear"
+        ],
+        "elsewhere-travel.experiences.booking-url": "https://quiet-harbor-paddle.example/trip-details",
+        "elsewhere-travel.experiences.itinerary": [
+          {
+            "id": "stage-14",
+            "values": {
+              "stop": "A sheltered route at first light",
+              "note": "A proposed harbor paddle retained as an unpublished sample record."
+            }
+          }
+        ],
+        "elsewhere-travel.experiences.destination-region": "bar-harbor-usa"
+      }
+    }
+  ]
+}

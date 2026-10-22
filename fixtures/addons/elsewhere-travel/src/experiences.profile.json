@@ -1,0 +1,586 @@
+{
+  "schemaVersion": 1,
+  "id": "elsewhere-travel.experiences",
+  "version": "1.0.0",
+  "name": "Elsewhere travel experiences",
+  "description": "Public destination, meeting location, experience, season, activity, duration, price, group, difficulty, accessibility, inclusion, booking, itinerary, and media facts for a travel directory.",
+  "fields": [
+    {
+      "key": "elsewhere-travel.experiences.destination",
+      "label": "Destination",
+      "help": "Destination published by the experience provider.",
+      "type": "short-text",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "card",
+      "group": "Experience",
+      "order": 10,
+      "searchable": true,
+      "facet": null,
+      "sort": null,
+      "constraints": {
+        "minLength": 2,
+        "maxLength": 160
+      }
+    },
+    {
+      "key": "elsewhere-travel.experiences.destination-region",
+      "label": "Destination",
+      "help": "A stable destination value used for browsing and filtering.",
+      "type": "single-choice",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Experience",
+      "order": 15,
+      "searchable": false,
+      "facet": {
+        "label": "Destination",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "lagos-portugal",
+            "label": "Lagos, Portugal"
+          },
+          {
+            "value": "north-cascades-usa",
+            "label": "North Cascades, USA"
+          },
+          {
+            "value": "moab-usa",
+            "label": "Moab, USA"
+          },
+          {
+            "value": "atchafalaya-usa",
+            "label": "Atchafalaya, USA"
+          },
+          {
+            "value": "imlil-morocco",
+            "label": "Imlil, Morocco"
+          },
+          {
+            "value": "astoria-usa",
+            "label": "Astoria, USA"
+          },
+          {
+            "value": "naxos-greece",
+            "label": "Naxos, Greece"
+          },
+          {
+            "value": "yakushima-japan",
+            "label": "Yakushima, Japan"
+          },
+          {
+            "value": "hveragerdi-iceland",
+            "label": "Hveragerði, Iceland"
+          },
+          {
+            "value": "monteverde-costa-rica",
+            "label": "Monteverde, Costa Rica"
+          },
+          {
+            "value": "aurland-norway",
+            "label": "Aurland, Norway"
+          },
+          {
+            "value": "madeira-portugal",
+            "label": "Madeira, Portugal"
+          },
+          {
+            "value": "tucson-usa",
+            "label": "Tucson, USA"
+          },
+          {
+            "value": "bar-harbor-usa",
+            "label": "Bar Harbor, USA"
+          }
+        ]
+      }
+    },
+    {
+      "key": "elsewhere-travel.experiences.meeting-location",
+      "label": "Meeting location",
+      "help": "Structured public meeting location for the experience.",
+      "type": "location",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Experience",
+      "order": 20,
+      "searchable": false,
+      "facet": null,
+      "sort": null,
+      "constraints": {
+        "countries": [
+          "US",
+          "PT",
+          "IS",
+          "JP",
+          "MA",
+          "CR",
+          "GR",
+          "NO"
+        ]
+      }
+    },
+    {
+      "key": "elsewhere-travel.experiences.experience-type",
+      "label": "Experience type",
+      "help": "Experience type published by the experience provider.",
+      "type": "single-choice",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "badge",
+      "group": "Experience",
+      "order": 30,
+      "searchable": false,
+      "facet": {
+        "label": "Experience",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "coastal",
+            "label": "Coastal"
+          },
+          {
+            "value": "mountain",
+            "label": "Mountain"
+          },
+          {
+            "value": "desert",
+            "label": "Desert"
+          },
+          {
+            "value": "wetland",
+            "label": "Wetland"
+          },
+          {
+            "value": "night-sky",
+            "label": "Night sky"
+          },
+          {
+            "value": "island",
+            "label": "Island"
+          },
+          {
+            "value": "forest",
+            "label": "Forest"
+          },
+          {
+            "value": "cultural",
+            "label": "Cultural"
+          }
+        ]
+      }
+    },
+    {
+      "key": "elsewhere-travel.experiences.seasons",
+      "label": "Seasons",
+      "help": "Seasons published by the experience provider.",
+      "type": "multiple-choice",
+      "cardinality": "many",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "badge",
+      "group": "Experience",
+      "order": 40,
+      "searchable": false,
+      "facet": {
+        "label": "Season",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "spring",
+            "label": "Spring"
+          },
+          {
+            "value": "summer",
+            "label": "Summer"
+          },
+          {
+            "value": "autumn",
+            "label": "Autumn"
+          },
+          {
+            "value": "winter",
+            "label": "Winter"
+          },
+          {
+            "value": "year-round",
+            "label": "Year round"
+          }
+        ]
+      }
+    },
+    {
+      "key": "elsewhere-travel.experiences.activities",
+      "label": "Activities",
+      "help": "Activities published by the experience provider.",
+      "type": "multiple-choice",
+      "cardinality": "many",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "card",
+      "group": "Experience",
+      "order": 50,
+      "searchable": false,
+      "facet": {
+        "label": "Activity",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "kayaking",
+            "label": "Kayaking"
+          },
+          {
+            "value": "hiking",
+            "label": "Hiking"
+          },
+          {
+            "value": "cycling",
+            "label": "Cycling"
+          },
+          {
+            "value": "stargazing",
+            "label": "Stargazing"
+          },
+          {
+            "value": "foraging",
+            "label": "Foraging"
+          },
+          {
+            "value": "canoeing",
+            "label": "Canoeing"
+          },
+          {
+            "value": "wildlife",
+            "label": "Wildlife watching"
+          },
+          {
+            "value": "walking",
+            "label": "Walking"
+          },
+          {
+            "value": "photography",
+            "label": "Photography"
+          }
+        ]
+      }
+    },
+    {
+      "key": "elsewhere-travel.experiences.duration",
+      "label": "Duration",
+      "help": "Duration published by the experience provider.",
+      "type": "duration",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "card",
+      "group": "Experience",
+      "order": 60,
+      "searchable": false,
+      "facet": {
+        "label": "Duration",
+        "mode": "any"
+      },
+      "sort": {
+        "label": "Duration",
+        "directions": [
+          "asc",
+          "desc"
+        ]
+      },
+      "constraints": {
+        "minSeconds": 1800,
+        "maxSeconds": 604800
+      }
+    },
+    {
+      "key": "elsewhere-travel.experiences.price",
+      "label": "Price",
+      "help": "Price published by the experience provider.",
+      "type": "money",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "card",
+      "group": "Experience",
+      "order": 70,
+      "searchable": false,
+      "facet": {
+        "label": "Price",
+        "mode": "any"
+      },
+      "sort": {
+        "label": "Price",
+        "directions": [
+          "asc",
+          "desc"
+        ]
+      },
+      "constraints": {
+        "minMinor": 0,
+        "maxMinor": 2000000,
+        "currencies": [
+          "USD"
+        ]
+      }
+    },
+    {
+      "key": "elsewhere-travel.experiences.group-size",
+      "label": "Group size",
+      "help": "Group size published by the experience provider.",
+      "type": "integer",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Experience",
+      "order": 80,
+      "searchable": false,
+      "facet": {
+        "label": "Group size",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {
+        "min": 1,
+        "max": 24
+      }
+    },
+    {
+      "key": "elsewhere-travel.experiences.difficulty",
+      "label": "Difficulty",
+      "help": "Difficulty published by the experience provider.",
+      "type": "single-choice",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "badge",
+      "group": "Experience",
+      "order": 90,
+      "searchable": false,
+      "facet": {
+        "label": "Difficulty",
+        "mode": "any"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "easy",
+            "label": "Easy"
+          },
+          {
+            "value": "moderate",
+            "label": "Moderate"
+          },
+          {
+            "value": "challenging",
+            "label": "Challenging"
+          }
+        ]
+      }
+    },
+    {
+      "key": "elsewhere-travel.experiences.accessibility",
+      "label": "Accessibility",
+      "help": "Accessibility published by the experience provider.",
+      "type": "multiple-choice",
+      "cardinality": "many",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Experience",
+      "order": 100,
+      "searchable": false,
+      "facet": {
+        "label": "Accessibility",
+        "mode": "all"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "step-free",
+            "label": "Step-free route"
+          },
+          {
+            "value": "adaptive-equipment",
+            "label": "Adaptive equipment"
+          },
+          {
+            "value": "low-impact",
+            "label": "Low-impact pace"
+          },
+          {
+            "value": "hearing-support",
+            "label": "Hearing support"
+          },
+          {
+            "value": "visual-guide",
+            "label": "Visual guide"
+          }
+        ]
+      }
+    },
+    {
+      "key": "elsewhere-travel.experiences.inclusions",
+      "label": "Inclusions",
+      "help": "Inclusions published by the experience provider.",
+      "type": "multiple-choice",
+      "cardinality": "many",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Experience",
+      "order": 110,
+      "searchable": false,
+      "facet": {
+        "label": "Inclusions",
+        "mode": "all"
+      },
+      "sort": null,
+      "constraints": {
+        "choices": [
+          {
+            "value": "local-guide",
+            "label": "Local guide"
+          },
+          {
+            "value": "equipment",
+            "label": "Equipment"
+          },
+          {
+            "value": "safety-gear",
+            "label": "Safety gear"
+          },
+          {
+            "value": "refreshments",
+            "label": "Refreshments"
+          },
+          {
+            "value": "meal",
+            "label": "Meal"
+          },
+          {
+            "value": "permits",
+            "label": "Permits"
+          },
+          {
+            "value": "instruction",
+            "label": "Instruction"
+          }
+        ]
+      }
+    },
+    {
+      "key": "elsewhere-travel.experiences.booking-url",
+      "label": "Booking URL",
+      "help": "The provider’s public trip and booking information page.",
+      "type": "url",
+      "cardinality": "one",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "card",
+      "group": "Experience",
+      "order": 120,
+      "searchable": false,
+      "facet": null,
+      "sort": null,
+      "constraints": {}
+    },
+    {
+      "key": "elsewhere-travel.experiences.itinerary",
+      "label": "Itinerary",
+      "help": "Itinerary published by the experience provider.",
+      "type": "group",
+      "cardinality": "many",
+      "required": true,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "detail",
+      "group": "Trip plan",
+      "order": 130,
+      "searchable": false,
+      "facet": null,
+      "sort": null,
+      "constraints": {
+        "minItems": 1,
+        "maxItems": 12,
+        "children": [
+          {
+            "key": "stop",
+            "label": "Stop",
+            "help": "A named itinerary stage.",
+            "type": "short-text",
+            "required": true,
+            "constraints": {
+              "minLength": 2,
+              "maxLength": 160
+            }
+          },
+          {
+            "key": "note",
+            "label": "Details",
+            "help": "Provider-published details for this stage.",
+            "type": "short-text",
+            "required": true,
+            "constraints": {
+              "minLength": 5,
+              "maxLength": 300
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "elsewhere-travel.experiences.travel-media",
+      "label": "Travel media",
+      "help": "Original destination and activity photography.",
+      "type": "media",
+      "cardinality": "many",
+      "required": false,
+      "writeAuthority": "owner",
+      "visibility": "public",
+      "placement": "card",
+      "group": "Experience",
+      "order": 140,
+      "searchable": false,
+      "facet": null,
+      "sort": null,
+      "constraints": {
+        "maxItems": 6
+      }
+    }
+  ]
+}
