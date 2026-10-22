@@ -1,0 +1,144 @@
+[data-template="homekind-services"] {
+  --hk-bg: var(--background);
+  --hk-card: var(--card);
+  --hk-ink: var(--foreground);
+  --hk-teal: var(--primary);
+  --hk-sage: var(--accent);
+  background: var(--hk-bg);
+  color: var(--hk-ink);
+}
+[data-template="homekind-services"] *,
+[data-template="homekind-services"] *::before,
+[data-template="homekind-services"] *::after { box-sizing: border-box; }
+[data-template="homekind-services"] body { min-width: 0; overflow-x: clip; background: var(--hk-bg); color: var(--hk-ink); }
+[data-template="homekind-services"] h1,
+[data-template="homekind-services"] h2,
+[data-template="homekind-services"] h3 { overflow-wrap: anywhere; font-family: var(--preset-heading-font); font-weight: 720; letter-spacing: -.04em; }
+[data-template="homekind-services"] :focus-visible { outline: 3px solid var(--hk-teal); outline-offset: 3px; }
+
+.homekind-header { border-bottom: 1px solid var(--sidebar-border); background: var(--sidebar); color: var(--sidebar-foreground); }
+.homekind-nav { display: flex; width: min(100% - 2rem, var(--theme-page-width)); margin: auto; align-items: center; justify-content: space-between; gap: 1rem; padding: .8rem 0; }
+.homekind-brand { display: flex; align-items: center; gap: .7rem; }
+.homekind-brand img { width: 2.65rem; height: 2.65rem; }
+.homekind-brand strong { color: var(--sidebar-primary); font-size: 1.45rem; font-weight: 780; letter-spacing: -.04em; }
+.homekind-nav > div { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; font-size: .8rem; }
+.homekind-nav > div > a { padding: .55rem .7rem; }
+
+.homekind-home,
+.homekind-directory,
+.homekind-detail { width: min(100% - 2rem, var(--theme-page-width)); min-width: 0; margin: auto; }
+.homekind-hero { display: grid; grid-template-columns: minmax(0, .9fr) minmax(22rem, 1.1fr); gap: clamp(2rem, 6vw, 6rem); align-items: center; padding: clamp(3.5rem, 8vw, 7rem) 0; }
+.homekind-hero > div > p,
+.homekind-picks header p,
+.homekind-detail header p,
+.homekind-detail-grid article > p,
+.homekind-detail-grid aside > p { color: var(--hk-teal); font-size: .7rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.homekind-hero h1 { margin-top: 1rem; font-size: clamp(3.7rem, 7vw, 6.8rem); line-height: .92; }
+.homekind-hero h1 em { color: var(--hk-teal); font-style: normal; }
+.homekind-hero > div > span { display: block; max-width: 38rem; margin-top: 1.3rem; color: var(--muted-foreground); font-size: 1.05rem; line-height: 1.7; }
+.homekind-hero form { margin-top: 2rem; border-radius: 10px; background: var(--hk-card); box-shadow: var(--theme-shadow); padding: .7rem; }
+.homekind-hero form label { display: block; margin: 0 .2rem .5rem; font-size: .72rem; font-weight: 760; }
+.homekind-hero form > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+.homekind-hero input { min-width: 0; border: 1px solid var(--input); border-right: 0; border-radius: 8px 0 0 8px; background: var(--hk-bg); padding: .85rem; }
+.homekind-hero button { min-height: 3rem; border: 1px solid var(--hk-teal); border-radius: 0 8px 8px 0; background: var(--hk-teal); padding: 0 1rem; color: var(--primary-foreground); font-weight: 780; }
+.homekind-hero div > nav { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: 1rem; }
+.homekind-hero div > nav a { border: 1px solid var(--border); border-radius: 999px; background: var(--hk-card); padding: .35rem .6rem; font-size: .66rem; font-weight: 700; }
+.homekind-lead { display: block; border-radius: 10px; background: var(--hk-card); box-shadow: var(--theme-shadow); padding: .8rem; }
+.homekind-lead > img { display: block; width: 100%; height: clamp(23rem, 48vw, 38rem); max-height: none; border: 0; border-radius: 7px; object-fit: cover; }
+.homekind-lead > span { display: inline-block; margin-top: 1rem; border-radius: 999px; background: var(--secondary); padding: .3rem .5rem; color: var(--hk-teal); font-size: .64rem; font-weight: 800; text-transform: uppercase; }
+.homekind-lead h2 { margin-top: .5rem; font-size: clamp(2.2rem, 4vw, 3.5rem); line-height: 1; }
+.homekind-lead > p { margin-top: .55rem; color: var(--muted-foreground); line-height: 1.55; }
+
+.homekind-review { display: flex; flex-wrap: wrap; gap: .25rem .45rem; align-items: center; margin-top: .8rem; color: var(--muted-foreground); font-size: .68rem; }
+.homekind-review b { color: var(--hk-ink); font-size: .9rem; }
+.homekind-review em { border-radius: 999px; background: var(--secondary); padding: .22rem .45rem; color: var(--hk-teal); font-style: normal; font-weight: 760; }
+.homekind-assurance { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-block: 1px solid var(--border); }
+.homekind-assurance > div { padding: clamp(2rem, 4vw, 3.5rem); border-right: 1px solid var(--border); }
+.homekind-assurance > div:last-child { border-right: 0; }
+.homekind-assurance strong { color: var(--hk-teal); font-size: .68rem; }
+.homekind-assurance h2 { margin-top: 1.5rem; font-size: 1.55rem; }
+.homekind-assurance p { margin-top: .65rem; color: var(--muted-foreground); font-size: .84rem; line-height: 1.65; }
+
+.homekind-picks { padding: clamp(4rem, 8vw, 7rem) 0; }
+.homekind-picks > header { display: flex; align-items: end; justify-content: space-between; gap: 2rem; margin-bottom: 2rem; }
+.homekind-picks h2 { max-width: 16ch; font-size: clamp(2.7rem, 5vw, 4.8rem); line-height: .96; }
+.homekind-grid { display: grid; min-width: 0; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.homekind-card { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; background: var(--hk-card); }
+.homekind-card > a { display: block; padding: .65rem; }
+.homekind-card > a > img { display: block; width: 100%; height: 15.5rem; max-height: none; border: 0; border-radius: 7px; object-fit: cover; }
+.homekind-card > a > p { margin: .9rem .35rem 0; color: var(--hk-teal); font-size: .65rem; font-weight: 800; text-transform: uppercase; }
+.homekind-card h3 { margin: .25rem .35rem 0; font-size: 1.65rem; line-height: 1.05; }
+.homekind-card > a > span:not(.homekind-review) { display: block; min-height: 4.5em; margin: .55rem .35rem 0; color: var(--muted-foreground); font-size: .82rem; line-height: 1.5; }
+.homekind-card > a > div { display: flex; flex-wrap: wrap; gap: .35rem; margin: .8rem .35rem 0; }
+.homekind-card > a > div b { border-radius: 999px; background: var(--muted); padding: .3rem .48rem; font-size: .62rem; }
+.homekind-card .homekind-review { margin: .7rem .35rem .35rem; }
+.homekind-card .profile-values { display: flex; flex-wrap: wrap; gap: .3rem; padding: .2rem 1rem 1rem; }
+.homekind-card .profile-value { display: flex; align-items: baseline; gap: .2rem; border: 0; border-radius: 999px; background: var(--secondary); padding: .24rem .42rem; font-size: .6rem; }
+.homekind-card .profile-value dt { color: var(--hk-teal); font-weight: 750; }
+.homekind-card .profile-value dt::after { content: ":"; }
+.homekind-card > small { display: block; padding: 0 1rem 1rem; color: var(--hk-teal); font-weight: 750; }
+
+.homekind-directory { padding: clamp(3rem, 7vw, 6rem) 0; }
+.homekind-directory > header { max-width: 64rem; }
+.homekind-directory > header > p { color: var(--hk-teal); font-size: .7rem; font-weight: 800; text-transform: uppercase; }
+.homekind-directory > header h1 { margin-top: .7rem; font-size: clamp(3.6rem, 8vw, 7rem); line-height: .9; }
+.homekind-directory > header > span { display: block; max-width: 42rem; margin-top: 1rem; color: var(--muted-foreground); line-height: 1.7; }
+.homekind-directory-layout { display: grid; grid-template-columns: minmax(14rem, .27fr) minmax(0, 1fr); gap: 3rem; margin-top: 3rem; border-top: 1px solid var(--border); padding-top: 2rem; }
+.homekind-directory-layout * { min-width: 0; }
+.homekind-directory-layout aside > strong { display: block; margin-bottom: 1rem; color: var(--hk-teal); font-size: .7rem; font-weight: 800; text-transform: uppercase; }
+.homekind-directory-layout .profile-facets { display: grid; gap: 1rem; }
+.homekind-directory-layout input,
+.homekind-directory-layout select { max-width: 100%; background: var(--hk-card); }
+.homekind-results { min-width: 0; }
+.homekind-empty { display: grid; gap: 1rem; border: 1px solid var(--border); border-radius: 10px; background: var(--hk-card); padding: 2rem; }
+.homekind-empty strong { font-size: 1.5rem; }
+.homekind-empty a { width: fit-content; color: var(--hk-teal); font-weight: 750; }
+
+.homekind-detail { padding: 3rem 0 6rem; }
+.homekind-detail > a { color: var(--hk-teal); font-weight: 750; }
+.homekind-detail > header { display: grid; grid-template-columns: minmax(0, .9fr) minmax(20rem, 1.1fr); gap: clamp(2rem, 6vw, 6rem); align-items: center; margin-top: 2rem; border-block: 1px solid var(--border); padding: 2rem 0; }
+.homekind-detail h1 { margin-top: .55rem; font-size: clamp(3.5rem, 7vw, 6.5rem); line-height: .9; }
+.homekind-detail header strong { display: block; margin-top: 1rem; color: var(--muted-foreground); font-size: 1.04rem; line-height: 1.65; }
+.homekind-detail header div > div { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: 1.1rem; }
+.homekind-detail header div > div span { border-radius: 999px; background: var(--muted); padding: .32rem .5rem; font-size: .66rem; }
+.homekind-detail header > img { display: block; width: 100%; height: clamp(22rem, 42vw, 35rem); max-height: none; border: 0; border-radius: 10px; object-fit: cover; }
+.homekind-detail-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(17rem, .85fr); gap: clamp(2rem, 6vw, 6rem); padding-top: 2.7rem; }
+.homekind-detail-grid .markdown-content { margin-top: 1rem; line-height: 1.8; }
+.homekind-evidence { display: grid; gap: .55rem; margin-top: 2rem; border: 1px solid var(--border); border-left: 5px solid var(--hk-teal); border-radius: 10px; background: var(--hk-card); padding: 1.2rem; }
+.homekind-evidence > p { color: var(--hk-teal); font-size: .68rem; font-weight: 800; text-transform: uppercase; }
+.homekind-evidence span { color: var(--muted-foreground); font-size: .78rem; }
+.homekind-evidence a { width: fit-content; color: var(--hk-teal); font-size: .78rem; font-weight: 750; }
+.homekind-actions { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: 1.5rem; }
+.homekind-actions a { border: 1px solid var(--border); border-radius: 8px; padding: .7rem .9rem; font-size: .75rem; font-weight: 750; }
+.homekind-actions a:first-child { border-color: var(--hk-teal); background: var(--hk-teal); color: var(--primary-foreground); }
+.homekind-detail-grid article > small { display: block; margin-top: .85rem; color: var(--muted-foreground); }
+.homekind-detail-grid aside .profile-values { grid-template-columns: minmax(0, 1fr); margin-top: .85rem; }
+
+.homekind-footer { display: flex; width: min(100% - 2rem, var(--theme-page-width)); margin: auto; align-items: end; justify-content: space-between; gap: 2rem; border-top: 1px solid var(--border); padding: 2.2rem 0 3rem; }
+.homekind-footer strong { color: var(--hk-teal); font-size: 1.8rem; font-weight: 800; }
+.homekind-footer p { font-size: 1rem; font-weight: 650; }
+.homekind-footer span { color: var(--muted-foreground); font-size: .68rem; }
+.homekind-footer nav { display: flex; flex-wrap: wrap; gap: 1rem; font-size: .75rem; }
+
+@media (max-width: 920px) {
+  .homekind-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .homekind-assurance { grid-template-columns: minmax(0, 1fr); }
+  .homekind-assurance > div { border-right: 0; border-bottom: 1px solid var(--border); }
+  .homekind-assurance > div:last-child { border-bottom: 0; }
+}
+@media (max-width: 760px) {
+  .homekind-nav { align-items: flex-start; flex-direction: column; }
+  .homekind-hero,
+  .homekind-directory-layout,
+  .homekind-detail > header,
+  .homekind-detail-grid { grid-template-columns: minmax(0, 1fr); }
+  .homekind-picks > header,
+  .homekind-footer { align-items: flex-start; flex-direction: column; }
+  .homekind-directory-layout .profile-facet-actions { position: static; }
+}
+@media (max-width: 520px) {
+  .homekind-hero form > div { grid-template-columns: minmax(0, 1fr); }
+  .homekind-hero input { border-right: 1px solid var(--input); border-bottom: 0; border-radius: 8px 8px 0 0; }
+  .homekind-hero button { border-radius: 0 0 8px 8px; }
+  .homekind-grid { grid-template-columns: minmax(0, 1fr); }
+}

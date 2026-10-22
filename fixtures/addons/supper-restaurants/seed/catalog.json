@@ -1,0 +1,964 @@
+{
+  "profile": {
+    "id": "supper-restaurants.restaurants",
+    "version": "1.0.0"
+  },
+  "listings": [
+    {
+      "slug": "marigold-table",
+      "title": "Marigold Table",
+      "summary": "A seasonal restaurant in river ward with published service and dietary details.",
+      "description": "Marigold Table serves a focused seasonal menu. Supper presents its published cuisine, neighborhood, typical price, dietary accommodations, meal periods, service modes, hours, time zone, accessibility, and signature dish without claiming real-time availability.",
+      "category": "Seasonal",
+      "url": "https://marigold-table.example",
+      "status": "published",
+      "profileValues": {
+        "supper-restaurants.restaurants.cuisines": [
+          "seasonal",
+          "vegetarian"
+        ],
+        "supper-restaurants.restaurants.neighborhood": "river-ward",
+        "supper-restaurants.restaurants.location": {
+          "countryCode": "US",
+          "region": "PA",
+          "locality": "Bellwether",
+          "latitude": 40.1,
+          "longitude": -75.15
+        },
+        "supper-restaurants.restaurants.price-level": "special",
+        "supper-restaurants.restaurants.typical-meal-price": {
+          "amountMinor": 3200,
+          "currency": "USD"
+        },
+        "supper-restaurants.restaurants.dietary-options": [
+          "vegetarian",
+          "vegan",
+          "gluten-aware"
+        ],
+        "supper-restaurants.restaurants.meal-periods": [
+          "lunch",
+          "dinner"
+        ],
+        "supper-restaurants.restaurants.service-modes": [
+          "dine-in",
+          "patio"
+        ],
+        "supper-restaurants.restaurants.reservation-url": "https://marigold-table.example/reservations",
+        "supper-restaurants.restaurants.time-zone": "America/New_York",
+        "supper-restaurants.restaurants.opening-hours": [
+          {
+            "id": "hours-1",
+            "values": {
+              "days": "Tuesday–Saturday",
+              "opens": "11:30",
+              "closes": "22:00"
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.signature-dishes": [
+          {
+            "id": "dish-1",
+            "values": {
+              "name": "Market vegetables",
+              "note": "Market vegetables with charred lemon and seed crumble."
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.accessibility": [
+          "step-free",
+          "outdoor-seating"
+        ]
+      },
+      "media": [
+        {
+          "source": "seed/media/marigold-table.webp",
+          "field": "supper-restaurants.restaurants.restaurant-media",
+          "alt": "Original food and dining photograph for Marigold Table"
+        }
+      ]
+    },
+    {
+      "slug": "red-oak",
+      "title": "Red Oak",
+      "summary": "A wood-fired restaurant in old quarter with published service and dietary details.",
+      "description": "Red Oak serves a focused wood-fired menu. Supper presents its published cuisine, neighborhood, typical price, dietary accommodations, meal periods, service modes, hours, time zone, accessibility, and signature dish without claiming real-time availability.",
+      "category": "Wood-fired",
+      "url": "https://red-oak.example",
+      "status": "published",
+      "profileValues": {
+        "supper-restaurants.restaurants.cuisines": [
+          "seasonal"
+        ],
+        "supper-restaurants.restaurants.neighborhood": "old-quarter",
+        "supper-restaurants.restaurants.location": {
+          "countryCode": "US",
+          "region": "PA",
+          "locality": "Bellwether",
+          "latitude": 40.102000000000004,
+          "longitude": -75.14800000000001
+        },
+        "supper-restaurants.restaurants.price-level": "special",
+        "supper-restaurants.restaurants.typical-meal-price": {
+          "amountMinor": 4100,
+          "currency": "USD"
+        },
+        "supper-restaurants.restaurants.dietary-options": [
+          "vegetarian",
+          "gluten-aware"
+        ],
+        "supper-restaurants.restaurants.meal-periods": [
+          "dinner"
+        ],
+        "supper-restaurants.restaurants.service-modes": [
+          "dine-in"
+        ],
+        "supper-restaurants.restaurants.reservation-url": "https://red-oak.example/reservations",
+        "supper-restaurants.restaurants.time-zone": "America/New_York",
+        "supper-restaurants.restaurants.opening-hours": [
+          {
+            "id": "hours-2",
+            "values": {
+              "days": "Tuesday–Saturday",
+              "opens": "17:00",
+              "closes": "22:00"
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.signature-dishes": [
+          {
+            "id": "dish-2",
+            "values": {
+              "name": "Hearth-roasted squash",
+              "note": "Hearth-roasted squash with brown butter and herbs."
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.accessibility": [
+          "step-free",
+          "accessible-restroom"
+        ]
+      },
+      "media": [
+        {
+          "source": "seed/media/red-oak.webp",
+          "field": "supper-restaurants.restaurants.restaurant-media",
+          "alt": "Original food and dining photograph for Red Oak"
+        }
+      ]
+    },
+    {
+      "slug": "little-finch",
+      "title": "Little Finch",
+      "summary": "A italian restaurant in garden district with published service and dietary details.",
+      "description": "Little Finch serves a focused italian menu. Supper presents its published cuisine, neighborhood, typical price, dietary accommodations, meal periods, service modes, hours, time zone, accessibility, and signature dish without claiming real-time availability.",
+      "category": "Italian",
+      "url": "https://little-finch.example",
+      "status": "published",
+      "profileValues": {
+        "supper-restaurants.restaurants.cuisines": [
+          "italian"
+        ],
+        "supper-restaurants.restaurants.neighborhood": "garden-district",
+        "supper-restaurants.restaurants.location": {
+          "countryCode": "US",
+          "region": "PA",
+          "locality": "Bellwether",
+          "latitude": 40.104,
+          "longitude": -75.146
+        },
+        "supper-restaurants.restaurants.price-level": "moderate",
+        "supper-restaurants.restaurants.typical-meal-price": {
+          "amountMinor": 2600,
+          "currency": "USD"
+        },
+        "supper-restaurants.restaurants.dietary-options": [
+          "vegetarian"
+        ],
+        "supper-restaurants.restaurants.meal-periods": [
+          "lunch",
+          "dinner"
+        ],
+        "supper-restaurants.restaurants.service-modes": [
+          "dine-in",
+          "patio"
+        ],
+        "supper-restaurants.restaurants.reservation-url": "https://little-finch.example/reservations",
+        "supper-restaurants.restaurants.time-zone": "America/New_York",
+        "supper-restaurants.restaurants.opening-hours": [
+          {
+            "id": "hours-3",
+            "values": {
+              "days": "Tuesday–Saturday",
+              "opens": "11:30",
+              "closes": "22:00"
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.signature-dishes": [
+          {
+            "id": "dish-3",
+            "values": {
+              "name": "Hand-cut pasta",
+              "note": "Hand-cut pasta with spring peas and pecorino."
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.accessibility": [
+          "step-free",
+          "outdoor-seating"
+        ]
+      },
+      "media": [
+        {
+          "source": "seed/media/little-finch.webp",
+          "field": "supper-restaurants.restaurants.restaurant-media",
+          "alt": "Original food and dining photograph for Little Finch"
+        }
+      ]
+    },
+    {
+      "slug": "salt-house",
+      "title": "Salt House",
+      "summary": "A coastal restaurant in river ward with published service and dietary details.",
+      "description": "Salt House serves a focused coastal menu. Supper presents its published cuisine, neighborhood, typical price, dietary accommodations, meal periods, service modes, hours, time zone, accessibility, and signature dish without claiming real-time availability.",
+      "category": "Coastal",
+      "url": "https://salt-house.example",
+      "status": "published",
+      "profileValues": {
+        "supper-restaurants.restaurants.cuisines": [
+          "coastal"
+        ],
+        "supper-restaurants.restaurants.neighborhood": "river-ward",
+        "supper-restaurants.restaurants.location": {
+          "countryCode": "US",
+          "region": "PA",
+          "locality": "Bellwether",
+          "latitude": 40.106,
+          "longitude": -75.144
+        },
+        "supper-restaurants.restaurants.price-level": "special",
+        "supper-restaurants.restaurants.typical-meal-price": {
+          "amountMinor": 3800,
+          "currency": "USD"
+        },
+        "supper-restaurants.restaurants.dietary-options": [
+          "gluten-aware",
+          "dairy-free"
+        ],
+        "supper-restaurants.restaurants.meal-periods": [
+          "lunch",
+          "dinner"
+        ],
+        "supper-restaurants.restaurants.service-modes": [
+          "dine-in",
+          "patio"
+        ],
+        "supper-restaurants.restaurants.reservation-url": "https://salt-house.example/reservations",
+        "supper-restaurants.restaurants.time-zone": "America/New_York",
+        "supper-restaurants.restaurants.opening-hours": [
+          {
+            "id": "hours-4",
+            "values": {
+              "days": "Tuesday–Saturday",
+              "opens": "11:30",
+              "closes": "22:00"
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.signature-dishes": [
+          {
+            "id": "dish-4",
+            "values": {
+              "name": "Whole grilled fish",
+              "note": "Whole grilled fish with citrus and coastal greens."
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.accessibility": [
+          "step-free",
+          "accessible-restroom"
+        ]
+      },
+      "media": [
+        {
+          "source": "seed/media/salt-house.webp",
+          "field": "supper-restaurants.restaurants.restaurant-media",
+          "alt": "Original food and dining photograph for Salt House"
+        }
+      ]
+    },
+    {
+      "slug": "good-grain",
+      "title": "Good Grain",
+      "summary": "A vegetarian restaurant in northline with published service and dietary details.",
+      "description": "Good Grain serves a focused vegetarian menu. Supper presents its published cuisine, neighborhood, typical price, dietary accommodations, meal periods, service modes, hours, time zone, accessibility, and signature dish without claiming real-time availability.",
+      "category": "Vegetarian",
+      "url": "https://good-grain.example",
+      "status": "published",
+      "profileValues": {
+        "supper-restaurants.restaurants.cuisines": [
+          "vegetarian"
+        ],
+        "supper-restaurants.restaurants.neighborhood": "northline",
+        "supper-restaurants.restaurants.location": {
+          "countryCode": "US",
+          "region": "PA",
+          "locality": "Bellwether",
+          "latitude": 40.108000000000004,
+          "longitude": -75.14200000000001
+        },
+        "supper-restaurants.restaurants.price-level": "moderate",
+        "supper-restaurants.restaurants.typical-meal-price": {
+          "amountMinor": 1800,
+          "currency": "USD"
+        },
+        "supper-restaurants.restaurants.dietary-options": [
+          "vegetarian",
+          "vegan",
+          "gluten-aware",
+          "dairy-free"
+        ],
+        "supper-restaurants.restaurants.meal-periods": [
+          "breakfast",
+          "lunch"
+        ],
+        "supper-restaurants.restaurants.service-modes": [
+          "counter",
+          "takeaway"
+        ],
+        "supper-restaurants.restaurants.reservation-url": "https://good-grain.example/reservations",
+        "supper-restaurants.restaurants.time-zone": "America/New_York",
+        "supper-restaurants.restaurants.opening-hours": [
+          {
+            "id": "hours-5",
+            "values": {
+              "days": "Tuesday–Saturday",
+              "opens": "11:30",
+              "closes": "22:00"
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.signature-dishes": [
+          {
+            "id": "dish-5",
+            "values": {
+              "name": "Warm grains",
+              "note": "Warm grains with pickles, herbs, and tahini."
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.accessibility": [
+          "step-free",
+          "outdoor-seating"
+        ]
+      },
+      "media": [
+        {
+          "source": "seed/media/good-grain.webp",
+          "field": "supper-restaurants.restaurants.restaurant-media",
+          "alt": "Original food and dining photograph for Good Grain"
+        }
+      ]
+    },
+    {
+      "slug": "night-market",
+      "title": "Night Market",
+      "summary": "A east asian restaurant in market row with published service and dietary details.",
+      "description": "Night Market serves a focused east asian menu. Supper presents its published cuisine, neighborhood, typical price, dietary accommodations, meal periods, service modes, hours, time zone, accessibility, and signature dish without claiming real-time availability.",
+      "category": "East Asian",
+      "url": "https://night-market.example",
+      "status": "published",
+      "profileValues": {
+        "supper-restaurants.restaurants.cuisines": [
+          "east-asian"
+        ],
+        "supper-restaurants.restaurants.neighborhood": "market-row",
+        "supper-restaurants.restaurants.location": {
+          "countryCode": "US",
+          "region": "PA",
+          "locality": "Bellwether",
+          "latitude": 40.11,
+          "longitude": -75.14
+        },
+        "supper-restaurants.restaurants.price-level": "budget",
+        "supper-restaurants.restaurants.typical-meal-price": {
+          "amountMinor": 1500,
+          "currency": "USD"
+        },
+        "supper-restaurants.restaurants.dietary-options": [
+          "vegetarian",
+          "dairy-free"
+        ],
+        "supper-restaurants.restaurants.meal-periods": [
+          "dinner",
+          "late-night"
+        ],
+        "supper-restaurants.restaurants.service-modes": [
+          "counter",
+          "takeaway"
+        ],
+        "supper-restaurants.restaurants.reservation-url": "https://night-market.example/reservations",
+        "supper-restaurants.restaurants.time-zone": "America/New_York",
+        "supper-restaurants.restaurants.opening-hours": [
+          {
+            "id": "hours-6",
+            "values": {
+              "days": "Tuesday–Saturday",
+              "opens": "17:00",
+              "closes": "01:00"
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.signature-dishes": [
+          {
+            "id": "dish-6",
+            "values": {
+              "name": "Chili noodles",
+              "note": "Chili noodles with sesame, greens, and crisp shallot."
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.accessibility": [
+          "step-free",
+          "accessible-restroom"
+        ]
+      },
+      "media": [
+        {
+          "source": "seed/media/night-market.webp",
+          "field": "supper-restaurants.restaurants.restaurant-media",
+          "alt": "Original food and dining photograph for Night Market"
+        }
+      ]
+    },
+    {
+      "slug": "juniper-room",
+      "title": "Juniper Room",
+      "summary": "A seasonal restaurant in old quarter with published service and dietary details.",
+      "description": "Juniper Room serves a focused seasonal menu. Supper presents its published cuisine, neighborhood, typical price, dietary accommodations, meal periods, service modes, hours, time zone, accessibility, and signature dish without claiming real-time availability.",
+      "category": "Seasonal",
+      "url": "https://juniper-room.example",
+      "status": "published",
+      "profileValues": {
+        "supper-restaurants.restaurants.cuisines": [
+          "seasonal"
+        ],
+        "supper-restaurants.restaurants.neighborhood": "old-quarter",
+        "supper-restaurants.restaurants.location": {
+          "countryCode": "US",
+          "region": "PA",
+          "locality": "Bellwether",
+          "latitude": 40.112,
+          "longitude": -75.138
+        },
+        "supper-restaurants.restaurants.price-level": "special",
+        "supper-restaurants.restaurants.typical-meal-price": {
+          "amountMinor": 4600,
+          "currency": "USD"
+        },
+        "supper-restaurants.restaurants.dietary-options": [
+          "vegetarian",
+          "gluten-aware"
+        ],
+        "supper-restaurants.restaurants.meal-periods": [
+          "dinner",
+          "weekend-brunch"
+        ],
+        "supper-restaurants.restaurants.service-modes": [
+          "dine-in"
+        ],
+        "supper-restaurants.restaurants.reservation-url": "https://juniper-room.example/reservations",
+        "supper-restaurants.restaurants.time-zone": "America/New_York",
+        "supper-restaurants.restaurants.opening-hours": [
+          {
+            "id": "hours-7",
+            "values": {
+              "days": "Tuesday–Saturday",
+              "opens": "17:00",
+              "closes": "22:00"
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.signature-dishes": [
+          {
+            "id": "dish-7",
+            "values": {
+              "name": "Roasted roots",
+              "note": "Roasted roots with juniper, cultured cream, and rye."
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.accessibility": [
+          "step-free",
+          "outdoor-seating"
+        ]
+      },
+      "media": [
+        {
+          "source": "seed/media/juniper-room.webp",
+          "field": "supper-restaurants.restaurants.restaurant-media",
+          "alt": "Original food and dining photograph for Juniper Room"
+        }
+      ]
+    },
+    {
+      "slug": "saffron-yard",
+      "title": "Saffron Yard",
+      "summary": "A middle eastern restaurant in garden district with published service and dietary details.",
+      "description": "Saffron Yard serves a focused middle eastern menu. Supper presents its published cuisine, neighborhood, typical price, dietary accommodations, meal periods, service modes, hours, time zone, accessibility, and signature dish without claiming real-time availability.",
+      "category": "Middle Eastern",
+      "url": "https://saffron-yard.example",
+      "status": "published",
+      "profileValues": {
+        "supper-restaurants.restaurants.cuisines": [
+          "middle-eastern"
+        ],
+        "supper-restaurants.restaurants.neighborhood": "garden-district",
+        "supper-restaurants.restaurants.location": {
+          "countryCode": "US",
+          "region": "PA",
+          "locality": "Bellwether",
+          "latitude": 40.114000000000004,
+          "longitude": -75.13600000000001
+        },
+        "supper-restaurants.restaurants.price-level": "moderate",
+        "supper-restaurants.restaurants.typical-meal-price": {
+          "amountMinor": 2900,
+          "currency": "USD"
+        },
+        "supper-restaurants.restaurants.dietary-options": [
+          "vegetarian",
+          "vegan",
+          "dairy-free"
+        ],
+        "supper-restaurants.restaurants.meal-periods": [
+          "lunch",
+          "dinner"
+        ],
+        "supper-restaurants.restaurants.service-modes": [
+          "dine-in",
+          "patio"
+        ],
+        "supper-restaurants.restaurants.reservation-url": "https://saffron-yard.example/reservations",
+        "supper-restaurants.restaurants.time-zone": "America/New_York",
+        "supper-restaurants.restaurants.opening-hours": [
+          {
+            "id": "hours-8",
+            "values": {
+              "days": "Tuesday–Saturday",
+              "opens": "11:30",
+              "closes": "22:00"
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.signature-dishes": [
+          {
+            "id": "dish-8",
+            "values": {
+              "name": "Saffron rice",
+              "note": "Saffron rice with herbs, roasted fruit, and flatbread."
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.accessibility": [
+          "step-free",
+          "accessible-restroom"
+        ]
+      },
+      "media": [
+        {
+          "source": "seed/media/saffron-yard.webp",
+          "field": "supper-restaurants.restaurants.restaurant-media",
+          "alt": "Original food and dining photograph for Saffron Yard"
+        }
+      ]
+    },
+    {
+      "slug": "paper-mill-bakery",
+      "title": "Paper Mill Bakery",
+      "summary": "A bakery restaurant in northline with published service and dietary details.",
+      "description": "Paper Mill Bakery serves a focused bakery menu. Supper presents its published cuisine, neighborhood, typical price, dietary accommodations, meal periods, service modes, hours, time zone, accessibility, and signature dish without claiming real-time availability.",
+      "category": "Bakery",
+      "url": "https://paper-mill-bakery.example",
+      "status": "published",
+      "profileValues": {
+        "supper-restaurants.restaurants.cuisines": [
+          "bakery"
+        ],
+        "supper-restaurants.restaurants.neighborhood": "northline",
+        "supper-restaurants.restaurants.location": {
+          "countryCode": "US",
+          "region": "PA",
+          "locality": "Bellwether",
+          "latitude": 40.116,
+          "longitude": -75.134
+        },
+        "supper-restaurants.restaurants.price-level": "budget",
+        "supper-restaurants.restaurants.typical-meal-price": {
+          "amountMinor": 900,
+          "currency": "USD"
+        },
+        "supper-restaurants.restaurants.dietary-options": [
+          "vegetarian"
+        ],
+        "supper-restaurants.restaurants.meal-periods": [
+          "breakfast",
+          "lunch"
+        ],
+        "supper-restaurants.restaurants.service-modes": [
+          "counter",
+          "takeaway"
+        ],
+        "supper-restaurants.restaurants.reservation-url": "https://paper-mill-bakery.example/reservations",
+        "supper-restaurants.restaurants.time-zone": "America/New_York",
+        "supper-restaurants.restaurants.opening-hours": [
+          {
+            "id": "hours-9",
+            "values": {
+              "days": "Tuesday–Saturday",
+              "opens": "11:30",
+              "closes": "22:00"
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.signature-dishes": [
+          {
+            "id": "dish-9",
+            "values": {
+              "name": "Cardamom morning bun",
+              "note": "Cardamom morning bun with cultured butter."
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.accessibility": [
+          "step-free",
+          "outdoor-seating"
+        ],
+        "supper-restaurants.restaurants.restaurant-media": []
+      }
+    },
+    {
+      "slug": "casa-luna",
+      "title": "Casa Luna",
+      "summary": "A mexican restaurant in market row with published service and dietary details.",
+      "description": "Casa Luna serves a focused mexican menu. Supper presents its published cuisine, neighborhood, typical price, dietary accommodations, meal periods, service modes, hours, time zone, accessibility, and signature dish without claiming real-time availability.",
+      "category": "Mexican",
+      "url": "https://casa-luna.example",
+      "status": "published",
+      "profileValues": {
+        "supper-restaurants.restaurants.cuisines": [
+          "mexican"
+        ],
+        "supper-restaurants.restaurants.neighborhood": "market-row",
+        "supper-restaurants.restaurants.location": {
+          "countryCode": "US",
+          "region": "PA",
+          "locality": "Bellwether",
+          "latitude": 40.118,
+          "longitude": -75.132
+        },
+        "supper-restaurants.restaurants.price-level": "moderate",
+        "supper-restaurants.restaurants.typical-meal-price": {
+          "amountMinor": 2100,
+          "currency": "USD"
+        },
+        "supper-restaurants.restaurants.dietary-options": [
+          "vegetarian",
+          "gluten-aware"
+        ],
+        "supper-restaurants.restaurants.meal-periods": [
+          "dinner",
+          "weekend-brunch"
+        ],
+        "supper-restaurants.restaurants.service-modes": [
+          "dine-in",
+          "patio"
+        ],
+        "supper-restaurants.restaurants.reservation-url": "https://casa-luna.example/reservations",
+        "supper-restaurants.restaurants.time-zone": "America/New_York",
+        "supper-restaurants.restaurants.opening-hours": [
+          {
+            "id": "hours-10",
+            "values": {
+              "days": "Tuesday–Saturday",
+              "opens": "17:00",
+              "closes": "22:00"
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.signature-dishes": [
+          {
+            "id": "dish-10",
+            "values": {
+              "name": "Blue corn tostada",
+              "note": "Blue corn tostada with beans, squash, and salsa macha."
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.accessibility": [
+          "step-free",
+          "accessible-restroom"
+        ],
+        "supper-restaurants.restaurants.restaurant-media": []
+      }
+    },
+    {
+      "slug": "broth-and-barley",
+      "title": "Broth & Barley",
+      "summary": "A seasonal restaurant in river ward with published service and dietary details.",
+      "description": "Broth & Barley serves a focused seasonal menu. Supper presents its published cuisine, neighborhood, typical price, dietary accommodations, meal periods, service modes, hours, time zone, accessibility, and signature dish without claiming real-time availability.",
+      "category": "Seasonal",
+      "url": "https://broth-and-barley.example",
+      "status": "published",
+      "profileValues": {
+        "supper-restaurants.restaurants.cuisines": [
+          "seasonal"
+        ],
+        "supper-restaurants.restaurants.neighborhood": "river-ward",
+        "supper-restaurants.restaurants.location": {
+          "countryCode": "US",
+          "region": "PA",
+          "locality": "Bellwether",
+          "latitude": 40.120000000000005,
+          "longitude": -75.13000000000001
+        },
+        "supper-restaurants.restaurants.price-level": "moderate",
+        "supper-restaurants.restaurants.typical-meal-price": {
+          "amountMinor": 2400,
+          "currency": "USD"
+        },
+        "supper-restaurants.restaurants.dietary-options": [
+          "dairy-free"
+        ],
+        "supper-restaurants.restaurants.meal-periods": [
+          "lunch",
+          "dinner"
+        ],
+        "supper-restaurants.restaurants.service-modes": [
+          "dine-in",
+          "takeaway"
+        ],
+        "supper-restaurants.restaurants.reservation-url": "https://broth-and-barley.example/reservations",
+        "supper-restaurants.restaurants.time-zone": "America/New_York",
+        "supper-restaurants.restaurants.opening-hours": [
+          {
+            "id": "hours-11",
+            "values": {
+              "days": "Tuesday–Saturday",
+              "opens": "11:30",
+              "closes": "22:00"
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.signature-dishes": [
+          {
+            "id": "dish-11",
+            "values": {
+              "name": "Slow broth",
+              "note": "Slow broth with barley, mushrooms, and winter greens."
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.accessibility": [
+          "step-free",
+          "outdoor-seating"
+        ],
+        "supper-restaurants.restaurants.restaurant-media": []
+      }
+    },
+    {
+      "slug": "olive-press",
+      "title": "Olive Press",
+      "summary": "A mediterranean restaurant in old quarter with published service and dietary details.",
+      "description": "Olive Press serves a focused mediterranean menu. Supper presents its published cuisine, neighborhood, typical price, dietary accommodations, meal periods, service modes, hours, time zone, accessibility, and signature dish without claiming real-time availability.",
+      "category": "Mediterranean",
+      "url": "https://olive-press.example",
+      "status": "published",
+      "profileValues": {
+        "supper-restaurants.restaurants.cuisines": [
+          "middle-eastern",
+          "coastal"
+        ],
+        "supper-restaurants.restaurants.neighborhood": "old-quarter",
+        "supper-restaurants.restaurants.location": {
+          "countryCode": "US",
+          "region": "PA",
+          "locality": "Bellwether",
+          "latitude": 40.122,
+          "longitude": -75.128
+        },
+        "supper-restaurants.restaurants.price-level": "special",
+        "supper-restaurants.restaurants.typical-meal-price": {
+          "amountMinor": 3500,
+          "currency": "USD"
+        },
+        "supper-restaurants.restaurants.dietary-options": [
+          "vegetarian",
+          "vegan",
+          "gluten-aware"
+        ],
+        "supper-restaurants.restaurants.meal-periods": [
+          "dinner"
+        ],
+        "supper-restaurants.restaurants.service-modes": [
+          "dine-in"
+        ],
+        "supper-restaurants.restaurants.reservation-url": "https://olive-press.example/reservations",
+        "supper-restaurants.restaurants.time-zone": "America/New_York",
+        "supper-restaurants.restaurants.opening-hours": [
+          {
+            "id": "hours-12",
+            "values": {
+              "days": "Tuesday–Saturday",
+              "opens": "17:00",
+              "closes": "22:00"
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.signature-dishes": [
+          {
+            "id": "dish-12",
+            "values": {
+              "name": "Charred octopus",
+              "note": "Charred octopus with white beans and preserved lemon."
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.accessibility": [
+          "step-free",
+          "accessible-restroom"
+        ],
+        "supper-restaurants.restaurants.restaurant-media": []
+      }
+    },
+    {
+      "slug": "sunroom-cafe",
+      "title": "Sunroom Café",
+      "summary": "A cafe restaurant in garden district with published service and dietary details.",
+      "description": "Sunroom Café serves a focused cafe menu. Supper presents its published cuisine, neighborhood, typical price, dietary accommodations, meal periods, service modes, hours, time zone, accessibility, and signature dish without claiming real-time availability.",
+      "category": "Cafe",
+      "url": "https://sunroom-cafe.example",
+      "status": "published",
+      "profileValues": {
+        "supper-restaurants.restaurants.cuisines": [
+          "bakery",
+          "vegetarian"
+        ],
+        "supper-restaurants.restaurants.neighborhood": "garden-district",
+        "supper-restaurants.restaurants.location": {
+          "countryCode": "US",
+          "region": "PA",
+          "locality": "Bellwether",
+          "latitude": 40.124,
+          "longitude": -75.126
+        },
+        "supper-restaurants.restaurants.price-level": "budget",
+        "supper-restaurants.restaurants.typical-meal-price": {
+          "amountMinor": 1200,
+          "currency": "USD"
+        },
+        "supper-restaurants.restaurants.dietary-options": [
+          "vegetarian",
+          "vegan"
+        ],
+        "supper-restaurants.restaurants.meal-periods": [
+          "breakfast",
+          "lunch",
+          "weekend-brunch"
+        ],
+        "supper-restaurants.restaurants.service-modes": [
+          "counter",
+          "patio"
+        ],
+        "supper-restaurants.restaurants.reservation-url": "https://sunroom-cafe.example/reservations",
+        "supper-restaurants.restaurants.time-zone": "America/New_York",
+        "supper-restaurants.restaurants.opening-hours": [
+          {
+            "id": "hours-13",
+            "values": {
+              "days": "Tuesday–Saturday",
+              "opens": "11:30",
+              "closes": "22:00"
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.signature-dishes": [
+          {
+            "id": "dish-13",
+            "values": {
+              "name": "Seasonal fruit tart",
+              "note": "Seasonal fruit tart with oat crumble."
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.accessibility": [
+          "step-free",
+          "outdoor-seating"
+        ],
+        "supper-restaurants.restaurants.restaurant-media": []
+      }
+    },
+    {
+      "slug": "quiet-corner",
+      "title": "Quiet Corner",
+      "summary": "A italian restaurant in northline with published service and dietary details.",
+      "description": "Quiet Corner serves a focused italian menu. Supper presents its published cuisine, neighborhood, typical price, dietary accommodations, meal periods, service modes, hours, time zone, accessibility, and signature dish without claiming real-time availability.",
+      "category": "Italian",
+      "url": "https://quiet-corner.example",
+      "status": "draft",
+      "profileValues": {
+        "supper-restaurants.restaurants.cuisines": [
+          "italian"
+        ],
+        "supper-restaurants.restaurants.neighborhood": "northline",
+        "supper-restaurants.restaurants.location": {
+          "countryCode": "US",
+          "region": "PA",
+          "locality": "Bellwether",
+          "latitude": 40.126000000000005,
+          "longitude": -75.12400000000001
+        },
+        "supper-restaurants.restaurants.price-level": "special",
+        "supper-restaurants.restaurants.typical-meal-price": {
+          "amountMinor": 3300,
+          "currency": "USD"
+        },
+        "supper-restaurants.restaurants.dietary-options": [
+          "vegetarian"
+        ],
+        "supper-restaurants.restaurants.meal-periods": [
+          "dinner"
+        ],
+        "supper-restaurants.restaurants.service-modes": [
+          "dine-in"
+        ],
+        "supper-restaurants.restaurants.reservation-url": "https://quiet-corner.example/reservations",
+        "supper-restaurants.restaurants.time-zone": "America/New_York",
+        "supper-restaurants.restaurants.opening-hours": [
+          {
+            "id": "hours-14",
+            "values": {
+              "days": "Tuesday–Saturday",
+              "opens": "17:00",
+              "closes": "22:00"
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.signature-dishes": [
+          {
+            "id": "dish-14",
+            "values": {
+              "name": "Braised greens ravioli",
+              "note": "Braised greens ravioli with sage and lemon."
+            }
+          }
+        ],
+        "supper-restaurants.restaurants.accessibility": [
+          "step-free",
+          "accessible-restroom"
+        ],
+        "supper-restaurants.restaurants.restaurant-media": []
+      }
+    }
+  ]
+}
