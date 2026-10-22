@@ -1,6 +1,6 @@
 # Install, upgrade, and rollback
 
-This repository uses Node.js 22.12 or newer and npm. The committed lockfile currently installs Next.js 16.4.0, React 19.3.0, and TypeScript 6.0.3. Use `npm ci` so the lockfile determines the installed versions. Keep the database, uploaded media, `BETTER_AUTH_SECRET`, and `BILLING_ENCRYPTION_KEY` on persistent storage outside the checkout. Do not commit an environment file or either secret.
+This repository uses Node.js 22.12 or newer and npm. The committed lockfile currently installs Next.js 16.4.2, React 19.3.0, and TypeScript 6.0.3. Use `npm ci` so the lockfile determines the installed versions. Keep the database, uploaded media, `BETTER_AUTH_SECRET`, and `BILLING_ENCRYPTION_KEY` on persistent storage outside the checkout. Do not commit an environment file or either secret.
 
 ## Fresh installation
 
