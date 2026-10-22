@@ -41,3 +41,9 @@ Status: Agreed 2026-10-10
 Falsifier: Version `1.1.0` uses a lightweight or moved tag, its tag and GitHub release do not identify the same default-branch commit, the GitHub release is missing or marked as a draft or prerelease, or its notes omit a material operator-visible change or required upgrade action since `1.0.0`.
 Mechanism: release-publication
 Status: Agreed 2026-10-14
+
+[FOUND-009] Version `1.2.1` is published from a completed, verified commit on the default branch as an annotated SemVer tag and a matching non-draft, non-prerelease GitHub release. Its lockfile installs Next.js 16.4.2 or later, and its release notes name the fixed Next.js advisories GHSA-2464-fhr4-w9xw, GHSA-673q-mjm6-r5xr, and GHSA-p3m5-59mp-jv5r and the upgrade action operators must take since `1.2.0`.
+Falsifier: Version `1.2.1` uses a lightweight or moved tag, its tag and GitHub release do not identify the same default-branch commit, the GitHub release is missing or marked as a draft or prerelease, the tagged lockfile installs a Next.js version below 16.4.2, or its notes omit a fixed advisory or the required upgrade action since `1.2.0`.
+Mechanism: security-release-publication
+Rationale: Operators who cloned 1.2.0 learn about a security fix from a tagged release, not from commits on main.
+Status: Agreed 2026-10-22

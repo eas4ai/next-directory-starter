@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: remaining-directory-templates
+Current: nextjs-security-release
 
 ## public-starter-and-theme
 
@@ -861,3 +861,9 @@ mode, usable without client JavaScript, and free of horizontal scrolling at
 visible records. The shared mechanism passes every TPL-005 through TPL-011
 check and no unresolved finding remains after the commitment's adversarial
 review.
+
+## nextjs-security-release
+
+Requirements: FOUND-001, OPS-002, FOUND-009
+
+Upgrade `next`, `@next/env`, and `eslint-config-next` from 16.4.0 to 16.4.2 through the lockfile to close the October 2026 Next.js advisories GHSA-2464-fhr4-w9xw, GHSA-673q-mjm6-r5xr, and GHSA-p3m5-59mp-jv5r, update the upgrade guide to the installed versions, and publish version `1.2.1` as an annotated tag and GitHub release whose notes name the advisories and the upgrade action. Done when the security-release-publication mechanism fails before the release and passes after it, `npm audit --audit-level=high` reports no Next.js advisory, the foundation-app, operator-adoption, and test-suite mechanisms pass, and the final adversarial review is resolved.
