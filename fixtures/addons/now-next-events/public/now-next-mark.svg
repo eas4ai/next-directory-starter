@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
-  <title id="title">NOW/NEXT</title>
-  <rect width="64" height="64" fill="#F05A2D"/>
-  <path d="M10 10h18v18H10zm26 0h18v18H36zM10 36h18v18H10z" fill="#171A17"/>
-  <path d="M36 36h18v18H36z" fill="#E9E8B9"/>
-</svg>
