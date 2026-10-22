@@ -1,6 +1,6 @@
 # Roadmap
 
-Current: nextjs-security-release
+Current: test-suite-time-limit
 
 ## public-starter-and-theme
 
@@ -867,3 +867,9 @@ review.
 Requirements: FOUND-001, OPS-002, FOUND-009
 
 Upgrade `next`, `@next/env`, and `eslint-config-next` from 16.4.0 to 16.4.2 through the lockfile to close the October 2026 Next.js advisories GHSA-2464-fhr4-w9xw, GHSA-673q-mjm6-r5xr, and GHSA-p3m5-59mp-jv5r, update the upgrade guide to the installed versions, and publish version `1.2.1` as an annotated tag and GitHub release whose notes name the advisories and the upgrade action. Done when the security-release-publication mechanism fails before the release and passes after it, `npm audit --audit-level=high` reports no Next.js advisory, the foundation-app, operator-adoption, and test-suite mechanisms pass, and the final adversarial review is resolved.
+
+## test-suite-time-limit
+
+Requirements: FOUND-007
+
+Delivers backlog item test-suite-time-limit: mechanisms/check-test-suite.mjs gives npm test 900000 ms. In nextjs-security-release the passing run took 13 minutes and receipt 1820010837f2 stopped at test 85 of 145 under load, reporting fail without a failing test. Set a limit with real margin or shorten the template package tests so the mechanism fails only on defects.
